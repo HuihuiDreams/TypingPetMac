@@ -2,6 +2,8 @@
 
 一个专为 Mac 设计的桌面打字陪伴宠物！每当你在键盘上打字时，它就会随着你的敲击变换各种可爱生动的表情。
 
+> 📌 **项目说明**：本项目从 [https://github.com/ynifamily3/TypingPetMac](https://github.com/ynifamily3/TypingPetMac) fork 并进行了汉化。
+
 ![键盘宠物预览](Sources/TypingPet/Resources/basic.png)
 
 ---
