@@ -1,82 +1,89 @@
-# Changelog
+# 更新日志
+
+## 0.12.0 - 2026-10-10
+
+- 全面支持简体中文界面：汉化菜单栏、设置窗口、权限引导及系统提示文案。
+- 将代码库核心注释与文档翻译为中文。
+- 更新内置默认桌宠素材为七九（basic / left / right），图库导入规则支持将 `basic` 识别为待机图。
+- 新增详尽的中文使用说明与权限配置指南（README.md 与 README.txt）。
 
 ## 0.11.2 - 2026-09-27
 
-- Replace the permission guide's Finder shortcut with a prominent button that reopens Input Monitoring settings.
-- Share the same Input Monitoring deep link between the menu, settings window, and floating guide.
+- 将权限引导窗口中的 Finder 快捷方式替换为重新打开“输入监控”设置的醒目按钮。
+- 在菜单栏、设置窗口和浮动引导窗口之间统一共用相同的“输入监控”跳转链接。
 
 ## 0.11.1 - 2026-09-27
 
-- Keep the Input Monitoring guide above normal application windows.
-- Follow the open System Settings window without requesting Accessibility permission.
-- Prefer placement beside System Settings and stay inside the visible screen when space is limited.
+- 让“输入监控”引导窗口保持在常规应用窗口上方（置顶显示）。
+- 无需申请辅助功能（Accessibility）权限即可自动跟随已打开的“系统设置”窗口。
+- 优先吸附排列在“系统设置”窗口旁边，并在空间受限时保持在可视屏幕区域内。
 
 ## 0.11.0 - 2026-09-27
 
-- Add a floating guide for granting Input Monitoring permission.
-- Make the real TypingPet.app icon draggable into the system permission list.
-- Detect permission changes automatically and dismiss the guide after access is granted.
-- Warn when the app is outside Applications and provide Finder and manual-picker fallbacks.
+- 添加用于授予“输入监控”权限的浮动引导窗口。
+- 支持将真实的 `TypingPet.app` 图标直接拖拽到系统权限列表中。
+- 自动检测权限变更，并在授予访问权限后自动关闭引导窗口。
+- 当应用位于 Applications 文件夹外部时发出警告，并提供在 Finder 中定位及手动选择的后备方案。
 
 ## 0.10.0 - 2026-09-27
 
-- Simplify the menu bar menu to the essential pet, position, permission, login, and quit actions.
-- Show key-input monitoring availability in green or red when the menu opens.
+- 精简菜单栏菜单，仅保留核心的宠物显示、位置、权限、开机自启和退出操作。
+- 菜单展开时以绿色或红色直观显示按键输入监控是否可用。
 
 ## 0.9.1 - 2026-09-25
 
-- Show the native diagonal frame-resize cursor over the pet's resize handle.
-- Add a drag-to-resize tooltip and accessibility help to make the control easier to discover.
+- 在宠物的缩放把手上显示原生对角线框架缩放光标。
+- 添加“拖拽以调整大小”的提示信息与辅助功能说明，提升控件易用性。
 
 ## 0.9.0 - 2026-09-25
 
-- Standardize settings spacing on a 4-point grid across all tabs.
-- Replace the nested grouped form with flat sections and aligned rows.
-- Unify gallery cards, action groups, empty states, and window margins.
+- 所有设置标签页统一采用 4 点网格标准间距规范。
+- 使用扁平分块与对齐行替换原有的嵌套分组表单。
+- 统一图库卡片、操作按钮组、空白状态以及窗口边距样式。
 
 ## 0.8.1 - 2026-09-25
 
-- Let pointer avoidance favor playful diagonal escape paths when space permits.
-- Rotate around the direct escape vector and retain edge-aware fallback behavior.
+- 在空间充裕时，让指针避让更偏向灵动的对角线逃跑路径。
+- 围绕直线逃逸向量旋转采样，并保留屏幕边缘自适应的后备行为。
 
 ## 0.8.0 - 2026-09-25
 
-- Add an optional pointer-avoidance mode for click-through position lock.
-- Move away with damped spring motion while remaining inside the current display.
-- Choose an alternate escape direction when the nearest screen edge blocks movement.
+- 为点击穿透位置锁定模式添加可选的指针避让功能。
+- 在保持处于当前显示器范围内的同时，以阻尼弹簧运动平滑远离光标。
+- 当最近的屏幕边缘阻挡移动时，自动选取备选逃逸方向。
 
 ## 0.7.0 - 2026-09-25
 
-- Replace distance-based fading with configurable resting and hover opacity settings.
-- Default to 100% resting opacity and 30% hover opacity.
-- Apply hover entry and exit opacity immediately without a transition.
+- 使用可配置的常驻与悬停不透明度设置替代基于距离的渐变透明。
+- 默认设置为常驻 100% 不透明度与悬停 30% 不透明度。
+- 光标进入与离开悬停状态时不透明度立即生效，无需过渡延迟。
 
 ## 0.6.0 - 2026-09-25
 
-- Fade the pet image smoothly based on pointer proximity, down to 30% opacity on hover.
-- Keep hide and resize controls fully visible while the pet image fades.
+- 根据指针接近程度平滑淡化宠物图像，悬停时降至 30% 不透明度。
+- 宠物图像淡化时，保持隐藏与缩放控件完全清晰可见。
 
 ## 0.5.1 - 2026-09-25
 
-- Center the image-layer anchor so hover and pressed spring effects scale around the pet's midpoint.
+- 将图像层锚点居中，使悬停与按下的弹簧缩放效果围绕宠物中心点缩放。
 
 ## 0.5.0 - 2026-09-25
 
-- Add velocity-based drag inertia with smooth friction and screen-edge containment.
-- Add springy hover enlargement and pressed-down drag feedback.
+- 添加基于速度的拖拽惯性，具备平滑摩擦力衰减与屏幕边缘边界碰撞反弹。
+- 添加富有弹性的悬停放大及按下拖动时的微缩反馈。
 
 ## 0.4.0 - 2026-09-25
 
-- Show hover controls for hiding and resizing the pet.
-- Allow proportional corner resizing and keep it synchronized with the size setting.
-- Make the close control hide only the pet while the menu bar app and key monitor continue running.
-- Add a menu item for showing the hidden pet again.
+- 悬停时显示用于隐藏和缩放宠物的控制控件。
+- 支持右上角等比缩放，并与设置窗口中的尺寸数值保持同步。
+- 关闭控件仅隐藏宠物本体，菜单栏应用与按键监听继续在后台运行。
+- 添加用于重新显示已隐藏宠物的菜单项。
 
 ## 0.3.0 - 2026-09-25
 
-- Add a dedicated settings window with general, gallery, and key-reaction tabs.
-- Add reusable image-set galleries with migration from the earlier single-set format.
-- Add exact key and modifier-combination reactions.
-- Add four bounce-strength levels.
-- Add an original CC0 keyboard-cat placeholder image set and app icon.
-- Add Developer ID-aware build and notarization scripts.
+- 添加包含通用、图库和按键反应标签页的独立设置窗口。
+- 支持多套可复用的图库图像集，并从早期的单图像集格式平滑迁移。
+- 支持精确匹配特定按键及修饰键组合的专用反应图像。
+- 添加四档按键弹跳幅度等级。
+- 添加原创的 CC0 协议键盘猫咪占位图像集与应用图标。
+- 添加支持 Developer ID 签名的编译构建与公证脚本。

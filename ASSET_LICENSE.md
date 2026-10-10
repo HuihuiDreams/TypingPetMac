@@ -1,14 +1,5 @@
-# Default artwork
+# 默认美术资源
 
-The teal keyboard-cat images in `Sources/TypingPet/Resources` were generated
-specifically for this repository using OpenAI image generation. They do not use
-artwork from the original TypingPet project or the repository owner's private
-image collection.
+`Sources/TypingPet/Resources` 中的默认七九桌宠图像（`basic.png`, `left.png`, `right.png`）为应用内置默认素材。
 
-To the extent that the repository owner holds copyright or related rights in
-these generated assets, those rights are licensed under CC0 1.0 Universal:
-https://creativecommons.org/publicdomain/zero/1.0/
-
-User-imported image sets are stored outside the repository in the user's
-Application Support directory and remain subject to their own licenses.
-
+用户自行导入的图像集存储在用户 Application Support 目录中，并受其各自的版权及许可协议管辖。
