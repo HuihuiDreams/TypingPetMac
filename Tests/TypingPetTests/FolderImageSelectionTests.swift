@@ -55,7 +55,7 @@ final class FolderImageSelectionTests: XCTestCase {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
         let sourceImage = packageRoot
-            .appendingPathComponent("Sources/TypingPet/Resources/pet-idle.png")
+            .appendingPathComponent("Sources/TypingPet/Resources/basic.png")
         let selectedImage = inputDirectory.appendingPathComponent("my-idle.png")
         try fileManager.copyItem(at: sourceImage, to: selectedImage)
 
@@ -96,8 +96,8 @@ final class FolderImageSelectionTests: XCTestCase {
 
         let packageRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         let resources = packageRoot.appendingPathComponent("Sources/TypingPet/Resources", isDirectory: true)
-        try fileManager.copyItem(at: resources.appendingPathComponent("pet-idle.png"), to: input.appendingPathComponent("idle.png"))
-        try fileManager.copyItem(at: resources.appendingPathComponent("pet-left.png"), to: input.appendingPathComponent("wave.png"))
+        try fileManager.copyItem(at: resources.appendingPathComponent("basic.png"), to: input.appendingPathComponent("idle.png"))
+        try fileManager.copyItem(at: resources.appendingPathComponent("left.png"), to: input.appendingPathComponent("wave.png"))
 
         let suite = "TypingPetGalleryTests.\(UUID())"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
@@ -120,7 +120,7 @@ final class FolderImageSelectionTests: XCTestCase {
         try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? fileManager.removeItem(at: root) }
         let packageRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-        let resource = packageRoot.appendingPathComponent("Sources/TypingPet/Resources/pet-idle.png")
+        let resource = packageRoot.appendingPathComponent("Sources/TypingPet/Resources/basic.png")
         let legacyImage = root.appendingPathComponent("legacy.png")
         try fileManager.copyItem(at: resource, to: legacyImage)
 
@@ -132,7 +132,7 @@ final class FolderImageSelectionTests: XCTestCase {
 
         let library = PetImageLibrary(fileManager: fileManager, defaults: defaults, imagesDirectory: root)
         XCTAssertEqual(library.imageSets.count, 2)
-        XCTAssertEqual(library.activeSet.name, "기존 사용자 세트")
+        XCTAssertEqual(library.activeSet.name, "现有用户图集")
         XCTAssertEqual(library.idleURL?.path, legacyImage.path)
 
         try library.replaceIdle(with: resource)

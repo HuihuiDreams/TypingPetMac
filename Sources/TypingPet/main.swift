@@ -42,14 +42,14 @@ private final class PetResizeHandleView: NSView {
         let configuration = NSImage.SymbolConfiguration(pointSize: 16, weight: .semibold)
         imageView.image = NSImage(
             systemSymbolName: "arrow.up.left.and.arrow.down.right",
-            accessibilityDescription: "크기 조절"
+            accessibilityDescription: "调整尺寸"
         )?.withSymbolConfiguration(configuration)
         imageView.contentTintColor = .white
         imageView.imageScaling = .scaleProportionallyDown
         addSubview(imageView)
-        toolTip = "드래그하여 크기 조절"
-        setAccessibilityLabel("펫 크기 조절")
-        setAccessibilityHelp("드래그하여 펫 크기를 조절합니다.")
+        toolTip = "拖拽调整尺寸"
+        setAccessibilityLabel("调整宠物尺寸")
+        setAccessibilityHelp("拖拽调整宠物尺寸。")
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -148,7 +148,7 @@ private final class PetContentView: NSView {
         closeButton.isBordered = false
         closeButton.image = NSImage(
             systemSymbolName: "xmark",
-            accessibilityDescription: "펫 숨기기"
+            accessibilityDescription: "隐藏宠物"
         )?.withSymbolConfiguration(.init(pointSize: 18, weight: .semibold))
         closeButton.imagePosition = .imageOnly
         closeButton.contentTintColor = .white
@@ -156,7 +156,7 @@ private final class PetContentView: NSView {
         closeButton.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.62).cgColor
         closeButton.target = self
         closeButton.action = #selector(closePet)
-        closeButton.setAccessibilityLabel("펫 숨기기")
+        closeButton.setAccessibilityLabel("隐藏宠物")
 
         resizeHandle.onResizeBegan = { [weak self] in self?.onResizeBegan?($0) }
         resizeHandle.onResizeDragged = { [weak self] in self?.onResizeDragged?($0) }
@@ -1050,7 +1050,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     }
 
     func menuWillOpen(_ menu: NSMenu) {
-        petVisibilityItem.title = petController.isPetVisible ? "펫 숨기기" : "펫 다시 표시"
+        petVisibilityItem.title = petController.isPetVisible ? "隐藏宠物" : "重新显示宠物"
         positionLockedItem.state = petController.isPositionLocked ? .on : .off
         loginItem.state = SMAppService.mainApp.status == .enabled ? .on : .off
         updateMonitoringStatusItem()
@@ -1090,8 +1090,8 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
 
     @objc private func changeIdleImage() {
         guard let url = chooseImageFiles(
-            title: "대기 이미지 선택",
-            message: "키 입력이 없을 때 표시할 이미지를 선택하세요.",
+            title: "选择待机图像",
+            message: "请选择无按键输入时显示的图像。",
             allowsMultipleSelection: false
         )?.first else { return }
 
@@ -1105,8 +1105,8 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
 
     @objc private func replaceReactionImages() {
         guard let urls = chooseImageFiles(
-            title: "반응 이미지 선택",
-            message: "키를 누를 때 무작위로 표시할 이미지를 한 장 이상 선택하세요.",
+            title: "选择反应图像",
+            message: "请选择按下按键时随机显示的一张或多张图像。",
             allowsMultipleSelection: true
         ), !urls.isEmpty else { return }
 
@@ -1121,9 +1121,9 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     @objc private func importImageFolder() {
         NSRunningApplication.current.activate(options: [.activateIgnoringOtherApps])
         let panel = NSOpenPanel()
-        panel.title = "이미지 폴더 가져오기"
-        panel.message = "idle.* 또는 pet-idle.*는 대기 이미지로, 나머지는 키 입력용 이미지로 가져옵니다."
-        panel.prompt = "가져오기"
+        panel.title = "导入图像文件夹"
+        panel.message = "idle.* 或 pet-idle.* 作为待机图像，其余作为按键输入反应图像导入。"
+        panel.prompt = "导入"
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
@@ -1136,15 +1136,15 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
 
             var parts: [String] = []
             if result.changedIdle {
-                parts.append("대기 이미지 1장")
+                parts.append("待机图像 1 张")
             }
             if let reactionCount = result.reactionCount {
-                parts.append("반응 이미지 \(reactionCount)장")
+                parts.append("反应图像 \(reactionCount) 张")
             }
             showAlert(
-                title: "이미지를 가져왔습니다",
-                message: parts.joined(separator: ", ") + "을 적용했습니다.",
-                primaryButton: "확인"
+                title: "图像导入成功",
+                message: "已应用 " + parts.joined(separator: ", ") + "。",
+                primaryButton: "好"
             )
         } catch {
             showImageError(error)
@@ -1153,18 +1153,18 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
 
     @objc private func showImageFolderRules() {
         showAlert(
-            title: "이미지 세트 폴더 규칙",
-            message: "파일명은 자유롭게 사용할 수 있습니다. idle.* 또는 pet-idle.* 파일이 있으면 대기 이미지로 인식하며, 나머지는 키 입력용 이미지가 됩니다. 대기 이미지가 없으면 정렬상 첫 이미지를 대기 이미지로 사용합니다. 이미지가 한 장뿐이면 대기/반응에 함께 사용합니다. PNG, APNG, JPG, GIF, TIFF, HEIC, WebP를 지원합니다.",
-            primaryButton: "확인"
+            title: "图像集文件夹规则",
+            message: "文件名无限制。若包含 idle.* 或 pet-idle.* 文件，将作为待机图像，其余作为按键输入反应图像。若无待机图像，则按文件名排序的第一张作为待机图像。若仅有 1 张图像，则同时用于待机和反应。支持 PNG、APNG、JPG、GIF、TIFF、HEIC、WebP 格式。",
+            primaryButton: "好"
         )
     }
 
     @objc private func resetImages() {
         showAlert(
-            title: "기본 이미지로 복원할까요?",
-            message: "현재 선택한 대기 이미지와 반응 이미지 설정을 기본값으로 되돌립니다. 원본 이미지 파일은 변경하지 않습니다.",
-            primaryButton: "복원",
-            secondaryButton: "취소"
+            title: "确定恢复为默认图像吗？",
+            message: "将当前选中的待机图像和反应图像设置恢复为默认值。不会修改原始图像文件。",
+            primaryButton: "恢复",
+            secondaryButton: "取消"
         ) { [weak self] response in
             guard response == .alertFirstButtonReturn else { return }
             self?.imageLibrary.resetToDefaults()
@@ -1232,9 +1232,9 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
             }
         } catch {
             showAlert(
-                title: "자동 실행 설정 실패",
+                title: "设置自动启动失败",
                 message: error.localizedDescription,
-                primaryButton: "확인"
+                primaryButton: "好"
             )
         }
     }
@@ -1255,31 +1255,31 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         menu.delegate = self
         menu.autoenablesItems = false
 
-        menu.addItem(makeMenuItem("설정", action: #selector(showSettings), keyEquivalent: ","))
-        petVisibilityItem = makeMenuItem("펫 숨기기", action: #selector(togglePetVisibility))
+        menu.addItem(makeMenuItem("设置", action: #selector(showSettings), keyEquivalent: ","))
+        petVisibilityItem = makeMenuItem("隐藏宠物", action: #selector(togglePetVisibility))
         menu.addItem(petVisibilityItem)
         menu.addItem(.separator())
 
-        positionLockedItem = makeMenuItem("위치 잠금 (클릭 통과)", action: #selector(togglePositionLock))
+        positionLockedItem = makeMenuItem("锁定位置 (点击穿透)", action: #selector(togglePositionLock))
         menu.addItem(positionLockedItem)
-        menu.addItem(makeMenuItem("위치 초기화", action: #selector(resetPosition)))
+        menu.addItem(makeMenuItem("重置位置", action: #selector(resetPosition)))
         menu.addItem(.separator())
-        monitoringStatusItem = NSMenuItem(title: "키 입력 감지 (확인 중)", action: nil, keyEquivalent: "")
+        monitoringStatusItem = NSMenuItem(title: "按键监听 (检测中)", action: nil, keyEquivalent: "")
         monitoringStatusItem.isEnabled = true
         menu.addItem(monitoringStatusItem)
         updateMonitoringStatusItem()
-        menu.addItem(makeMenuItem("입력 모니터링 설정", action: #selector(openInputMonitoringSettings)))
+        menu.addItem(makeMenuItem("输入监控设置", action: #selector(openInputMonitoringSettings)))
         menu.addItem(.separator())
 
-        loginItem = makeMenuItem("로그인 시 자동 실행", action: #selector(toggleLaunchAtLogin))
+        loginItem = makeMenuItem("登录时自动启动", action: #selector(toggleLaunchAtLogin))
         menu.addItem(loginItem)
-        menu.addItem(makeMenuItem("Typing Pet 종료", action: #selector(quit), keyEquivalent: "q"))
+        menu.addItem(makeMenuItem("退出 Typing Pet", action: #selector(quit), keyEquivalent: "q"))
         statusItem.menu = menu
     }
 
     private func updateMonitoringStatusItem() {
         let isAvailable = keyMonitor?.isRunning == true
-        let title = isAvailable ? "키 입력 감지 (가능)" : "키 입력 감지 (불가능)"
+        let title = isAvailable ? "按键监听 (正常)" : "按键监听 (未授权/异常)"
         monitoringStatusItem.attributedTitle = NSAttributedString(
             string: title,
             attributes: [
@@ -1308,7 +1308,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         let panel = NSOpenPanel()
         panel.title = title
         panel.message = message
-        panel.prompt = "선택"
+        panel.prompt = "选择"
         panel.canChooseDirectories = false
         panel.canChooseFiles = true
         panel.allowsMultipleSelection = allowsMultipleSelection
@@ -1318,9 +1318,9 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
 
     private func showImageError(_ error: Error) {
         showAlert(
-            title: "이미지를 적용하지 못했습니다",
+            title: "无法应用图像",
             message: error.localizedDescription,
-            primaryButton: "확인"
+            primaryButton: "好"
         )
     }
 
@@ -1336,10 +1336,10 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         didShowPermissionAlert = true
         _ = CGRequestListenEventAccess()
         showAlert(
-            title: "키 입력 감지 권한이 필요합니다",
-            message: "Typing Pet은 입력 내용을 읽거나 저장하지 않고, 키가 눌렸다는 사실만 감지합니다. 시스템 설정에서 Typing Pet의 입력 모니터링을 허용하면 앱이 자동으로 다시 연결합니다.",
-            primaryButton: "시스템 설정 열기",
-            secondaryButton: "나중에"
+            title: "需要输入监控权限",
+            message: "Typing Pet 不会读取或保存您的输入内容，仅检测是否有按键按下。在系统设置中允许 Typing Pet 的输入监控权限后，应用将自动恢复连接。",
+            primaryButton: "打开系统设置",
+            secondaryButton: "稍后"
         ) { [weak self] response in
             if response == .alertFirstButtonReturn {
                 self?.openInputMonitoringSettings()

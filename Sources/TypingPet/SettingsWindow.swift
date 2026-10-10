@@ -153,9 +153,9 @@ final class TypingPetSettingsModel: ObservableObject {
 
     func importImageSet() {
         let panel = NSOpenPanel()
-        panel.title = "이미지 세트 폴더 추가"
-        panel.message = "idle.* 또는 pet-idle.*는 대기 이미지로, 나머지는 반응 이미지로 가져옵니다."
-        panel.prompt = "갤러리에 추가"
+        panel.title = "添加图像集文件夹"
+        panel.message = "idle.* 或 pet-idle.* 作为待机图像，其余作为反应图像导入。"
+        panel.prompt = "添加至图库"
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         guard panel.runModal() == .OK, let url = panel.url else { return }
@@ -170,10 +170,10 @@ final class TypingPetSettingsModel: ObservableObject {
     func deleteSelectedSet() {
         guard let set = selectedSet, !set.isBuiltIn else { return }
         let alert = NSAlert()
-        alert.messageText = "‘\(set.name)’ 세트를 목록에서 제거할까요?"
-        alert.informativeText = "원본 이미지에는 영향을 주지 않습니다."
-        alert.addButton(withTitle: "제거")
-        alert.addButton(withTitle: "취소")
+        alert.messageText = "确定从列表中移除“\(set.name)”吗？"
+        alert.informativeText = "不会影响原始图像文件。"
+        alert.addButton(withTitle: "移除")
+        alert.addButton(withTitle: "取消")
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         do {
             try library.deleteSet(id: set.id)
@@ -188,10 +188,10 @@ final class TypingPetSettingsModel: ObservableObject {
         let field = NSTextField(string: set.name)
         field.frame = NSRect(x: 0, y: 0, width: 280, height: 24)
         let alert = NSAlert()
-        alert.messageText = "이미지 세트 이름 변경"
+        alert.messageText = "重命名图像集"
         alert.accessoryView = field
-        alert.addButton(withTitle: "변경")
-        alert.addButton(withTitle: "취소")
+        alert.addButton(withTitle: "更改")
+        alert.addButton(withTitle: "取消")
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         do {
             try library.renameSet(id: set.id, to: field.stringValue)
@@ -221,7 +221,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     init(model: TypingPetSettingsModel) {
         let root = SettingsRootView(model: model)
         let window = NSWindow(contentViewController: NSHostingController(rootView: root))
-        window.title = "Typing Pet 설정"
+        window.title = "Typing Pet 设置"
         window.setContentSize(NSSize(width: 780, height: 600))
         window.minSize = NSSize(width: 700, height: 540)
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
@@ -250,17 +250,17 @@ private struct SettingsRootView: View {
     var body: some View {
         TabView {
             GeneralSettingsView(model: model)
-                .tabItem { Label("일반", systemImage: "gearshape") }
+                .tabItem { Label("通用", systemImage: "gearshape") }
             GallerySettingsView(model: model)
-                .tabItem { Label("갤러리", systemImage: "photo.on.rectangle.angled") }
+                .tabItem { Label("图库", systemImage: "photo.on.rectangle.angled") }
             KeyReactionSettingsView(model: model)
-                .tabItem { Label("키 반응", systemImage: "keyboard") }
+                .tabItem { Label("按键反应", systemImage: "keyboard") }
         }
         .padding(SettingsMetrics.space4)
-        .alert("오류", isPresented: Binding(
+        .alert("错误", isPresented: Binding(
             get: { model.errorMessage != nil },
             set: { if !$0 { model.errorMessage = nil } }
-        )) { Button("확인") { model.errorMessage = nil } } message: {
+        )) { Button("好") { model.errorMessage = nil } } message: {
             Text(model.errorMessage ?? "")
         }
     }
@@ -362,38 +362,38 @@ private struct GeneralSettingsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: SettingsMetrics.space6) {
-                FlatSettingsSection("펫") {
+                FlatSettingsSection("宠物") {
                     VStack(spacing: 0) {
                         SettingsSliderRow(
-                            title: "크기",
+                            title: "尺寸",
                             value: Binding(get: { model.scale }, set: model.setScale),
                             range: 0.35...1.25
                         )
                         Divider()
                         SettingsSliderRow(
-                            title: "상시 투명도",
+                            title: "常驻不透明度",
                             value: Binding(get: { model.restingOpacity }, set: model.setRestingOpacity),
                             range: 0...1
                         )
                         Divider()
                         SettingsSliderRow(
-                            title: "호버 시 투명도",
+                            title: "悬停不透明度",
                             value: Binding(get: { model.hoverOpacity }, set: model.setHoverOpacity),
                             range: 0...1
                         )
                         Divider()
-                        SettingsNote(text: "100%는 선명하게, 0%는 완전히 투명하게 표시됩니다.")
+                        SettingsNote(text: "100% 为完全不透明，0% 为完全透明。")
                             .frame(maxWidth: .infinity, alignment: .leading)
                         Divider()
                         SettingsRow {
                             HStack(spacing: SettingsMetrics.space3) {
-                                Text("통통 튀는 정도")
+                                Text("按键弹跳幅度")
                                 Spacer(minLength: SettingsMetrics.space3)
                                 Picker("", selection: Binding(get: { model.shakeLevel }, set: model.setShakeLevel)) {
-                                    Text("끔").tag(0)
-                                    Text("약하게").tag(1)
-                                    Text("보통").tag(2)
-                                    Text("강하게").tag(3)
+                                    Text("关闭").tag(0)
+                                    Text("轻微").tag(1)
+                                    Text("适中").tag(2)
+                                    Text("强烈").tag(3)
                                 }
                                 .labelsHidden()
                                 .frame(width: 112)
@@ -401,46 +401,46 @@ private struct GeneralSettingsView: View {
                         }
                         Divider()
                         SettingsToggleRow(
-                            title: "항상 다른 창 위에 표시",
+                            title: "始终置顶显示",
                             isOn: Binding(get: { model.alwaysOnTop }, set: model.setAlwaysOnTop)
                         )
                         Divider()
                         SettingsToggleRow(
-                            title: "위치 잠금 (클릭 통과)",
+                            title: "锁定位置 (点击穿透)",
                             isOn: Binding(get: { model.positionLocked }, set: model.setPositionLocked)
                         )
                         Divider()
                         SettingsToggleRow(
-                            title: "위치 잠금 중 마우스 피하기",
+                            title: "位置锁定下避开鼠标",
                             isOn: Binding(get: { model.avoidsPointerWhenLocked }, set: model.setPointerAvoidance),
                             isEnabled: model.positionLocked
                         )
                         Divider()
-                        SettingsNote(text: "커서가 가까워지면 펫이 화면 안에서 부드럽게 자리를 비킵니다.")
+                        SettingsNote(text: "光标靠近时，宠物会在屏幕范围内平滑移动躲避。")
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
 
-                FlatSettingsSection("시스템") {
+                FlatSettingsSection("系统") {
                     VStack(spacing: 0) {
                         SettingsToggleRow(
-                            title: "로그인 시 자동 실행",
+                            title: "登录时自动启动",
                             isOn: Binding(get: { model.launchAtLogin }, set: model.toggleLaunchAtLogin)
                         )
                         Divider()
                         SettingsRow {
                             HStack(spacing: SettingsMetrics.space3) {
                                 Label(
-                                    model.inputMonitoringGranted ? "입력 모니터링 권한 허용됨" : "입력 모니터링 권한 필요",
+                                    model.inputMonitoringGranted ? "已获得输入监控权限" : "需要输入监控权限",
                                     systemImage: model.inputMonitoringGranted ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"
                                 )
                                 .foregroundStyle(model.inputMonitoringGranted ? .green : .orange)
                                 Spacer(minLength: SettingsMetrics.space3)
-                                Button("시스템 설정 열기") { model.openInputMonitoringSettings() }
+                                Button("打开系统设置") { model.openInputMonitoringSettings() }
                             }
                         }
                         Divider()
-                        SettingsNote(text: "키 조합 판별에는 물리 키 코드와 보조 키만 사용하며, 입력 문자는 저장하거나 전송하지 않습니다.")
+                        SettingsNote(text: "按键识别仅使用物理键码和修饰键，不会记录或传输输入的具体字符。")
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
@@ -457,9 +457,9 @@ private struct GallerySettingsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: SettingsMetrics.space4) {
             HStack(spacing: SettingsMetrics.space3) {
-                Text("이미지 세트").font(.title2).bold()
+                Text("图像集").font(.title2).bold()
                 Spacer()
-                Button { model.importImageSet() } label: { Label("폴더 추가", systemImage: "plus") }
+                Button { model.importImageSet() } label: { Label("添加文件夹", systemImage: "plus") }
             }
             ScrollView {
                 LazyVGrid(columns: columns, spacing: SettingsMetrics.space4) {
@@ -473,13 +473,13 @@ private struct GallerySettingsView: View {
             Divider()
             HStack(spacing: SettingsMetrics.space2) {
                 if let set = model.selectedSet {
-                    Text("\(set.name) · 반응 이미지 \(model.library.reactionURLs(for: set).count)장")
+                    Text("\(set.name) · 反应图像 \(model.library.reactionURLs(for: set).count) 张")
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Button("이름 변경") { model.renameSelectedSet() }.disabled(model.selectedSet?.isBuiltIn != false)
-                Button("제거") { model.deleteSelectedSet() }.disabled(model.selectedSet?.isBuiltIn != false)
-                Button("적용") { model.activateSelectedSet() }.buttonStyle(.borderedProminent).disabled(model.selectedSetID == model.activeSetID)
+                Button("重命名") { model.renameSelectedSet() }.disabled(model.selectedSet?.isBuiltIn != false)
+                Button("移除") { model.deleteSelectedSet() }.disabled(model.selectedSet?.isBuiltIn != false)
+                Button("应用") { model.activateSelectedSet() }.buttonStyle(.borderedProminent).disabled(model.selectedSetID == model.activeSetID)
             }
         }
         .padding(SettingsMetrics.space4)
@@ -528,17 +528,17 @@ private struct KeyReactionSettingsView: View {
         VStack(alignment: .leading, spacing: SettingsMetrics.space4) {
             HStack(spacing: SettingsMetrics.space3) {
                 VStack(alignment: .leading, spacing: SettingsMetrics.space1) {
-                    Text("특정 키 반응").font(.title2).bold()
-                    Text("등록한 키 또는 키 조합에는 지정한 이미지가 우선 표시됩니다.").foregroundStyle(.secondary)
+                    Text("特定按键反应").font(.title2).bold()
+                    Text("已添加的按键或按键组合将优先显示指定的图像。").foregroundStyle(.secondary)
                 }
                 Spacer()
-                Button { chooseImage() } label: { Label("규칙 추가", systemImage: "plus") }
+                Button { chooseImage() } label: { Label("添加规则", systemImage: "plus") }
             }
             if model.rules.isEmpty {
                 VStack(spacing: SettingsMetrics.space2) {
                     Image(systemName: "keyboard").font(.system(size: 40)).foregroundStyle(.secondary)
-                    Text("등록된 키 반응이 없습니다").font(.headline)
-                    Text("규칙 추가를 눌러 이미지와 키 조합을 지정하세요.").foregroundStyle(.secondary)
+                    Text("暂无按键反应规则").font(.headline)
+                    Text("点击“添加规则”以绑定图像与按键组合。").foregroundStyle(.secondary)
                 }.frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 List(model.rules) { rule in
@@ -578,7 +578,7 @@ private struct KeyReactionSettingsView: View {
 
     private func chooseImage() {
         let panel = NSOpenPanel()
-        panel.title = "키 반응 이미지 선택"
+        panel.title = "选择按键反应图像"
         panel.canChooseDirectories = false
         panel.canChooseFiles = true
         panel.allowedContentTypes = [.image]
@@ -596,13 +596,13 @@ private struct KeyCaptureSheet: View {
     var body: some View {
         VStack(spacing: 20) {
             Image(systemName: "keyboard.badge.ellipsis").font(.system(size: 42)).foregroundStyle(.tint)
-            Text("사용할 키 또는 키 조합을 누르세요").font(.title3).bold()
-            Text(captured?.displayName ?? "예: K, ⌘K, ⌃⌥Space")
+            Text("请按下要绑定的按键或按键组合").font(.title3).bold()
+            Text(captured?.displayName ?? "例如: K, ⌘K, ⌃⌥Space")
                 .font(.system(size: 22, weight: .semibold, design: .rounded)).frame(minHeight: 32)
             KeyCaptureView { captured = $0 }.frame(width: 1, height: 1)
             HStack {
-                Button("취소", action: onCancel)
-                Button("등록") { if let captured { onCapture(captured) } }
+                Button("取消", action: onCancel)
+                Button("确定") { if let captured { onCapture(captured) } }
                     .buttonStyle(.borderedProminent).disabled(captured == nil)
             }
         }.padding(32).frame(width: 420, height: 260)

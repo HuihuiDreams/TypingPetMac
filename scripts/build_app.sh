@@ -11,6 +11,9 @@ macos_dir="$contents_dir/MacOS"
 resources_dir="$contents_dir/Resources"
 
 cd "$project_dir"
+if [[ -z "${SDKROOT:-}" && -d "/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk" ]]; then
+    export SDKROOT="/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk"
+fi
 swift build -c "$configuration"
 
 binary_path="$(swift build -c "$configuration" --show-bin-path)/$app_name"
@@ -26,7 +29,7 @@ cat > "$contents_dir/Info.plist" <<'PLIST'
 <plist version="1.0">
 <dict>
     <key>CFBundleDevelopmentRegion</key>
-    <string>ko</string>
+    <string>zh-Hans</string>
     <key>CFBundleDisplayName</key>
     <string>Typing Pet</string>
     <key>CFBundleExecutable</key>

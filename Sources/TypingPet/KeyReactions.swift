@@ -50,8 +50,8 @@ enum KeyReactionError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .unreadableImage(let name): "이미지를 읽을 수 없습니다: \(name)"
-        case .unsupportedFormat(let name): "지원하지 않는 이미지 형식입니다: \(name)"
+        case .unreadableImage(let name): "无法读取图像: \(name)"
+        case .unsupportedFormat(let name): "不支持的图像格式: \(name)"
         }
     }
 }
@@ -132,5 +132,5 @@ enum KeyCodeNames {
         119: "End", 121: "Page Down", 123: "←", 124: "→", 125: "↓", 126: "↑"
     ]
 
-    static func name(for keyCode: UInt16) -> String { names[keyCode] ?? "키 \(keyCode)" }
+    static func name(for keyCode: UInt16) -> String { names[keyCode] ?? "按键 \(keyCode)" }
 }

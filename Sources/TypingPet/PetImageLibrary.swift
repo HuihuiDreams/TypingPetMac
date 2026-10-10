@@ -16,7 +16,7 @@ struct FolderImageSelection {
             .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
         let idleURL = images.first {
             let name = $0.deletingPathExtension().lastPathComponent.lowercased()
-            return name == "idle" || name == "pet-idle"
+            return name == "idle" || name == "pet-idle" || name == "basic"
         }
         return FolderImageSelection(idleURL: idleURL, reactionURLs: images.filter { $0 != idleURL })
     }
@@ -47,12 +47,12 @@ enum PetImageLibraryError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .unsupportedFormat(let name): "지원하지 않는 이미지 형식입니다: \(name)"
-        case .unreadableImage(let name): "이미지를 읽을 수 없습니다: \(name)"
-        case .noImagesInFolder: "선택한 폴더에서 지원되는 이미지를 찾지 못했습니다."
-        case .noReactionImages: "키 입력용 이미지를 한 장 이상 선택해 주세요."
-        case .imageSetNotFound: "이미지 세트를 찾지 못했습니다."
-        case .cannotDeleteBuiltInSet: "기본 이미지 세트는 삭제할 수 없습니다."
+        case .unsupportedFormat(let name): "不支持的图像格式: \(name)"
+        case .unreadableImage(let name): "无法读取图像: \(name)"
+        case .noImagesInFolder: "所选文件夹中未找到支持的图像。"
+        case .noReactionImages: "请选择至少一张按键反应图像。"
+        case .imageSetNotFound: "未找到图像集。"
+        case .cannotDeleteBuiltInSet: "无法删除默认图像集。"
         }
     }
 }
@@ -67,9 +67,9 @@ final class PetImageLibrary {
     }
 
     static let builtInID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
-    private static let defaultIdleName = "pet-idle.png"
+    private static let defaultIdleName = "basic.png"
     private static let defaultReactionNames = [
-        "pet-left.png", "pet-right.png", "pet-question.png", "pet-exclamation.png"
+        "left.png", "right.png"
     ]
 
     private let fileManager: FileManager
@@ -180,7 +180,7 @@ final class PetImageLibrary {
     }
 
     func replaceIdle(with sourceURL: URL) throws {
-        var set = try editableActiveSet(named: "사용자 이미지")
+        var set = try editableActiveSet(named: "自定义图像")
         if set.storageFolder == nil { set.storageFolder = set.id.uuidString }
         let directory = try storageDirectory(for: set)
         set.idleFileName = try copyImage(from: sourceURL, to: directory)
@@ -189,7 +189,7 @@ final class PetImageLibrary {
 
     func replaceReactions(with sourceURLs: [URL]) throws {
         guard !sourceURLs.isEmpty else { throw PetImageLibraryError.noReactionImages }
-        var set = try editableActiveSet(named: "사용자 이미지")
+        var set = try editableActiveSet(named: "自定义图像")
         if set.storageFolder == nil { set.storageFolder = set.id.uuidString }
         let directory = try storageDirectory(for: set)
         set.reactionFileNames = try sourceURLs.map { try copyImage(from: $0, to: directory) }
@@ -207,7 +207,7 @@ final class PetImageLibrary {
     private static var builtInSet: PetImageSet {
         PetImageSet(
             id: builtInID,
-            name: "기본 세트",
+            name: "默认图集",
             storageFolder: nil,
             idleFileName: defaultIdleName,
             reactionFileNames: defaultReactionNames,
@@ -295,7 +295,7 @@ final class PetImageLibrary {
         let reactions = defaults.stringArray(forKey: Keys.legacyReactionFiles) ?? []
         guard idle != nil || !reactions.isEmpty else { return }
         let set = PetImageSet(
-            id: UUID(), name: "기존 사용자 세트", storageFolder: nil,
+            id: UUID(), name: "现有用户图集", storageFolder: nil,
             idleFileName: idle ?? Self.defaultIdleName,
             reactionFileNames: reactions.isEmpty ? Self.defaultReactionNames : reactions,
             isBuiltIn: false

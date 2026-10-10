@@ -25,7 +25,7 @@ final class KeyReactionTests: XCTestCase {
         defer { try? fileManager.removeItem(at: root) }
 
         let packageRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-        let image = packageRoot.appendingPathComponent("Sources/TypingPet/Resources/pet-left.png")
+        let image = packageRoot.appendingPathComponent("Sources/TypingPet/Resources/left.png")
         let suite = "TypingPetKeyTests.\(UUID())"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }

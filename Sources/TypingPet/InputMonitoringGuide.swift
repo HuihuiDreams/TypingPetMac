@@ -183,7 +183,7 @@ final class InputMonitoringGuideController: NSObject, NSWindowDelegate {
         let panel = NSPanel(contentViewController: hostingController)
         panel.setContentSize(NSSize(width: 404, height: panelHeight))
         panel.styleMask = [.titled, .closable, .utilityWindow, .fullSizeContentView, .nonactivatingPanel]
-        panel.title = "Typing Pet 입력 모니터링 안내"
+        panel.title = "Typing Pet 输入监控指南"
         panel.titleVisibility = .hidden
         panel.titlebarAppearsTransparent = true
         panel.isOpaque = false
@@ -302,9 +302,9 @@ private struct InputMonitoringGuideView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Typing Pet을 목록에 추가하세요")
+                Text("将 Typing Pet 添加到列表中")
                     .font(.title3.bold())
-                Text("앱 아이콘을 입력 모니터링 목록으로 드래그한 뒤 오른쪽 스위치를 켜세요.")
+                Text("将应用图标拖拽至输入监控列表，然后开启右侧开关。")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -324,9 +324,9 @@ private struct InputMonitoringGuideView: View {
                     .foregroundStyle(.secondary)
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("입력 모니터링 목록")
+                    Text("输入监控列表")
                         .font(.headline)
-                    Text("① 아이콘 추가\n② 스위치 켜기")
+                    Text("① 添加图标\n② 开启开关")
                         .font(.callout)
                         .foregroundStyle(.secondary)
                 }
@@ -345,14 +345,14 @@ private struct InputMonitoringGuideView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            Text("드래그가 안 되면 입력 모니터링 목록 아래의 + 버튼을 누르고 TypingPet.app을 선택하세요.")
+            Text("若拖拽无效，可点击输入监控列表下方的 + 按钮并选择 TypingPet.app。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
             HStack(spacing: 8) {
                 Label(
-                    model.isGranted ? "권한이 확인되었습니다" : "권한을 기다리는 중",
+                    model.isGranted ? "已确认权限" : "正在等待权限",
                     systemImage: model.isGranted ? "checkmark.circle.fill" : "clock"
                 )
                 .font(.caption.weight(.medium))
@@ -360,10 +360,10 @@ private struct InputMonitoringGuideView: View {
 
                 Spacer()
 
-                Button("설정 창 열기", action: openSettings)
+                Button("打开系统设置", action: openSettings)
                     .buttonStyle(.borderedProminent)
-                Button("다시 확인", action: checkPermission)
-                Button("나중에", action: close)
+                Button("重新检查", action: checkPermission)
+                Button("稍后", action: close)
             }
         }
         .padding(24)
@@ -377,9 +377,9 @@ private struct InputMonitoringGuideView: View {
         case .applications:
             return ""
         case .outsideApplications:
-            return "현재 앱이 Applications 폴더 밖에서 실행 중입니다. 먼저 Applications로 옮긴 뒤 추가하는 것을 권장합니다."
+            return "当前应用在 Applications 文件夹之外运行。建议先移动到 Applications 文件夹再添加。"
         case .translocated:
-            return "현재 앱이 임시 보안 위치에서 실행 중입니다. Applications 폴더로 옮겨 다시 실행한 뒤 추가해 주세요."
+            return "当前应用在临时安全位置运行。请移动到 Applications 文件夹并重新打开后再添加。"
         }
     }
 }
@@ -409,9 +409,9 @@ private final class AppBundleDragView: NSView, NSDraggingSource {
         iconView.image = icon
         iconView.imageScaling = .scaleProportionallyUpOrDown
         addSubview(iconView)
-        toolTip = "TypingPet.app을 입력 모니터링 목록으로 드래그"
-        setAccessibilityLabel("드래그 가능한 TypingPet.app")
-        setAccessibilityHelp("입력 모니터링 목록으로 드래그하여 앱을 추가합니다.")
+        toolTip = "将 TypingPet.app 拖拽至输入监控列表"
+        setAccessibilityLabel("可拖拽的 TypingPet.app")
+        setAccessibilityHelp("拖拽至输入监控列表以添加应用。")
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
