@@ -13,6 +13,7 @@ if [[ -z "$identity" ]]; then
 fi
 
 work_dir="$(mktemp -d)"
+trap 'rm -rf "$work_dir"' EXIT
 submission_zip="$work_dir/TypingPet-notary.zip"
 ditto -c -k --sequesterRsrc --keepParent "$app_path" "$submission_zip"
 xcrun notarytool submit "$submission_zip" --keychain-profile "$keychain_profile" --wait

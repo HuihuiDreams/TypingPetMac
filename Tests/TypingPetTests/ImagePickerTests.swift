@@ -1,21 +1,21 @@
-import XCTest
+import Testing
 @testable import TypingPet
 
-final class ImagePickerTests: XCTestCase {
-    func testPickerExcludesCurrentImage() {
+@Suite struct ImagePickerTests {
+    @Test func pickerExcludesCurrentImage() {
         let picker = ImagePicker(names: ["left", "right", "question"])
         let result = picker.next(excluding: "left") { _ in 0 }
-        XCTAssertEqual(result, "right")
+        #expect(result == "right")
     }
 
-    func testPickerReturnsOnlyImageWhenNoAlternativeExists() {
+    @Test func pickerReturnsOnlyImageWhenNoAlternativeExists() {
         let picker = ImagePicker(names: ["left"])
         let result = picker.next(excluding: "left") { _ in 0 }
-        XCTAssertEqual(result, "left")
+        #expect(result == "left")
     }
 
-    func testEmptyPickerReturnsNil() {
+    @Test func emptyPickerReturnsNil() {
         let picker = ImagePicker(names: [])
-        XCTAssertNil(picker.next(excluding: nil) { _ in 0 })
+        #expect(picker.next(excluding: nil) { _ in 0 } == nil)
     }
 }

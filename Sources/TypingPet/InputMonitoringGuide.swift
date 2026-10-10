@@ -257,7 +257,7 @@ final class InputMonitoringGuideController: NSObject, NSWindowDelegate {
     private func startWindowTrackingTimer() {
         windowTrackingTimer?.invalidate()
         let timer = Timer(
-            timeInterval: 0.12,
+            timeInterval: 0.6,
             target: self,
             selector: #selector(followSystemSettingsWindow),
             userInfo: nil,

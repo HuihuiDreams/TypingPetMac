@@ -68,7 +68,9 @@ final class KeyReactionStore {
     init(fileManager: FileManager = .default, defaults: UserDefaults = .standard, directory: URL? = nil) {
         self.fileManager = fileManager
         self.defaults = defaults
-        self.directory = directory ?? fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let baseDirectory = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? fileManager.temporaryDirectory
+        self.directory = directory ?? baseDirectory
             .appendingPathComponent("TypingPet", isDirectory: true)
             .appendingPathComponent("KeyReactions", isDirectory: true)
         if let data = defaults.data(forKey: Keys.rules),
@@ -102,17 +104,41 @@ final class KeyReactionStore {
         try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
         let fileName = "\(UUID().uuidString).\(ext)"
         try fileManager.copyItem(at: sourceURL, to: directory.appendingPathComponent(fileName))
+        
+        let oldRules = rules.filter { $0.stroke == stroke }
         rules.removeAll { $0.stroke == stroke }
         let rule = KeyReactionRule(id: UUID(), stroke: stroke, imageFileName: fileName)
         rules.append(rule)
         rules.sort { $0.stroke.displayName < $1.stroke.displayName }
+        
+        for oldRule in oldRules {
+            deleteImageFileIfOrphaned(oldRule.imageFileName)
+        }
+        
         persist()
         return rule
     }
 
     func removeRule(id: UUID) {
+        let removed = rules.filter { $0.id == id }
         rules.removeAll { $0.id == id }
+        for rule in removed {
+            deleteImageFileIfOrphaned(rule.imageFileName)
+        }
         persist()
+    }
+
+    private func deleteImageFileIfOrphaned(_ fileName: String) {
+        let trimmed = fileName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty,
+              trimmed != ".",
+              trimmed != "..",
+              !trimmed.contains("/") else { return }
+        guard !rules.contains(where: { $0.imageFileName == trimmed }) else { return }
+        let fileURL = directory.appendingPathComponent(trimmed)
+        if fileManager.fileExists(atPath: fileURL.path) {
+            try? fileManager.removeItem(at: fileURL)
+        }
     }
 
     private func persist() {

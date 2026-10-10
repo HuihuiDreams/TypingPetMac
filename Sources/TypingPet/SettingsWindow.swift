@@ -79,11 +79,11 @@ final class TypingPetSettingsModel: ObservableObject {
     var inputMonitoringGranted: Bool { CGPreflightListenEventAccess() }
 
     func thumbnail(for set: PetImageSet) -> NSImage? {
-        library.idleURL(for: set).flatMap(NSImage.init(contentsOf:))
+        library.thumbnail(for: set)
     }
 
     func ruleImage(for rule: KeyReactionRule) -> NSImage? {
-        keyStore.imageURL(for: rule).flatMap(NSImage.init(contentsOf:))
+        keyStore.imageURL(for: rule).flatMap { library.image(for: $0) }
     }
 
     func refresh() {
@@ -201,12 +201,19 @@ final class TypingPetSettingsModel: ObservableObject {
 
     func addRule(stroke: KeyStroke, imageURL: URL) {
         do {
+            if let existing = rules.first(where: { $0.stroke == stroke }),
+               let oldURL = keyStore.imageURL(for: existing) {
+                library.invalidateCache(for: oldURL)
+            }
             try keyStore.setRule(for: stroke, image: imageURL)
             rules = keyStore.rules
         } catch { errorMessage = error.localizedDescription }
     }
 
     func removeRule(_ rule: KeyReactionRule) {
+        if let url = keyStore.imageURL(for: rule) {
+            library.invalidateCache(for: url)
+        }
         keyStore.removeRule(id: rule.id)
         rules = keyStore.rules
     }
