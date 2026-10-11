@@ -2,7 +2,7 @@
 
 一个专为 Mac 设计的桌面打字陪伴宠物！每当你在键盘上打字时，它就会随着你的敲击变换各种可爱生动的表情。
 
-> 📌 **项目说明**：本项目从 [https://github.com/ynifamily3/TypingPetMac](https://github.com/ynifamily3/TypingPetMac) fork 并进行了汉化。
+> 📌 **项目说明**：本项目基于原作者 [Jongkeun Choi (@ynifamily3)](https://github.com/ynifamily3) 开发的开源项目 [TypingPetMac](https://github.com/ynifamily3/TypingPetMac) 进行汉化、功能优化与定制。衷心感谢原作者的开源贡献！
 
 ![键盘宠物预览](Sources/TypingPet/Resources/basic.png)
 
@@ -106,7 +106,15 @@ A: 请检查「系统设置 -> 隐私与安全性 -> 输入监听」中 TypingPe
 
 ---
 
+## 🙏 致谢与素材来源
+
+- **原项目作者**：衷心感谢 **[Jongkeun Choi (@ynifamily3)](https://github.com/ynifamily3)** 开发的开源项目 [TypingPetMac](https://github.com/ynifamily3/TypingPetMac)，为本项目提供了优秀的架构与灵感！
+- **默认桌宠画师**：特别鸣谢画师 **-烤得很香的狗蛋-**（LOFTER ID: `guduxiaolangnaibu`）精心绘制并分享的默认桌宠素材。
+- **默认角色说明**：内置默认桌宠为《人渣反派自救系统》的 **七九 CP**（岳清源 × 沈清秋）。素材版权归原画师所有，仅供个人爱好者学习与桌面陪伴使用。
+
+---
+
 ## 📄 开源许可证
 
-- 源代码：[MIT License](LICENSE)
-- 默认猫咪素材：[CC0 1.0 Universal](ASSET_LICENSE.md)（公共领域免版权）
+- 源代码：[MIT License](LICENSE)（遵循原作者开源协议）
+- 默认美术素材：详见 [ASSET_LICENSE.md](ASSET_LICENSE.md)
