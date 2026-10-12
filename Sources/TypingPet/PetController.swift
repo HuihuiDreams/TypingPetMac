@@ -503,6 +503,7 @@ internal final class PetController: NSObject, NSWindowDelegate {
 
     private func bounce() {
         let amplitudes: [CGFloat] = [0, 4, 9, 15]
+        guard shakeLevel >= 0, shakeLevel < amplitudes.count else { return }
         let amplitude = amplitudes[shakeLevel]
         guard amplitude > 0 else { return }
         guard let layer = imageView.layer else { return }

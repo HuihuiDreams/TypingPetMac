@@ -58,8 +58,6 @@ enum KeyReactionError: LocalizedError {
 
 @MainActor
 final class KeyReactionStore {
-    private enum Keys { static let rules = "keyReactionRules-v1" }
-
     private let fileManager: FileManager
     private let defaults: UserDefaults
     private let directory: URL
@@ -73,7 +71,7 @@ final class KeyReactionStore {
         self.directory = directory ?? baseDirectory
             .appendingPathComponent("TypingPet", isDirectory: true)
             .appendingPathComponent("KeyReactions", isDirectory: true)
-        if let data = defaults.data(forKey: Keys.rules),
+        if let data = defaults.data(forKey: AppPreferencesKey.keyReactionRules),
            let decoded = try? JSONDecoder().decode([KeyReactionRule].self, from: data) {
             rules = decoded
         } else {
@@ -142,7 +140,7 @@ final class KeyReactionStore {
     }
 
     private func persist() {
-        if let data = try? JSONEncoder().encode(rules) { defaults.set(data, forKey: Keys.rules) }
+        if let data = try? JSONEncoder().encode(rules) { defaults.set(data, forKey: AppPreferencesKey.keyReactionRules) }
     }
 }
 

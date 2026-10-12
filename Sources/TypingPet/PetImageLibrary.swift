@@ -59,13 +59,6 @@ enum PetImageLibraryError: LocalizedError {
 
 @MainActor
 final class PetImageLibrary {
-    private enum Keys {
-        static let gallery = "imageGalleryData-v1"
-        static let activeSetID = "activeImageSetID-v1"
-        static let legacyIdleFile = "customIdleImageFile"
-        static let legacyReactionFiles = "customReactionImageFiles"
-    }
-
     static let builtInID = UUID(uuidString: "00000000-0000-0000-0000-000000000001") ?? UUID()
     private static let defaultIdleName = "basic.png"
     private static let defaultReactionNames = [
@@ -92,7 +85,7 @@ final class PetImageLibrary {
                 .appendingPathComponent("Images", isDirectory: true)
         }
         setsDirectory = self.imagesDirectory.appendingPathComponent("Sets", isDirectory: true)
-        if let data = defaults.data(forKey: Keys.gallery),
+        if let data = defaults.data(forKey: AppPreferencesKey.gallery),
            let decoded = try? JSONDecoder().decode([PetImageSet].self, from: data) {
             customSets = decoded.filter { !$0.isBuiltIn }
         } else {
@@ -105,8 +98,8 @@ final class PetImageLibrary {
     var imageSets: [PetImageSet] { [Self.builtInSet] + customSets }
 
     var activeSetID: UUID {
-        get { UUID(uuidString: defaults.string(forKey: Keys.activeSetID) ?? "") ?? Self.builtInID }
-        set { defaults.set(newValue.uuidString, forKey: Keys.activeSetID) }
+        get { UUID(uuidString: defaults.string(forKey: AppPreferencesKey.activeSetID) ?? "") ?? Self.builtInID }
+        set { defaults.set(newValue.uuidString, forKey: AppPreferencesKey.activeSetID) }
     }
 
     var activeSet: PetImageSet { imageSets.first { $0.id == activeSetID } ?? Self.builtInSet }
@@ -343,7 +336,7 @@ final class PetImageLibrary {
     }
 
     private func persistGallery() {
-        if let data = try? JSONEncoder().encode(customSets) { defaults.set(data, forKey: Keys.gallery) }
+        if let data = try? JSONEncoder().encode(customSets) { defaults.set(data, forKey: AppPreferencesKey.gallery) }
     }
 
     private func repairActiveSelection() {
@@ -352,8 +345,8 @@ final class PetImageLibrary {
 
     private func migrateLegacySelectionIfNeeded() {
         guard customSets.isEmpty else { return }
-        let idle = defaults.string(forKey: Keys.legacyIdleFile)
-        let reactions = defaults.stringArray(forKey: Keys.legacyReactionFiles) ?? []
+        let idle = defaults.string(forKey: AppPreferencesKey.legacyIdleFile)
+        let reactions = defaults.stringArray(forKey: AppPreferencesKey.legacyReactionFiles) ?? []
         guard idle != nil || !reactions.isEmpty else { return }
         let set = PetImageSet(
             id: UUID(), name: "现有用户图集", storageFolder: nil,
@@ -364,7 +357,7 @@ final class PetImageLibrary {
         customSets = [set]
         persistGallery()
         activeSetID = set.id
-        defaults.removeObject(forKey: Keys.legacyIdleFile)
-        defaults.removeObject(forKey: Keys.legacyReactionFiles)
+        defaults.removeObject(forKey: AppPreferencesKey.legacyIdleFile)
+        defaults.removeObject(forKey: AppPreferencesKey.legacyReactionFiles)
     }
 }

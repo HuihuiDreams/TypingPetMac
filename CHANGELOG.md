@@ -10,8 +10,8 @@
 - 磁盘卫生与文件管理：删除图集时物理同步删除磁盘目录；删除或覆盖按键反应规则时清理旧孤立图像文件。
 - 内存与响应速度优化：为图集与待机图引入基于 `NSCache` 的内存缓存机制，并在图像变动时自动失效。
 - 隐私与健壮性防护：修复 Release 二进制中的本地路径泄漏（`#filePath` 仅在 DEBUG 模式下作为开发回退），消除不安全的强制解包。
-- 架构解耦与重构：集中收敛 UserDefaults 配置键 (`PetPreferences`)；将 1397 行的巨石 `main.swift` 拆解为 `PetViews`, `GlobalKeyMonitor`, `PetController`, `AppDelegate` 与 11 行极简启动入口，并新增 ADR-001 决策记录。
-- 现代测试迁移：将单元测试全面迁移至原生 Swift Testing 框架，新增磁盘物理清理与缓存失效生命周期测试套件。
+- 架构解耦与重构：集中收敛 UserDefaults 配置键 (`PetPreferences`)，彻底消除 `PetImageLibrary` 与 `KeyReactionStore` 的本地重复键；在 `GlobalKeyMonitor` 销毁与注销时显式失效 MachPort；为按键弹跳动画添加安全越界守卫；将 1397 行的巨石 `main.swift` 拆解为 `PetViews`, `GlobalKeyMonitor`, `PetController`, `AppDelegate` 与 11 行极简启动入口，并新增 ADR-001 决策记录。
+- 现代测试迁移：将单元测试全面迁移至原生 Swift Testing 框架，新增磁盘物理清理、缓存失效生命周期以及首选项存储契约 (`PetPreferencesContractTests`) 测试套件。
 
 ## 0.11.2 - 2026-09-27
 

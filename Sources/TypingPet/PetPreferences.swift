@@ -73,7 +73,4 @@ enum AppPreferencesDefault {
     // MARK: - Timing & Dimensions
     static let idleDelay: TimeInterval = 0.75
     static let fallbackBaseSize = NSSize(width: 453, height: 354)
-
-    // MARK: - Window Frame Autosave Name
-    static let windowFrameAutosaveName = NSWindow.FrameAutosaveName(AppPreferencesKey.windowFrame)
 }

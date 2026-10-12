@@ -60,6 +60,7 @@ internal final class GlobalKeyMonitor {
         }
 
         guard let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0) else {
+            CFMachPortInvalidate(tap)
             return false
         }
 
@@ -73,6 +74,7 @@ internal final class GlobalKeyMonitor {
     func stop() {
         if let eventTap {
             CGEvent.tapEnable(tap: eventTap, enable: false)
+            CFMachPortInvalidate(eventTap)
         }
         if let runLoopSource {
             CFRunLoopRemoveSource(CFRunLoopGetMain(), runLoopSource, .commonModes)

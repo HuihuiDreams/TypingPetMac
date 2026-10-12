@@ -38,4 +38,36 @@ struct ThumbnailCacheTests {
         try library.deleteSet(id: set.id)
         #expect(library.thumbnail(for: set) == nil)
     }
+
+    @Test func clearCacheRemovesAllCachedImages() throws {
+        let fileManager = FileManager.default
+        let tempRoot = fileManager.temporaryDirectory.appendingPathComponent("TypingPetClearCacheTest-\(UUID().uuidString)", isDirectory: true)
+        let inputDir = tempRoot.appendingPathComponent("CatSet", isDirectory: true)
+        let storedDir = tempRoot.appendingPathComponent("Stored", isDirectory: true)
+        try fileManager.createDirectory(at: inputDir, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: tempRoot) }
+
+        let packageRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let resource = packageRoot.appendingPathComponent("Sources/TypingPet/Resources/basic.png")
+        try fileManager.copyItem(at: resource, to: inputDir.appendingPathComponent("idle.png"))
+
+        let suite = "TypingPetClearCacheTest.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let library = PetImageLibrary(fileManager: fileManager, defaults: defaults, imagesDirectory: storedDir)
+        let set = try library.addSet(from: inputDir, name: "Clear Cache Test Set")
+
+        // First read caches image
+        let image1 = library.thumbnail(for: set)
+        #expect(image1 != nil)
+
+        // Clear cache
+        library.clearCache()
+
+        // Next read must instantiate a new object instance
+        let image2 = library.thumbnail(for: set)
+        #expect(image2 != nil)
+        #expect(image1 !== image2)
+    }
 }
