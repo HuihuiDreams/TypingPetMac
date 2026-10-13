@@ -82,12 +82,11 @@ final class KeyReactionStore {
     }
 
     func imageURL(matching stroke: KeyStroke) -> URL? {
-        guard let rule = rules.first(where: { $0.stroke == stroke }) else { return nil }
-        let url = directory.appendingPathComponent(rule.imageFileName)
-        return fileManager.fileExists(atPath: url.path) ? url : nil
+        rules.first(where: { $0.stroke == stroke }).flatMap(imageURL(for:))
     }
 
     func imageURL(for rule: KeyReactionRule) -> URL? {
+        guard StoredFileName.isSafe(rule.imageFileName) else { return nil }
         let url = directory.appendingPathComponent(rule.imageFileName)
         return fileManager.fileExists(atPath: url.path) ? url : nil
     }
@@ -133,7 +132,7 @@ final class KeyReactionStore {
     }
 
     private func deleteImageFileIfOrphaned(_ fileName: String, remainingRules: [KeyReactionRule]) throws {
-        guard !fileName.isEmpty, fileName != ".", fileName != "..", !fileName.contains("/") else {
+        guard StoredFileName.isSafe(fileName) else {
             throw KeyReactionError.invalidStoragePath
         }
         guard !remainingRules.contains(where: { $0.imageFileName == fileName }) else { return }

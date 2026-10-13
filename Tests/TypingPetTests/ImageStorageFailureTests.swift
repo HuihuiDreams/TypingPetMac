@@ -302,4 +302,42 @@ struct ImageStorageFailureTests {
         #expect(fixture.rules().rules == [rule])
         #expect(try fixture.allStoredFiles() == files)
     }
+
+    @Test func storedFileNameRejectsPathTraversal() {
+        for name in ["", ".", "..", "../outside.png", "a/b.png", "/etc/hosts"] {
+            #expect(!StoredFileName.isSafe(name))
+        }
+        #expect(StoredFileName.isSafe("8F2C-idle.png"))
+    }
+
+    @Test func unsafeGalleryFileNamesDoNotResolveOutsideStorage() throws {
+        let fixture = try ImageStorageFixture()
+        defer { fixture.cleanUp() }
+        let sets = fixture.stored.appendingPathComponent("Sets")
+        try fixture.fileManager.createDirectory(at: sets.appendingPathComponent("Safe"), withIntermediateDirectories: true)
+        try fixture.fileManager.copyItem(at: fixture.input.appendingPathComponent("idle.png"),
+                                         to: fixture.stored.appendingPathComponent("escape.png"))
+        let escapingNames = PetImageSet(id: UUID(), name: "names", storageFolder: "Safe",
+                                        idleFileName: "../../../Input/idle.png",
+                                        reactionFileNames: ["../../../Input/reaction.png"], isBuiltIn: false)
+        let escapingFolder = PetImageSet(id: UUID(), name: "folder", storageFolder: "..",
+                                         idleFileName: "escape.png", reactionFileNames: ["escape.png"], isBuiltIn: false)
+        fixture.defaults.set(try JSONEncoder().encode([escapingNames, escapingFolder]), forKey: AppPreferencesKey.gallery)
+        let library = fixture.library()
+        for set in [escapingNames, escapingFolder] {
+            #expect(library.idleURL(for: set) == nil)
+            #expect(library.reactionURLs(for: set).isEmpty)
+        }
+    }
+
+    @Test func unsafeRuleFileNameDoesNotResolveOutsideStorage() throws {
+        let fixture = try ImageStorageFixture()
+        defer { fixture.cleanUp() }
+        let stroke = KeyStroke(keyCode: 40, modifiers: [])
+        let rule = KeyReactionRule(id: UUID(), stroke: stroke, imageFileName: "../Input/idle.png")
+        fixture.defaults.set(try JSONEncoder().encode([rule]), forKey: AppPreferencesKey.keyReactionRules)
+        let store = fixture.rules()
+        #expect(store.imageURL(matching: stroke) == nil)
+        #expect(store.imageURL(for: rule) == nil)
+    }
 }

@@ -1,6 +1,13 @@
 import AppKit
 import Foundation
 
+/// 应用存储中的文件或目录名只允许单级名称，防止读取或删除时越出存储目录。
+enum StoredFileName {
+    static func isSafe(_ name: String) -> Bool {
+        !name.isEmpty && name != "." && name != ".." && !name.contains("/")
+    }
+}
+
 struct FolderImageSelection {
     let idleURL: URL?
     let reactionURLs: [URL]
@@ -245,6 +252,7 @@ final class PetImageLibrary {
             if let bundled = Bundle.main.url(forResource: name, withExtension: "png") { return bundled }
             return debugFallbackURL(for: fileName)
         }
+        guard StoredFileName.isSafe(fileName), set.storageFolder.map(StoredFileName.isSafe) ?? true else { return nil }
         let base = set.storageFolder.map { setsDirectory.appendingPathComponent($0, isDirectory: true) } ?? imagesDirectory
         let url = base.appendingPathComponent(fileName)
         if fileManager.fileExists(atPath: url.path) { return url }
@@ -309,7 +317,7 @@ final class PetImageLibrary {
     private func removeStoredImages(for set: PetImageSet) throws {
         let otherSets = customSets.filter { $0.id != set.id }
         if let folder = set.storageFolder {
-            guard !folder.isEmpty, folder != ".", folder != "..", !folder.contains("/") else {
+            guard StoredFileName.isSafe(folder) else {
                 throw PetImageLibraryError.invalidStoragePath
             }
             guard !otherSets.contains(where: { $0.storageFolder == folder }) else { return }
@@ -320,7 +328,7 @@ final class PetImageLibrary {
             let retained = Set(otherSets.filter { $0.storageFolder == nil }
                 .flatMap { [$0.idleFileName] + $0.reactionFileNames })
             for name in Set([set.idleFileName] + set.reactionFileNames).subtracting(retained) {
-                guard !name.isEmpty, name != ".", name != "..", !name.contains("/") else {
+                guard StoredFileName.isSafe(name) else {
                     throw PetImageLibraryError.invalidStoragePath
                 }
                 let url = imagesDirectory.appendingPathComponent(name)

@@ -35,8 +35,9 @@ internal final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegat
         )
         configureStatusItem()
 
+        // 事件源挂在主 RunLoop 上（见 GlobalKeyMonitor.start），回调已在主线程执行。
         keyMonitor = GlobalKeyMonitor { [weak self] stroke in
-            DispatchQueue.main.async {
+            MainActor.assumeIsolated {
                 self?.petController.handleKeystroke(stroke)
             }
         }

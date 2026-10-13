@@ -7,12 +7,27 @@ import QuartzCore
 enum PetConstants {
     static let fallbackBaseSize = AppPreferencesDefault.fallbackBaseSize
     static let idleDelay: TimeInterval = AppPreferencesDefault.idleDelay
+    /// 图像归一化后的最长边（pt），与默认图集的回退尺寸一致。
+    static let normalizedLongestSide: CGFloat = 453
+    /// 计算松手速度时保留的拖拽采样时长（秒）。
+    static let dragSampleWindow: TimeInterval = 0.15
+    /// 惯性滑行的启动与停止速度阈值（pt/s）。
+    static let inertiaStartSpeed: CGFloat = 45
+    static let inertiaStopSpeed: CGFloat = 18
+    /// 指针躲避弹簧参数：追踪目标时的刚度/阻尼、无目标时的阻尼、速度上限与停止阈值。
+    static let avoidanceStiffness: CGFloat = 58
+    static let avoidanceDamping: CGFloat = 13
+    static let avoidanceSettleDamping: CGFloat = 16
+    static let avoidanceMaxSpeed: CGFloat = 520
+    static let avoidanceStopSpeed: CGFloat = 5
+    /// 按抖动等级索引的击键弹跳幅度（pt）。
+    static let bounceAmplitudes: [CGFloat] = [0, 4, 9, 15]
 }
 
 // MARK: - PetController
 
 @MainActor
-internal final class PetController: NSObject, NSWindowDelegate {
+internal final class PetController: NSObject {
     private let library: PetImageLibrary
     private let keyStore: KeyReactionStore
     private let panel: PetPanel
@@ -26,6 +41,7 @@ internal final class PetController: NSObject, NSWindowDelegate {
     private var resizeInitialMouseLocation: NSPoint?
     private var resizeInitialFrame: NSRect?
     private var resizeInitialScale: CGFloat?
+    private var resizeLatestScale: CGFloat?
     private var moveInitialMouseLocation: NSPoint?
     private var moveInitialFrame: NSRect?
     private var moveSamples: [PetDragSample] = []
@@ -80,7 +96,6 @@ internal final class PetController: NSObject, NSWindowDelegate {
         contentView.onMoveEnded = { [weak self] in self?.endMove(with: $0) }
 
         panel.contentView = contentView
-        panel.delegate = self
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = false
@@ -238,10 +253,6 @@ internal final class PetController: NSObject, NSWindowDelegate {
         panel.saveFrame(usingName: AppPreferencesKey.windowFrame)
     }
 
-    func windowDidMove(_ notification: Notification) {
-        panel.saveFrame(usingName: AppPreferencesKey.windowFrame)
-    }
-
     private func showIdleImage() {
         guard let idleURL = library.idleURL else { return }
         showImage(at: idleURL)
@@ -300,13 +311,13 @@ internal final class PetController: NSObject, NSWindowDelegate {
 
     private func appendMoveSample(_ sample: PetDragSample) {
         moveSamples.append(sample)
-        let cutoff = sample.timestamp - 0.15
+        let cutoff = sample.timestamp - PetConstants.dragSampleWindow
         moveSamples.removeAll { $0.timestamp < cutoff }
     }
 
     private func startInertia(with velocity: CGVector) {
         let speed = hypot(velocity.dx, velocity.dy)
-        guard speed >= 45 else {
+        guard speed >= PetConstants.inertiaStartSpeed else {
             panel.saveFrame(usingName: AppPreferencesKey.windowFrame)
             return
         }
@@ -336,7 +347,7 @@ internal final class PetController: NSObject, NSWindowDelegate {
         inertiaVelocity = step.velocity
         panel.setFrameOrigin(step.origin)
         updatePetOpacity()
-        if hypot(step.velocity.dx, step.velocity.dy) < 18 {
+        if hypot(step.velocity.dx, step.velocity.dy) < PetConstants.inertiaStopSpeed {
             stopInertia(savePosition: true)
         }
     }
@@ -427,14 +438,14 @@ internal final class PetController: NSObject, NSWindowDelegate {
             dx: (target?.x ?? origin.x) - origin.x,
             dy: (target?.y ?? origin.y) - origin.y
         )
-        let stiffness: CGFloat = target == nil ? 0 : 58
-        let damping: CGFloat = target == nil ? 16 : 13
+        let stiffness: CGFloat = target == nil ? 0 : PetConstants.avoidanceStiffness
+        let damping: CGFloat = target == nil ? PetConstants.avoidanceSettleDamping : PetConstants.avoidanceDamping
         avoidanceVelocity.dx += (delta.dx * stiffness - avoidanceVelocity.dx * damping) * elapsed
         avoidanceVelocity.dy += (delta.dy * stiffness - avoidanceVelocity.dy * damping) * elapsed
 
         let speed = hypot(avoidanceVelocity.dx, avoidanceVelocity.dy)
-        if speed > 520 {
-            let factor = 520 / speed
+        if speed > PetConstants.avoidanceMaxSpeed {
+            let factor = PetConstants.avoidanceMaxSpeed / speed
             avoidanceVelocity.dx *= factor
             avoidanceVelocity.dy *= factor
         }
@@ -452,7 +463,7 @@ internal final class PetController: NSObject, NSWindowDelegate {
         panel.setFrameOrigin(nextOrigin)
         updatePetOpacity()
 
-        if target == nil, hypot(avoidanceVelocity.dx, avoidanceVelocity.dy) < 5 {
+        if target == nil, hypot(avoidanceVelocity.dx, avoidanceVelocity.dy) < PetConstants.avoidanceStopSpeed {
             stopPointerAvoidance(savePosition: true)
         }
     }
@@ -479,17 +490,23 @@ internal final class PetController: NSObject, NSWindowDelegate {
             initialSize: initialFrame.size,
             dragDelta: delta
         )
-        applyScale(newScale, anchorOrigin: initialFrame.origin, animate: false)
+        resizeLatestScale = applyScale(newScale, anchorOrigin: initialFrame.origin, animate: false)
     }
 
     private func endResize() {
+        if let resizeLatestScale {
+            UserDefaults.standard.set(Double(resizeLatestScale), forKey: AppPreferencesKey.petScale)
+        }
         resizeInitialMouseLocation = nil
         resizeInitialFrame = nil
         resizeInitialScale = nil
+        resizeLatestScale = nil
         panel.saveFrame(usingName: AppPreferencesKey.windowFrame)
     }
 
-    private func applyScale(_ value: CGFloat, anchorOrigin: NSPoint?, animate: Bool) {
+    /// 拖拽缩放（`animate == false`）时只更新窗口，由 `endResize()` 统一持久化，避免每个鼠标事件都写 UserDefaults。
+    @discardableResult
+    private func applyScale(_ value: CGFloat, anchorOrigin: NSPoint?, animate: Bool) -> CGFloat {
         let clamped = max(AppPreferencesDefault.minScale, min(value, AppPreferencesDefault.maxScale))
         let oldFrame = panel.frame
         let newSize = Self.scaledSize(baseSize: baseSize, scale: clamped)
@@ -498,15 +515,18 @@ internal final class PetController: NSObject, NSWindowDelegate {
             y: oldFrame.minY
         )
         panel.setFrame(NSRect(origin: newOrigin, size: newSize), display: true, animate: animate)
-        UserDefaults.standard.set(Double(clamped), forKey: AppPreferencesKey.petScale)
         onScaleChanged(clamped)
-        if animate { panel.saveFrame(usingName: AppPreferencesKey.windowFrame) }
+        if animate {
+            UserDefaults.standard.set(Double(clamped), forKey: AppPreferencesKey.petScale)
+            panel.saveFrame(usingName: AppPreferencesKey.windowFrame)
+        }
+        return clamped
     }
 
     private func bounce() {
-        let amplitudes: [CGFloat] = [0, 4, 9, 15]
-        guard shakeLevel >= 0, shakeLevel < amplitudes.count else { return }
-        let amplitude = amplitudes[shakeLevel]
+        let level = shakeLevel
+        guard PetConstants.bounceAmplitudes.indices.contains(level) else { return }
+        let amplitude = PetConstants.bounceAmplitudes[level]
         guard amplitude > 0 else { return }
         guard let layer = imageView.layer else { return }
         let animation = CAKeyframeAnimation(keyPath: "transform.translation.y")
@@ -529,7 +549,7 @@ internal final class PetController: NSObject, NSWindowDelegate {
             return PetConstants.fallbackBaseSize
         }
 
-        let longestSide: CGFloat = 453
+        let longestSide = PetConstants.normalizedLongestSide
         if imageSize.width >= imageSize.height {
             return NSSize(
                 width: longestSide,

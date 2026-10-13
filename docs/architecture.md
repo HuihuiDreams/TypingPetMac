@@ -163,7 +163,7 @@ sequenceDiagram
 
     Note over User, OS: 3. 拖拽惯性滑行流程
     User->>Panel: 按住宠物并快速拖拽松开
-    Panel->>Ctrl: 提交最近 0.12 秒的 PetDragSample
+    Panel->>Ctrl: 提交最近 0.15 秒的 PetDragSample
     Ctrl->>Physics: PetMotionPhysics.releaseVelocity()
     loop 每秒 60 帧 CADisplayLink / Timer
         Ctrl->>Physics: advance(origin, velocity, elapsed, visibleFrame)
@@ -207,7 +207,7 @@ sequenceDiagram
 ### 4.3 物理运动学与智能指针避让 (`PetWindowGeometry.swift`)
 
 - **惯性滑动模拟 (`PetMotionPhysics`)**：
-  - 维护采样窗口为 0.12 秒的鼠标拖拽序列 `[PetDragSample]`，采样滑动松手时的瞬时初速度，限制最大速度为 `900 pt/s`。
+  - 维护采样窗口为 0.15 秒（`PetConstants.dragSampleWindow`）的鼠标拖拽序列 `[PetDragSample]`，采样滑动松手时的瞬时初速度，限制最大速度为 `900 pt/s`。
   - 按照指数时间衰减模型计算阻尼减速（`velocityRetentionPerSecond = 0.004`）。
   - 遇到当前屏幕的 `visibleFrame`（自动避开 Dock 栏与顶部菜单栏）边界时触发弹性反弹（`edgeRestitution = 0.14`）。
 - **多显示器自适应指针避让 (`PetPointerAvoidance`)**：
@@ -232,6 +232,8 @@ sequenceDiagram
   }
   ```
   通过增加 `0.001` 的差值判断，仅在透明度发生实际跃迁时提交事务；配合 `setDisableActions(true)` 消除冗余隐式动画插值计算，彻底阻断空转能耗。
+- **位置与缩放持久化**：
+  拖拽、惯性滑行和指针躲避都以 60Hz 移动窗口，因此不在每次移动时写入 `UserDefaults`。窗口位置只在 `endMove` / `stopInertia` / `stopPointerAvoidance` / `endResize` 等动作结束时保存；拖拽缩放过程中只更新窗口与设置界面，`petScale` 在 `endResize()` 时写入一次。惯性、躲避与弹跳参数集中在 `PetConstants`。
 
 ### 4.5 集中配置与磁盘生命周期 (`PetPreferences.swift`, `PetImageLibrary.swift`)
 
@@ -240,6 +242,7 @@ sequenceDiagram
 - **存储路径隔离**：
   - 自定义图集隔离目录：`~/Library/Application Support/TypingPet/Images/Sets/<UUID>/`
   - 独立按键动作目录：`~/Library/Application Support/TypingPet/KeyReactions/`
+  - 图库与规则中的文件名、目录名来自 `UserDefaults`，读取和删除前都经过 `StoredFileName.isSafe` 校验，只接受单级名称（拒绝空串、`.`、`..` 与含 `/` 的名称），不合法的条目按缺失处理，不会解析到存储目录之外。
 - **磁盘物理卫生保障**：
   删除图集（`PetImageLibrary.deleteSet`）或删除/覆盖按键绑定（`KeyReactionStore.removeRule` / `setRule`）时，同步清理应用存储中的目录与孤立文件。删除失败会向调用方抛出错误，保留图库或规则记录，以便重试；设置窗口会显示错误。旧版图集只清理 `Images/` 下不再被其他图集引用的文件，不删除共享目录或用户源图像。该行为由 `DiskCleanupTests` 和 `ImageStorageFailureTests` 验证。
 - **导入与替换的失败处理**：
@@ -296,7 +299,7 @@ sequenceDiagram
    - 启用 `LSUIElement = true`（确保纯菜单栏与浮窗运行，不在 macOS Dock 栏显示常驻图标）。
    - 同步注入当前发布版本号（`CFBundleShortVersionString` 与 `CFBundleVersion`）。
 5. **代码签名 (Code Signing)**：
-   - 优先探测开发者电脑上的 `Developer ID Application` 证书并签署安全运行时（`--options runtime --timestamp`）。
+   - 优先探测开发者电脑上的 `Developer ID Application` 证书并签署安全运行时（`--options runtime --timestamp`）。应用包只含单个可执行文件，因此直接签名包体，不使用已弃用的 `--deep`。
    - 若无证书，则回退至 Ad-hoc 签名（`-`），保证本地可执行。
 
 ### 6.3 官方公证流程 (`scripts/notarize_release.sh`)
@@ -318,9 +321,9 @@ sequenceDiagram
 | :--- | :--- | :--- |
 | `PetPreferencesContractTests` | 配置持久化契约 | 确保所有读写均经由 `AppPreferencesKey` 常量，杜绝字符串字面量漂移与配置遗失。 |
 | `DiskCleanupTests` | 磁盘文件卫生 | 验证删除图集、覆盖规则、删除动作后，`Application Support` 目录下的物理文件确实被清理。 |
-| `ImageStorageFailureTests` | 存储错误与状态恢复 | 15 个回归用例覆盖旧版图集替换与删除、旧文件和缓存清理、失败导入、部分复制失败、删除重试、规则覆盖失败及设置锁定状态同步。 |
+| `ImageStorageFailureTests` | 存储错误与状态恢复 | 18 个回归用例覆盖旧版图集替换与删除、旧文件和缓存清理、失败导入、部分复制失败、删除重试、规则覆盖失败、设置锁定状态同步，以及图库/规则文件名的路径穿越拦截。 |
 | `ThumbnailCacheTests` | 图像缓存生命周期 | 验证基于 `NSCache` 的缩略图缓存命中、内存驱逐与图集变更时的显式缓存失效。 |
-| `PetWindowGeometryTests` | 空间几何与物理运算 | 验证透明度计算、屏幕可视区约束、指针躲避目标评分、拖拽惯性阻尼与缩放算子。 |
+| `PetWindowGeometryTests` | 空间几何与物理运算 | 验证透明度计算、屏幕可视区约束、指针躲避目标评分、拖拽惯性阻尼、缩放算子，以及弹跳幅度覆盖所有抖动等级。 |
 | `KeyReactionTests` | 按键动作录制与匹配 | 验证 `KeyStroke` 模型哈希、快捷键描述文本生成、JSON 序列化与冲突覆盖判定。 |
 | `FolderImageSelectionTests` | 图集导入智能推断 | 验证从外部文件夹解析图像，按去掉扩展名后的完整文件名 `basic`、`idle` 或 `pet-idle` 识别待机图（忽略大小写）。 |
 | `ImagePickerTests` | 随机图像选择 | 验证优先排除当前图像、只有一张图像时的回退及空列表处理。 |

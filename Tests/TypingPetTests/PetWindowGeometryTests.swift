@@ -236,4 +236,10 @@ import Testing
             ) - 1.25) < 0.0001
         )
     }
+
+    @Test func bounceAmplitudesCoverEveryShakeLevel() {
+        let levels = AppPreferencesDefault.minShakeLevel...AppPreferencesDefault.maxShakeLevel
+        #expect(levels.allSatisfy { PetConstants.bounceAmplitudes.indices.contains($0) })
+        #expect(PetConstants.bounceAmplitudes[AppPreferencesDefault.minShakeLevel] == 0)
+    }
 }

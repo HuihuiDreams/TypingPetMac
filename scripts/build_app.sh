@@ -74,10 +74,10 @@ if [[ -z "$signing_identity" ]]; then
 fi
 
 if [[ "$signing_identity" == "Developer ID Application:"* ]]; then
-    codesign --force --deep --options runtime --timestamp --sign "$signing_identity" "$app_dir"
+    codesign --force --options runtime --timestamp --sign "$signing_identity" "$app_dir"
     echo "Signed for distribution with $signing_identity"
 else
-    codesign --force --deep --options runtime --timestamp=none --sign "$signing_identity" "$app_dir"
+    codesign --force --options runtime --timestamp=none --sign "$signing_identity" "$app_dir"
     echo "Warning: this build is not signed with Developer ID and cannot be notarized."
 fi
 echo "$app_dir"
