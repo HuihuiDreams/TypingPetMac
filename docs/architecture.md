@@ -1,7 +1,8 @@
 # TypingPetMac 架构设计文档
 
-> **最后更新**：2026-10-12  
-> **基准版本**：0.12.0（以当前仓库代码与配置为准；ADR 保留历史决策背景）
+> **最后更新**：2026-10-13
+>
+> **基准版本**：0.12.1（以当前仓库代码与配置为准；ADR 保留历史决策背景）
 
 ---
 
@@ -48,11 +49,11 @@ TypingPetMac/
 │       ├── PetWindowGeometry.swift    # 几何计算、阻尼物理、对角线避让向量与屏幕停靠
 │       ├── GlobalKeyMonitor.swift     # 基于 CGEventTap 的低层级全局按键监听与 MachPort 维护
 │       ├── PetPreferences.swift       # 集中收敛的 UserDefaults 偏好键（AppPreferencesKey/Default）
-│       ├── PetImageLibrary.swift      # 图集管理、多角色切换、磁盘同步物理清理与 NSCache 缩略图
+│       ├── PetImageLibrary.swift      # 图集管理、多角色切换、磁盘清理与 NSCache 图像缓存
 │       ├── KeyReactions.swift         # 独立按键规则管理（绑定单键/快捷键特定动作）与存储
 │       ├── SettingsWindow.swift       # AppKit 原生多标签偏好设置面板（4 点网格规范）
 │       ├── InputMonitoringGuide.swift # 输入监听权限引导浮窗与系统设置窗口智能跟随
-│       ├── ImagePicker.swift          # 安全作用域系统文件/文件夹选取器封装
+│       ├── ImagePicker.swift          # 随机反应图选择，优先排除当前图像
 │       └── Resources/                 # 内置默认资源
 │           ├── AppIcon.icns           # 高清多分辨率应用图标
 │           ├── basic.png              # 默认待机发呆图（人渣反派七九 CP）
@@ -63,11 +64,12 @@ TypingPetMac/
 │   └── TypingPetTests/
 │       ├── PetPreferencesContractTests.swift # 偏好持久化键强类型契约测试
 │       ├── DiskCleanupTests.swift            # 图集与按键动作物理删除卫生验证
+│       ├── ImageStorageFailureTests.swift    # 迁移、失败清理、删除重试与设置状态同步
 │       ├── ThumbnailCacheTests.swift          # NSCache 内存缩略图命中与失效测试
 │       ├── PetWindowGeometryTests.swift       # 边界约束、阻尼惯性与几何算法测试
 │       ├── KeyReactionTests.swift             # 按键动作录制、快捷键序列化与映射测试
 │       ├── FolderImageSelectionTests.swift    # 图集文件夹导入及 basic/idle 自动识别测试
-│       └── ImagePickerTests.swift             # 文件类型过滤与面板选择测试
+│       └── ImagePickerTests.swift             # 随机图像选择与空列表边界测试
 │
 ├── scripts/
 │   ├── build_app.sh            # 独立打包脚本（编译 Release、组装 Bundle、Info.plist 与代码签名）
@@ -239,9 +241,13 @@ sequenceDiagram
   - 自定义图集隔离目录：`~/Library/Application Support/TypingPet/Images/Sets/<UUID>/`
   - 独立按键动作目录：`~/Library/Application Support/TypingPet/KeyReactions/`
 - **磁盘物理卫生保障**：
-  删除图集（`PetImageLibrary.deleteSet`）或删除/覆盖按键绑定（`KeyReactions.removeRule` / `setRule`）时，**同步物理清除磁盘对应目录与文件**，防止系统支持目录产生大量孤立垃圾文件。该行为由 `DiskCleanupTests` 严格守护。
-- **内存安全缩略图缓存**：
-  在 `PetImageLibrary` 中采用系统托管的 `NSCache<NSURL, NSImage>` 缓存图集和设置窗口中的缩略图，在保证流畅渲染的同时，由 macOS 在系统内存承压时自动逐出释放。
+  删除图集（`PetImageLibrary.deleteSet`）或删除/覆盖按键绑定（`KeyReactionStore.removeRule` / `setRule`）时，同步清理应用存储中的目录与孤立文件。删除失败会向调用方抛出错误，保留图库或规则记录，以便重试；设置窗口会显示错误。旧版图集只清理 `Images/` 下不再被其他图集引用的文件，不删除共享目录或用户源图像。该行为由 `DiskCleanupTests` 和 `ImageStorageFailureTests` 验证。
+- **导入与替换的失败处理**：
+  图集替换先在新目录准备待机图和反应图，保留未替换的图片，再清理旧存储并更新图库与当前选择。这也让旧版图集在迁入 `Sets/` 时保留另一组图片。导入或复制失败会清理新副本；从默认图集发起的失败替换不会创建图库记录或切换选择。按键规则覆盖会先复制新图，旧文件清理失败时清理新副本并保留原规则。
+- **显示与缩略图共享缓存**：
+  `PetImageLibrary` 使用系统托管的 `NSCache<NSURL, NSImage>` 缓存图像，宠物显示与设置缩略图共同复用。替换或删除图集时显式清除旧图像的缓存；按键规则变更时由设置模型清除对应缓存。`PetController` 在初始化和 `reloadImages()` 时解析反应图列表，避免每次击键都检查整个图集的文件。缓存可在内存承压时被系统逐出，之后按需重新加载。
+- **设置状态同步**：
+  `TypingPetSettingsModel.refresh()` 通过 `AppDelegate` 注入的 `currentPositionLock` 回调读取控制器的实际锁定状态，使菜单栏修改后重新打开或刷新设置窗口时，锁定开关及鼠标避让选项的启用状态保持一致。
 
 ### 4.6 智能权限引导浮窗 (`InputMonitoringGuide.swift`)
 
@@ -312,11 +318,14 @@ sequenceDiagram
 | :--- | :--- | :--- |
 | `PetPreferencesContractTests` | 配置持久化契约 | 确保所有读写均经由 `AppPreferencesKey` 常量，杜绝字符串字面量漂移与配置遗失。 |
 | `DiskCleanupTests` | 磁盘文件卫生 | 验证删除图集、覆盖规则、删除动作后，`Application Support` 目录下的物理文件确实被清理。 |
+| `ImageStorageFailureTests` | 存储错误与状态恢复 | 15 个回归用例覆盖旧版图集替换与删除、旧文件和缓存清理、失败导入、部分复制失败、删除重试、规则覆盖失败及设置锁定状态同步。 |
 | `ThumbnailCacheTests` | 图像缓存生命周期 | 验证基于 `NSCache` 的缩略图缓存命中、内存驱逐与图集变更时的显式缓存失效。 |
 | `PetWindowGeometryTests` | 空间几何与物理运算 | 验证透明度计算、屏幕可视区约束、指针躲避目标评分、拖拽惯性阻尼与缩放算子。 |
 | `KeyReactionTests` | 按键动作录制与匹配 | 验证 `KeyStroke` 模型哈希、快捷键描述文本生成、JSON 序列化与冲突覆盖判定。 |
-| `FolderImageSelectionTests` | 图集导入智能推断 | 验证从外部文件夹解析图像、自动将包含 `basic` / `idle` 的文件推断为待机图。 |
-| `ImagePickerTests` | 安全文件选取 | 验证图片格式拓展名白名单过滤机制。 |
+| `FolderImageSelectionTests` | 图集导入智能推断 | 验证从外部文件夹解析图像，按去掉扩展名后的完整文件名 `basic`、`idle` 或 `pet-idle` 识别待机图（忽略大小写）。 |
+| `ImagePickerTests` | 随机图像选择 | 验证优先排除当前图像、只有一张图像时的回退及空列表处理。 |
+
+0.12.1 的 Linux 辅助验证使用临时替代的 macOS 接口，运行了 6 个套件中的 32 个用例；全部 Swift 文件通过语法检查。这些结果不等同于原生 macOS 测试：发布前仍需在 macOS 上执行 `swift test` 和 `./scripts/build_app.sh`，并验证窗口交互及输入监控权限流程。
 
 > [!IMPORTANT]
 > **CI / Headless 无头环境测试隔离准则**：  

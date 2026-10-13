@@ -27,6 +27,7 @@ final class TypingPetSettingsModel: ObservableObject {
     private let applyShake: (Int) -> Void
     private let applyAlwaysOnTop: (Bool) -> Void
     private let applyPositionLock: (Bool) -> Void
+    private let currentPositionLock: () -> Bool
     private let applyPointerAvoidance: (Bool) -> Void
     private let reloadPet: () -> Void
     private let openInputMonitoringSettingsAction: () -> Void
@@ -47,6 +48,7 @@ final class TypingPetSettingsModel: ObservableObject {
         applyShake: @escaping (Int) -> Void,
         applyAlwaysOnTop: @escaping (Bool) -> Void,
         applyPositionLock: @escaping (Bool) -> Void,
+        currentPositionLock: @escaping () -> Bool,
         applyPointerAvoidance: @escaping (Bool) -> Void,
         reloadPet: @escaping () -> Void,
         openInputMonitoringSettings: @escaping () -> Void
@@ -66,6 +68,7 @@ final class TypingPetSettingsModel: ObservableObject {
         self.applyShake = applyShake
         self.applyAlwaysOnTop = applyAlwaysOnTop
         self.applyPositionLock = applyPositionLock
+        self.currentPositionLock = currentPositionLock
         self.applyPointerAvoidance = applyPointerAvoidance
         self.reloadPet = reloadPet
         openInputMonitoringSettingsAction = openInputMonitoringSettings
@@ -91,6 +94,7 @@ final class TypingPetSettingsModel: ObservableObject {
         activeSetID = library.activeSetID
         rules = keyStore.rules
         launchAtLogin = SMAppService.mainApp.status == .enabled
+        positionLocked = currentPositionLock()
     }
 
     func setScale(_ value: Double) {
@@ -214,8 +218,10 @@ final class TypingPetSettingsModel: ObservableObject {
         if let url = keyStore.imageURL(for: rule) {
             library.invalidateCache(for: url)
         }
-        keyStore.removeRule(id: rule.id)
-        rules = keyStore.rules
+        do {
+            try keyStore.removeRule(id: rule.id)
+            rules = keyStore.rules
+        } catch { errorMessage = error.localizedDescription }
     }
 
     func openInputMonitoringSettings() {

@@ -53,7 +53,7 @@ struct DiskCleanupTests {
         let diskFile = rulesDir.appendingPathComponent(rule.imageFileName)
         #expect(fileManager.fileExists(atPath: diskFile.path))
 
-        store.removeRule(id: rule.id)
+        try store.removeRule(id: rule.id)
         #expect(!fileManager.fileExists(atPath: diskFile.path))
     }
 

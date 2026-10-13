@@ -44,6 +44,7 @@ enum PetImageLibraryError: LocalizedError {
     case noReactionImages
     case imageSetNotFound
     case cannotDeleteBuiltInSet
+    case invalidStoragePath
 
     var errorDescription: String? {
         switch self {
@@ -53,6 +54,7 @@ enum PetImageLibraryError: LocalizedError {
         case .noReactionImages: "请选择至少一张按键反应图像。"
         case .imageSetNotFound: "未找到图像集。"
         case .cannotDeleteBuiltInSet: "无法删除默认图像集。"
+        case .invalidStoragePath: "图像集存储路径无效，无法安全清理文件。"
         }
     }
 }
@@ -161,8 +163,15 @@ final class PetImageLibrary {
         let destination = setsDirectory.appendingPathComponent(folderName, isDirectory: true)
         try fileManager.createDirectory(at: destination, withIntermediateDirectories: true)
 
-        let idleName = try copyImage(from: idleSource, to: destination)
-        let reactionNames = try reactionSources.map { try copyImage(from: $0, to: destination) }
+        let idleName: String
+        let reactionNames: [String]
+        do {
+            idleName = try copyImage(from: idleSource, to: destination)
+            reactionNames = try reactionSources.map { try copyImage(from: $0, to: destination) }
+        } catch {
+            try fileManager.removeItem(at: destination)
+            throw error
+        }
         let trimmedName = name?.trimmingCharacters(in: .whitespacesAndNewlines)
         let displayName = (trimmedName?.isEmpty == false ? trimmedName : nil) ?? folderURL.lastPathComponent
         let set = PetImageSet(
@@ -184,28 +193,11 @@ final class PetImageLibrary {
         guard let index = customSets.firstIndex(where: { $0.id == id }) else {
             throw PetImageLibraryError.imageSetNotFound
         }
-        let setToDelete = customSets.remove(at: index)
-
-        // Cache Invalidation (F4.2): Must resolve URLs before physical file deletion
-        if let idle = idleURL(for: setToDelete) {
-            invalidateCache(for: idle)
-        }
-        for reaction in reactionURLs(for: setToDelete) {
-            invalidateCache(for: reaction)
-        }
-
-        // F2.1: Physically delete custom set storage directory on disk
-        if let folder = setToDelete.storageFolder?.trimmingCharacters(in: .whitespacesAndNewlines),
-           !folder.isEmpty,
-           folder != ".",
-           folder != "..",
-           !folder.contains("/") {
-            let directory = setsDirectory.appendingPathComponent(folder, isDirectory: true)
-            if fileManager.fileExists(atPath: directory.path) {
-                try? fileManager.removeItem(at: directory)
-            }
-        }
-
+        let setToDelete = customSets[index]
+        let cachedURLs = [idleURL(for: setToDelete)].compactMap { $0 } + reactionURLs(for: setToDelete)
+        try removeStoredImages(for: setToDelete)
+        customSets.remove(at: index)
+        cachedURLs.forEach { invalidateCache(for: $0) }
         if activeSetID == id { activeSetID = Self.builtInID }
         persistGallery()
     }
@@ -220,28 +212,12 @@ final class PetImageLibrary {
     }
 
     func replaceIdle(with sourceURL: URL) throws {
-        var set = try editableActiveSet(named: "自定义图像")
-        let oldIdleURL = idleURL(for: set)
-        if set.storageFolder == nil { set.storageFolder = set.id.uuidString }
-        let directory = try storageDirectory(for: set)
-        set.idleFileName = try copyImage(from: sourceURL, to: directory)
-        if let oldIdleURL {
-            invalidateCache(for: oldIdleURL)
-        }
-        update(set)
+        try replaceImages(idleSource: sourceURL, reactionSources: nil)
     }
 
     func replaceReactions(with sourceURLs: [URL]) throws {
         guard !sourceURLs.isEmpty else { throw PetImageLibraryError.noReactionImages }
-        var set = try editableActiveSet(named: "自定义图像")
-        let oldReactionURLs = reactionURLs(for: set)
-        if set.storageFolder == nil { set.storageFolder = set.id.uuidString }
-        let directory = try storageDirectory(for: set)
-        set.reactionFileNames = try sourceURLs.map { try copyImage(from: $0, to: directory) }
-        for oldURL in oldReactionURLs {
-            invalidateCache(for: oldURL)
-        }
-        update(set)
+        try replaceImages(idleSource: nil, reactionSources: sourceURLs)
     }
 
     @discardableResult
@@ -290,33 +266,67 @@ final class PetImageLibrary {
         #endif
     }
 
-    private func editableActiveSet(named defaultName: String) throws -> PetImageSet {
-        if !activeSet.isBuiltIn { return activeSet }
-        let id = UUID()
-        let folder = id.uuidString
+    private func replaceImages(idleSource: URL?, reactionSources: [URL]?) throws {
+        let original = activeSet
+        let oldURLs = [idleURL(for: original)].compactMap { $0 } + reactionURLs(for: original)
+        let folder = UUID().uuidString
         let directory = setsDirectory.appendingPathComponent(folder, isDirectory: true)
         try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
-        let idleName = try idleURL.map { try copyImage(from: $0, to: directory) } ?? Self.defaultIdleName
-        let reactions = try reactionURLs.map { try copyImage(from: $0, to: directory) }
-        let set = PetImageSet(id: id, name: defaultName, storageFolder: folder, idleFileName: idleName, reactionFileNames: reactions, isBuiltIn: false)
-        customSets.append(set)
+        var replacement = original
+        replacement.storageFolder = folder
+        if original.isBuiltIn {
+            replacement = PetImageSet(id: UUID(), name: "自定义图像", storageFolder: folder,
+                                      idleFileName: original.idleFileName,
+                                      reactionFileNames: original.reactionFileNames, isBuiltIn: false)
+        }
+        do {
+            replacement.idleFileName = try (idleSource ?? idleURL(for: original))
+                .map { try copyImage(from: $0, to: directory) } ?? original.idleFileName
+            if let reactionSources {
+                replacement.reactionFileNames = try reactionSources.map { try copyImage(from: $0, to: directory) }
+            } else {
+                replacement.reactionFileNames = try original.reactionFileNames.map { name in
+                    try resolvedURL(fileName: name, set: original)
+                        .map { try copyImage(from: $0, to: directory) } ?? name
+                }
+            }
+            // Retain the original catalog and selection until copying and cleanup both succeed.
+            if !original.isBuiltIn { try removeStoredImages(for: original) }
+        } catch {
+            try fileManager.removeItem(at: directory)
+            throw error
+        }
+        if let index = customSets.firstIndex(where: { $0.id == replacement.id }) {
+            customSets[index] = replacement
+        } else {
+            customSets.append(replacement)
+        }
+        oldURLs.forEach { invalidateCache(for: $0) }
         persistGallery()
-        activeSetID = id
-        return set
+        activeSetID = replacement.id
     }
 
-    private func update(_ set: PetImageSet) {
-        guard let index = customSets.firstIndex(where: { $0.id == set.id }) else { return }
-        customSets[index] = set
-        persistGallery()
-        activeSetID = set.id
-    }
-
-    private func storageDirectory(for set: PetImageSet) throws -> URL {
-        let folder = set.storageFolder ?? set.id.uuidString
-        let url = setsDirectory.appendingPathComponent(folder, isDirectory: true)
-        try fileManager.createDirectory(at: url, withIntermediateDirectories: true)
-        return url
+    private func removeStoredImages(for set: PetImageSet) throws {
+        let otherSets = customSets.filter { $0.id != set.id }
+        if let folder = set.storageFolder {
+            guard !folder.isEmpty, folder != ".", folder != "..", !folder.contains("/") else {
+                throw PetImageLibraryError.invalidStoragePath
+            }
+            guard !otherSets.contains(where: { $0.storageFolder == folder }) else { return }
+            let directory = setsDirectory.appendingPathComponent(folder, isDirectory: true)
+            if fileManager.fileExists(atPath: directory.path) { try fileManager.removeItem(at: directory) }
+        } else {
+            // Legacy files live directly in Images; never remove that shared directory or bundled resources.
+            let retained = Set(otherSets.filter { $0.storageFolder == nil }
+                .flatMap { [$0.idleFileName] + $0.reactionFileNames })
+            for name in Set([set.idleFileName] + set.reactionFileNames).subtracting(retained) {
+                guard !name.isEmpty, name != ".", name != "..", !name.contains("/") else {
+                    throw PetImageLibraryError.invalidStoragePath
+                }
+                let url = imagesDirectory.appendingPathComponent(name)
+                if fileManager.fileExists(atPath: url.path) { try fileManager.removeItem(at: url) }
+            }
+        }
     }
 
     private func copyImage(from sourceURL: URL, to destinationDirectory: URL) throws -> String {

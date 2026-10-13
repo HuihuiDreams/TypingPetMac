@@ -217,6 +217,7 @@ internal final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegat
                 applyShake: { [weak self] in self?.petController.shakeLevel = $0 },
                 applyAlwaysOnTop: { [weak self] in self?.petController.isAlwaysOnTop = $0 },
                 applyPositionLock: { [weak self] in self?.petController.isPositionLocked = $0 },
+                currentPositionLock: { [weak self] in self?.petController.isPositionLocked ?? AppPreferencesDefault.positionLocked },
                 applyPointerAvoidance: { [weak self] in self?.petController.avoidsPointerWhenLocked = $0 },
                 reloadPet: { [weak self] in self?.petController.reloadImages() },
                 openInputMonitoringSettings: { [weak self] in self?.openInputMonitoringSettings() }

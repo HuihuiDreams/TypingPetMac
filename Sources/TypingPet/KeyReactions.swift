@@ -47,11 +47,13 @@ struct KeyReactionRule: Codable, Identifiable, Equatable {
 enum KeyReactionError: LocalizedError {
     case unreadableImage(String)
     case unsupportedFormat(String)
+    case invalidStoragePath
 
     var errorDescription: String? {
         switch self {
         case .unreadableImage(let name): "无法读取图像: \(name)"
         case .unsupportedFormat(let name): "不支持的图像格式: \(name)"
+        case .invalidStoragePath: "按键反应图像路径无效，无法安全清理文件。"
         }
     }
 }
@@ -101,41 +103,43 @@ final class KeyReactionStore {
         }
         try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
         let fileName = "\(UUID().uuidString).\(ext)"
-        try fileManager.copyItem(at: sourceURL, to: directory.appendingPathComponent(fileName))
-        
+        let destination = directory.appendingPathComponent(fileName)
         let oldRules = rules.filter { $0.stroke == stroke }
-        rules.removeAll { $0.stroke == stroke }
         let rule = KeyReactionRule(id: UUID(), stroke: stroke, imageFileName: fileName)
-        rules.append(rule)
-        rules.sort { $0.stroke.displayName < $1.stroke.displayName }
-        
-        for oldRule in oldRules {
-            deleteImageFileIfOrphaned(oldRule.imageFileName)
+        let nextRules = (rules.filter { $0.stroke != stroke } + [rule])
+            .sorted { $0.stroke.displayName < $1.stroke.displayName }
+        do {
+            try fileManager.copyItem(at: sourceURL, to: destination)
+            for oldRule in oldRules {
+                try deleteImageFileIfOrphaned(oldRule.imageFileName, remainingRules: nextRules)
+            }
+        } catch {
+            if fileManager.fileExists(atPath: destination.path) { try fileManager.removeItem(at: destination) }
+            throw error
         }
-        
+        rules = nextRules
         persist()
         return rule
     }
 
-    func removeRule(id: UUID) {
+    func removeRule(id: UUID) throws {
         let removed = rules.filter { $0.id == id }
-        rules.removeAll { $0.id == id }
+        let nextRules = rules.filter { $0.id != id }
         for rule in removed {
-            deleteImageFileIfOrphaned(rule.imageFileName)
+            try deleteImageFileIfOrphaned(rule.imageFileName, remainingRules: nextRules)
         }
+        rules = nextRules
         persist()
     }
 
-    private func deleteImageFileIfOrphaned(_ fileName: String) {
-        let trimmed = fileName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty,
-              trimmed != ".",
-              trimmed != "..",
-              !trimmed.contains("/") else { return }
-        guard !rules.contains(where: { $0.imageFileName == trimmed }) else { return }
-        let fileURL = directory.appendingPathComponent(trimmed)
+    private func deleteImageFileIfOrphaned(_ fileName: String, remainingRules: [KeyReactionRule]) throws {
+        guard !fileName.isEmpty, fileName != ".", fileName != "..", !fileName.contains("/") else {
+            throw KeyReactionError.invalidStoragePath
+        }
+        guard !remainingRules.contains(where: { $0.imageFileName == fileName }) else { return }
+        let fileURL = directory.appendingPathComponent(fileName)
         if fileManager.fileExists(atPath: fileURL.path) {
-            try? fileManager.removeItem(at: fileURL)
+            try fileManager.removeItem(at: fileURL)
         }
     }
 

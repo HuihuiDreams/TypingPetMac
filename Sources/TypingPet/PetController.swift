@@ -21,6 +21,7 @@ internal final class PetController: NSObject, NSWindowDelegate {
     private let onScaleChanged: (CGFloat) -> Void
     private var baseSize: NSSize
     private var currentImageKey = ""
+    private var reactionImageURLs: [URL]
     private var idleWorkItem: DispatchWorkItem?
     private var resizeInitialMouseLocation: NSPoint?
     private var resizeInitialFrame: NSRect?
@@ -46,8 +47,9 @@ internal final class PetController: NSObject, NSWindowDelegate {
     ) {
         self.library = library
         self.keyStore = keyStore
+        reactionImageURLs = library.reactionURLs
         self.onScaleChanged = onScaleChanged
-        let initialImage = library.idleURL.flatMap(NSImage.init(contentsOf:))
+        let initialImage = library.idleURL.flatMap { library.image(for: $0) }
         baseSize = Self.normalizedBaseSize(for: initialImage?.size ?? PetConstants.fallbackBaseSize)
         panel = PetPanel(
             contentRect: NSRect(
@@ -176,8 +178,7 @@ internal final class PetController: NSObject, NSWindowDelegate {
         if let stroke, let exactMatch = keyStore.imageURL(matching: stroke) {
             chosenURL = exactMatch
         } else {
-            let reactions = library.reactionURLs
-            let picker = ImagePicker(names: reactions.map(\.path))
+            let picker = ImagePicker(names: reactionImageURLs.map(\.path))
             chosenURL = picker.next(excluding: currentImageKey).map(URL.init(fileURLWithPath:))
         }
         guard let chosenURL else { return }
@@ -195,7 +196,8 @@ internal final class PetController: NSObject, NSWindowDelegate {
 
     func reloadImages() {
         idleWorkItem?.cancel()
-        if let idleImage = library.idleURL.flatMap(NSImage.init(contentsOf:)) {
+        reactionImageURLs = library.reactionURLs
+        if let idleImage = library.idleURL.flatMap({ library.image(for: $0) }) {
             baseSize = Self.normalizedBaseSize(for: idleImage.size)
         } else {
             baseSize = PetConstants.fallbackBaseSize
@@ -246,7 +248,7 @@ internal final class PetController: NSObject, NSWindowDelegate {
     }
 
     private func showImage(at url: URL) {
-        guard let image = NSImage(contentsOf: url) else { return }
+        guard let image = library.image(for: url) else { return }
         currentImageKey = url.path
         imageView.image = nil
         imageView.image = image
