@@ -5,6 +5,7 @@
 ### Added
 
 - 新增 15 个回归用例，覆盖图集迁移与替换、部分复制失败清理、删除重试、按键规则失败处理及设置状态同步。
+- 打包脚本 (`scripts/build_app.sh`) 末尾增加自动打包分发压缩包步骤，生成包含 `TypingPet.app` 与 `README.txt` 的 `dist/TypingPet-macOS.zip`。
 
 ### Fixed
 

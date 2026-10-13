@@ -81,3 +81,19 @@ else
     echo "Warning: this build is not signed with Developer ID and cannot be notarized."
 fi
 echo "$app_dir"
+
+zip_name="TypingPet-macOS.zip"
+zip_path="$destination/$zip_name"
+if [[ -f "$project_dir/README.txt" ]]; then
+    cp "$project_dir/README.txt" "$destination/README.txt"
+fi
+rm -f "$zip_path"
+(
+    cd "$destination"
+    if [[ -f "README.txt" ]]; then
+        zip -r -y -q "$zip_name" "$app_name.app" "README.txt" -x "*.DS_Store*"
+    else
+        zip -r -y -q "$zip_name" "$app_name.app" -x "*.DS_Store*"
+    fi
+)
+echo "$zip_path"
