@@ -97,6 +97,10 @@ final class KeyReactionStore {
         guard FolderImageSelection.supportedExtensions.contains(ext) else {
             throw KeyReactionError.unsupportedFormat(sourceURL.lastPathComponent)
         }
+        let values = try? sourceURL.resourceValues(forKeys: [.isSymbolicLinkKey, .isRegularFileKey])
+        if values?.isSymbolicLink == true {
+            throw KeyReactionError.unreadableImage(sourceURL.lastPathComponent)
+        }
         guard NSImage(contentsOf: sourceURL) != nil else {
             throw KeyReactionError.unreadableImage(sourceURL.lastPathComponent)
         }

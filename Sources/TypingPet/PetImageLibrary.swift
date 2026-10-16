@@ -149,9 +149,12 @@ final class PetImageLibrary {
     func addSet(from folderURL: URL, name: String? = nil) throws -> PetImageSet {
         let contents = try fileManager.contentsOfDirectory(
             at: folderURL,
-            includingPropertiesForKeys: [.isRegularFileKey],
+            includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey],
             options: [.skipsHiddenFiles]
-        )
+        ).filter { url in
+            let values = try? url.resourceValues(forKeys: [.isSymbolicLinkKey, .isRegularFileKey])
+            return values?.isSymbolicLink != true && values?.isRegularFile == true
+        }
         let selection = FolderImageSelection.make(from: contents)
         let allImages = ([selection.idleURL].compactMap { $0 } + selection.reactionURLs)
         guard !allImages.isEmpty else { throw PetImageLibraryError.noImagesInFolder }
@@ -334,6 +337,10 @@ final class PetImageLibrary {
         let ext = sourceURL.pathExtension.lowercased()
         guard FolderImageSelection.supportedExtensions.contains(ext) else {
             throw PetImageLibraryError.unsupportedFormat(sourceURL.lastPathComponent)
+        }
+        let values = try? sourceURL.resourceValues(forKeys: [.isSymbolicLinkKey, .isRegularFileKey])
+        if values?.isSymbolicLink == true {
+            throw PetImageLibraryError.unreadableImage(sourceURL.lastPathComponent)
         }
         guard NSImage(contentsOf: sourceURL) != nil else {
             throw PetImageLibraryError.unreadableImage(sourceURL.lastPathComponent)

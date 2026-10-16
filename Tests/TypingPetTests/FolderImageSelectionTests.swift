@@ -139,4 +139,33 @@ import Testing
         try library.replaceIdle(with: resource)
         #expect(library.idleURL?.path.contains("/Sets/") == true)
     }
+
+    @Test @MainActor
+    func ignoresSymlinkedImagesDuringFolderImport() throws {
+        let fileManager = FileManager.default
+        let root = fileManager.temporaryDirectory.appendingPathComponent("TypingPetSymlink-\(UUID())", isDirectory: true)
+        let input = root.appendingPathComponent("Input", isDirectory: true)
+        let stored = root.appendingPathComponent("Stored", isDirectory: true)
+        try fileManager.createDirectory(at: input, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: root) }
+
+        let packageRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let resources = packageRoot.appendingPathComponent("Sources/TypingPet/Resources", isDirectory: true)
+        let realImage = input.appendingPathComponent("idle.png")
+        try fileManager.copyItem(at: resources.appendingPathComponent("basic.png"), to: realImage)
+
+        let symlinkImage = input.appendingPathComponent("symlink.png")
+        try fileManager.createSymbolicLink(at: symlinkImage, withDestinationURL: realImage)
+
+        let suite = "TypingPetSymlinkTests.\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let library = PetImageLibrary(fileManager: fileManager, defaults: defaults, imagesDirectory: stored)
+        let imported = try library.addSet(from: input)
+
+        #expect(imported.reactionFileNames.allSatisfy { !$0.contains("symlink") })
+        #expect(throws: PetImageLibraryError.self) {
+            try library.replaceIdle(with: symlinkImage)
+        }
+    }
 }
