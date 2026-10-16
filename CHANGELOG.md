@@ -1,21 +1,33 @@
 # 更新日志
 
-## [Unreleased]
+## [0.12.2] - 2026-10-16
 
 ### Added
 
-- 新增 4 个回归用例：存储文件名校验、图库与按键规则文件名的路径穿越拦截、弹跳幅度覆盖全部抖动等级。
+- 在 `Info.plist` 中添加 `NSInputMonitoringUsageDescription` 权限用途描述文案，明确提示输入监控用于实时响应按键切换互动表情。
+- 扩充 `PetPreferencesContractTests`，新增 `preferencesKeysAndDefaultsAreConsistent` 契约测试，断言全部 13 个 `AppPreferencesKey` 常量唯一非空，且 `AppPreferencesDefault` 缩放范围、抖动等级及透明度默认值与边界符合约束。
+- 在 `KeyReactionTests` 中新增修饰键前缀顺序（`⌃⌥⇧⌘`）与 `F1`/`F2`/`F4` 功能键名称格式化测试。
+- 在 `PetWindowGeometryTests` 中新增指针躲避死角边界回归测试 `pointerAvoidanceReturnsNilWhenPinnedInCornerCannotMoveFurther`。
+
+### Fixed
+
+- 修复指针躲避在屏幕角落被逼停且鼠标在 90pt 范围内静止时，`targetOrigin` 仍返回当前原点导致 60 FPS 无限空转的问题。
+- 修复 `GlobalKeyMonitor.isRunning` 仅判断指针非空导致 Mach Port 失效后报告假阳性无法自动恢复的问题；并在 `AppDelegate` 监听系统唤醒通知实现自动重连。
+- 修复 `InputMonitoringGuide` 引导窗每 0.6s 轮询强行重置坐标、覆盖用户手动拖动位置的问题，改为仅在系统设置窗口首次出现或发生位移时平滑跟随；Timer 改为弱引用并在 `deinit` 安全释放。
+- 修复 `SettingsWindow` 缺少 `window.isReleasedWhenClosed = false` 导致关闭后重开可能失效的隐患。
+- 修复按键录制弹窗在空白处点击后失去键盘焦点且难以找回的问题；补充 `F1` (122)、`F2` (120)、`F4` (118) 功能键名称映射。
+- 修复 `FolderImageSelectionTests` 中直接使用 `"customIdleImageFile"` 与 `"customReactionImageFiles"` 字符串字面量的问题，改为统一引用 `AppPreferencesKey` 集中定义。
+- 修复 `scripts/notarize_release.sh` 在执行代码签名校验前缺少 `.app` 目录存在性判断的问题。
+- 统一 `scripts/notarize_release.sh` 归档输出文件名与打包格式：默认生成 `dist/TypingPet-macOS.zip` 并同步打包 `README.txt`，与 `build_app.sh` 保持一致。
+- 修复自定义图集磁盘文件丢失时没有自愈回退到默认图集的问题；修复单图文件夹导入时物理重复复制同一份图片的问题；修复 `catch` 回滚删除失败掩盖原始格式错误的问题。
 
 ### Changed
 
-- 窗口移动时不再逐帧写入 `UserDefaults`（移除 `windowDidMove` 保存），位置统一在拖拽、惯性、躲避和缩放结束时保存；拖拽缩放期间不再逐事件写入 `petScale`，改为松手时写入一次。
-- 每次击键只读取一次抖动等级；按键回调直接在主 RunLoop 上执行，去掉多余的 `DispatchQueue.main.async` 跳转。
-- 将惯性、指针躲避、拖拽采样、弹跳幅度与图像归一化尺寸等魔数收敛到 `PetConstants`。
-- 打包脚本签名时不再使用已弃用的 `codesign --deep`。
-
-### Security
-
-- 图库与按键规则的文件名在读取路径上也经过统一的 `StoredFileName` 校验，被篡改的偏好设置无法让应用读取存储目录以外的文件；删除路径改用同一校验。
+- 版本号提升至 `0.12.2` (Build 19)。
+- 清理 `AppDelegate.swift` 中旧版状态栏菜单残留的 14 个未使用的私有动作与辅助方法，文件从 410 行精简至 298 行。
+- 优化 `SettingsWindow.swift` 表单布局与视图层级，代码行数从 649 行压缩至 627 行，严格满足 ADR-001 规定的 650 行上限。
+- 优化 `InputMonitoringGuide` 与 `AppDelegate` 轮询定时器的 `tolerance` 容差，降低系统后台能耗。
+- 更新系统架构设计文档（`docs/architecture.md`），明确 `AppKit + SwiftUI` 与 `NSHostingController` 承载结构，并在根目录索引中补齐 `README.txt` 与 `LICENSE`。
 
 ## [0.12.1] - 2026-10-13
 

@@ -113,7 +113,7 @@ final class KeyReactionStore {
                 try deleteImageFileIfOrphaned(oldRule.imageFileName, remainingRules: nextRules)
             }
         } catch {
-            if fileManager.fileExists(atPath: destination.path) { try fileManager.removeItem(at: destination) }
+            if fileManager.fileExists(atPath: destination.path) { try? fileManager.removeItem(at: destination) }
             throw error
         }
         rules = nextRules
@@ -156,7 +156,7 @@ enum KeyCodeNames {
         41: ";", 42: "\\", 43: ",", 44: "/", 45: "N", 46: "M", 47: ".", 48: "Tab", 49: "Space", 50: "`",
         51: "Delete", 53: "Esc", 76: "Enter", 96: "F5", 97: "F6", 98: "F7", 99: "F3", 100: "F8",
         101: "F9", 103: "F11", 109: "F10", 111: "F12", 115: "Home", 116: "Page Up", 117: "Forward Delete",
-        119: "End", 121: "Page Down", 123: "←", 124: "→", 125: "↓", 126: "↑"
+        118: "F4", 119: "End", 120: "F2", 121: "Page Down", 122: "F1", 123: "←", 124: "→", 125: "↓", 126: "↑"
     ]
 
     static func name(for keyCode: UInt16) -> String { names[keyCode] ?? "按键 \(keyCode)" }

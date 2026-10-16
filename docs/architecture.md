@@ -1,8 +1,8 @@
 # TypingPetMac 架构设计文档
 
-> **最后更新**：2026-10-13
+> **最后更新**：2026-10-16
 >
-> **基准版本**：0.12.1（以当前仓库代码与配置为准；ADR 保留历史决策背景）
+> **基准版本**：0.12.2（以当前仓库代码与配置为准；ADR 保留历史决策背景）
 
 ---
 
@@ -13,7 +13,7 @@
 | 技术 / 框架 | 选型定位 | 说明与用途 |
 | :--- | :--- | :--- |
 | **Swift 6 (Swift 5 兼容模式)** | 核心编程语言 | 采用原生 Swift 编写，类型安全，严格并发检查（`@MainActor` 隔离）。 |
-| **AppKit (macOS 原生)** | 窗口与 UI 视图框架 | 提供非激活置顶面板（`NSPanel`）、自定义鼠标事件追踪、状态栏（`NSStatusItem`）常驻。 |
+| **AppKit + SwiftUI (macOS 原生)** | 窗口与 UI 视图框架 | 提供非激活置顶面板（`NSPanel`）、自定义鼠标事件追踪、状态栏（`NSStatusItem`）常驻；采用 `NSHostingController` 承载偏好设置与权限引导等 SwiftUI 界面。 |
 | **QuartzCore / CoreAnimation** | 渲染与动画图层 | `CALayer` 图层驱动、`CAKeyframeAnimation` 敲击弹跳，兼顾超高刷新率与极低 CPU 占用。 |
 | **CoreGraphics (`CGEventTap`)** | 全局低层级键盘监听 | 系统会话级输入监听（`.listenOnly`），无需辅助功能（Accessibility）即可捕获全局击键。 |
 | **ServiceManagement (`SMAppService`)** | 系统服务管理 | 现代 macOS 原生开机自启动管理，替代旧版废弃的 Login Items 方案。 |
@@ -38,6 +38,8 @@ TypingPetMac/
 ├── AGENTS.md                   # Agent 开发指南与工程规范
 ├── CHANGELOG.md                # 变更日志（遵循 Keep a Changelog 格式）
 ├── README.md                   # 中文使用说明与下载指引
+├── README.txt                  # 简要使用说明与启动提示（随包分发）
+├── LICENSE                     # MIT 开源许可证
 ├── ASSET_LICENSE.md            # 美术素材版权与致谢声明
 │
 ├── Sources/
@@ -51,7 +53,7 @@ TypingPetMac/
 │       ├── PetPreferences.swift       # 集中收敛的 UserDefaults 偏好键（AppPreferencesKey/Default）
 │       ├── PetImageLibrary.swift      # 图集管理、多角色切换、磁盘清理与 NSCache 图像缓存
 │       ├── KeyReactions.swift         # 独立按键规则管理（绑定单键/快捷键特定动作）与存储
-│       ├── SettingsWindow.swift       # AppKit 原生多标签偏好设置面板（4 点网格规范）
+│       ├── SettingsWindow.swift       # SwiftUI + AppKit NSHostingController 偏好设置面板（4 点网格规范）
 │       ├── InputMonitoringGuide.swift # 输入监听权限引导浮窗与系统设置窗口智能跟随
 │       ├── ImagePicker.swift          # 随机反应图选择，优先排除当前图像
 │       └── Resources/                 # 内置默认资源

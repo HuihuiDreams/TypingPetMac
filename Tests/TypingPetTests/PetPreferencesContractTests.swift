@@ -76,4 +76,42 @@ struct PetPreferencesContractTests {
         #expect(!monitor.isRunning)
         #expect(strokeReceived == nil)
     }
+
+    @Test func preferencesKeysAndDefaultsAreConsistent() {
+        let allKeys: [String] = [
+            AppPreferencesKey.alwaysOnTop,
+            AppPreferencesKey.positionLocked,
+            AppPreferencesKey.petScale,
+            AppPreferencesKey.restingOpacity,
+            AppPreferencesKey.hoverOpacity,
+            AppPreferencesKey.avoidsPointerWhenLocked,
+            AppPreferencesKey.shakeLevel,
+            AppPreferencesKey.windowFrame,
+            AppPreferencesKey.gallery,
+            AppPreferencesKey.activeSetID,
+            AppPreferencesKey.legacyIdleFile,
+            AppPreferencesKey.legacyReactionFiles,
+            AppPreferencesKey.keyReactionRules,
+        ]
+
+        #expect(allKeys.count == 13)
+        let uniqueKeys = Set(allKeys)
+        #expect(uniqueKeys.count == allKeys.count)
+        for key in allKeys {
+            #expect(!key.isEmpty)
+        }
+
+        // Scale bounds & default
+        #expect(AppPreferencesDefault.minScale < AppPreferencesDefault.petScale)
+        #expect(AppPreferencesDefault.petScale < AppPreferencesDefault.maxScale)
+        #expect(AppPreferencesDefault.minScale > 0)
+
+        // Shake level bounds & default
+        #expect(AppPreferencesDefault.minShakeLevel <= AppPreferencesDefault.shakeLevel)
+        #expect(AppPreferencesDefault.shakeLevel <= AppPreferencesDefault.maxShakeLevel)
+
+        // Opacity bounds
+        #expect((0.0...1.0).contains(AppPreferencesDefault.restingOpacity))
+        #expect((0.0...1.0).contains(AppPreferencesDefault.hoverOpacity))
+    }
 }

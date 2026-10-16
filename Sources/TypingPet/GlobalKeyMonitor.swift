@@ -11,7 +11,8 @@ internal final class GlobalKeyMonitor {
     }
 
     var isRunning: Bool {
-        eventTap != nil
+        guard let eventTap else { return false }
+        return CFMachPortIsValid(eventTap) && CGEvent.tapIsEnabled(tap: eventTap)
     }
 
     deinit {

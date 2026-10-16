@@ -14,9 +14,9 @@ cd "$project_dir"
 if [[ -z "${SDKROOT:-}" && -d "/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk" ]]; then
     export SDKROOT="/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk"
 fi
-swift build -c "$configuration"
+swift build --disable-sandbox -c "$configuration"
 
-binary_path="$(swift build -c "$configuration" --show-bin-path)/$app_name"
+binary_path="$(swift build --disable-sandbox -c "$configuration" --show-bin-path)/$app_name"
 rm -rf "$app_dir"
 mkdir -p "$macos_dir" "$resources_dir"
 cp "$binary_path" "$macos_dir/$app_name"
@@ -45,15 +45,17 @@ cat > "$contents_dir/Info.plist" <<'PLIST'
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>0.12.1</string>
+    <string>0.12.2</string>
     <key>CFBundleVersion</key>
-    <string>18</string>
+    <string>19</string>
     <key>LSMinimumSystemVersion</key>
     <string>13.0</string>
     <key>LSUIElement</key>
     <true/>
     <key>NSHumanReadableCopyright</key>
     <string>Personal macOS build</string>
+    <key>NSInputMonitoringUsageDescription</key>
+    <string>TypingPet 需要输入监控权限，以便在敲击键盘时实时切换宠物的互动表情。</string>
 </dict>
 </plist>
 PLIST

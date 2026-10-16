@@ -122,6 +122,7 @@ final class InputMonitoringGuideController: NSObject, NSWindowDelegate {
     private var panel: NSPanel?
     private var permissionTimer: Timer?
     private var windowTrackingTimer: Timer?
+    private var lastSettingsFrame: CGRect?
     private var didReportPermission = false
 
     init(appURL: URL = Bundle.main.bundleURL, onPermissionGranted: @escaping () -> Void) {
@@ -131,7 +132,14 @@ final class InputMonitoringGuideController: NSObject, NSWindowDelegate {
         super.init()
     }
 
+    deinit {
+        MainActor.assumeIsolated {
+            stopTimers()
+        }
+    }
+
     func show() {
+        lastSettingsFrame = nil
         model.isGranted = CGPreflightListenEventAccess()
         didReportPermission = false
 
@@ -146,6 +154,7 @@ final class InputMonitoringGuideController: NSObject, NSWindowDelegate {
     }
 
     func hide() {
+        lastSettingsFrame = nil
         stopTimers()
         panel?.orderOut(nil)
     }
@@ -154,7 +163,7 @@ final class InputMonitoringGuideController: NSObject, NSWindowDelegate {
         stopTimers()
     }
 
-    @objc private func refreshPermission() {
+    private func refreshPermission() {
         let granted = CGPreflightListenEventAccess()
         model.isGranted = granted
         guard granted, !didReportPermission else { return }
@@ -217,13 +226,19 @@ final class InputMonitoringGuideController: NSObject, NSWindowDelegate {
         panel.setFrameOrigin(origin)
     }
 
-    @objc private func followSystemSettingsWindow() {
+    private func followSystemSettingsWindow() {
         guard let panel,
               let primaryScreen = NSScreen.screens.first,
               let settingsFrame = SystemSettingsWindowLocator.frame(
                 primaryScreenMaxY: primaryScreen.frame.maxY
               ),
-              let screen = screen(containingMostOf: settingsFrame) else { return }
+              let screen = screen(containingMostOf: settingsFrame) else {
+            lastSettingsFrame = nil
+            return
+        }
+
+        guard lastSettingsFrame != settingsFrame else { return }
+        lastSettingsFrame = settingsFrame
 
         let origin = InputMonitoringGuidePlacement.origin(
             panelSize: panel.frame.size,
@@ -243,26 +258,24 @@ final class InputMonitoringGuideController: NSObject, NSWindowDelegate {
 
     private func startPermissionTimer() {
         permissionTimer?.invalidate()
-        let timer = Timer(
-            timeInterval: 0.75,
-            target: self,
-            selector: #selector(refreshPermission),
-            userInfo: nil,
-            repeats: true
-        )
+        let timer = Timer(timeInterval: 0.75, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.refreshPermission()
+            }
+        }
+        timer.tolerance = 0.2
         RunLoop.main.add(timer, forMode: .common)
         permissionTimer = timer
     }
 
     private func startWindowTrackingTimer() {
         windowTrackingTimer?.invalidate()
-        let timer = Timer(
-            timeInterval: 0.6,
-            target: self,
-            selector: #selector(followSystemSettingsWindow),
-            userInfo: nil,
-            repeats: true
-        )
+        let timer = Timer(timeInterval: 0.6, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.followSystemSettingsWindow()
+            }
+        }
+        timer.tolerance = 0.2
         RunLoop.main.add(timer, forMode: .common)
         windowTrackingTimer = timer
     }

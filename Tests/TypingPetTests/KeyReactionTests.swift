@@ -10,6 +10,21 @@ import Testing
         #expect(modifiers.displayPrefix == "⇧⌘")
     }
 
+    @Test func formatsControlAndOptionModifiersAndFunctionKeys() {
+        let allModifiers = KeyModifiers(eventFlags: [.maskControl, .maskAlternate, .maskShift, .maskCommand])
+        #expect(allModifiers == [.control, .option, .shift, .command])
+        #expect(allModifiers.displayPrefix == "⌃⌥⇧⌘")
+
+        let f1 = KeyStroke(keyCode: 122, modifiers: [.control])
+        #expect(f1.displayName == "⌃F1")
+
+        let f2 = KeyStroke(keyCode: 120, modifiers: [.option])
+        #expect(f2.displayName == "⌥F2")
+
+        let f4 = KeyStroke(keyCode: 118, modifiers: [])
+        #expect(f4.displayName == "F4")
+    }
+
     @Test func sameKeyWithDifferentModifiersIsDifferentStroke() {
         let plain = KeyStroke(keyCode: 40, modifiers: [])
         let command = KeyStroke(keyCode: 40, modifiers: [.command])

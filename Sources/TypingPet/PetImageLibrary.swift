@@ -38,12 +38,6 @@ struct PetImageSet: Codable, Identifiable, Equatable {
     var isBuiltIn: Bool
 }
 
-struct FolderImportResult {
-    let imageSet: PetImageSet
-    let changedIdle: Bool
-    let reactionCount: Int?
-}
-
 enum PetImageLibraryError: LocalizedError {
     case unsupportedFormat(String)
     case unreadableImage(String)
@@ -84,6 +78,7 @@ final class PetImageLibrary {
     init(fileManager: FileManager = .default, defaults: UserDefaults = .standard, imagesDirectory: URL? = nil) {
         self.fileManager = fileManager
         self.defaults = defaults
+        imageCache.countLimit = 64
         if let imagesDirectory {
             self.imagesDirectory = imagesDirectory
         } else {
@@ -174,9 +169,13 @@ final class PetImageLibrary {
         let reactionNames: [String]
         do {
             idleName = try copyImage(from: idleSource, to: destination)
-            reactionNames = try reactionSources.map { try copyImage(from: $0, to: destination) }
+            if reactionSources.count == 1 && reactionSources[0] == idleSource {
+                reactionNames = [idleName]
+            } else {
+                reactionNames = try reactionSources.map { try copyImage(from: $0, to: destination) }
+            }
         } catch {
-            try fileManager.removeItem(at: destination)
+            try? fileManager.removeItem(at: destination)
             throw error
         }
         let trimmedName = name?.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -225,12 +224,6 @@ final class PetImageLibrary {
     func replaceReactions(with sourceURLs: [URL]) throws {
         guard !sourceURLs.isEmpty else { throw PetImageLibraryError.noReactionImages }
         try replaceImages(idleSource: nil, reactionSources: sourceURLs)
-    }
-
-    @discardableResult
-    func importFolder(_ folderURL: URL) throws -> FolderImportResult {
-        let set = try addSet(from: folderURL)
-        return FolderImportResult(imageSet: set, changedIdle: true, reactionCount: set.reactionFileNames.count)
     }
 
     func resetToDefaults() { activeSetID = Self.builtInID }
@@ -358,7 +351,9 @@ final class PetImageLibrary {
     }
 
     private func repairActiveSelection() {
-        if !imageSets.contains(where: { $0.id == activeSetID }) { activeSetID = Self.builtInID }
+        if !imageSets.contains(where: { $0.id == activeSetID }) || (activeSetID != Self.builtInID && idleURL(for: activeSet) == nil) {
+            activeSetID = Self.builtInID
+        }
     }
 
     private func migrateLegacySelectionIfNeeded() {

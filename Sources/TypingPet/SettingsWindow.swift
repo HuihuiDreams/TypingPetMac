@@ -19,8 +19,8 @@ final class TypingPetSettingsModel: ObservableObject {
     @Published private(set) var launchAtLogin: Bool
     @Published var errorMessage: String?
 
-    let library: PetImageLibrary
-    let keyStore: KeyReactionStore
+    private let library: PetImageLibrary
+    private let keyStore: KeyReactionStore
     private let applyScale: (CGFloat) -> Void
     private let applyRestingOpacity: (CGFloat) -> Void
     private let applyHoverOpacity: (CGFloat) -> Void
@@ -33,15 +33,9 @@ final class TypingPetSettingsModel: ObservableObject {
     private let openInputMonitoringSettingsAction: () -> Void
 
     init(
-        library: PetImageLibrary,
-        keyStore: KeyReactionStore,
-        scale: CGFloat,
-        restingOpacity: CGFloat,
-        hoverOpacity: CGFloat,
-        shakeLevel: Int,
-        alwaysOnTop: Bool,
-        positionLocked: Bool,
-        avoidsPointerWhenLocked: Bool,
+        library: PetImageLibrary, keyStore: KeyReactionStore,
+        scale: CGFloat, restingOpacity: CGFloat, hoverOpacity: CGFloat, shakeLevel: Int,
+        alwaysOnTop: Bool, positionLocked: Bool, avoidsPointerWhenLocked: Bool,
         applyScale: @escaping (CGFloat) -> Void,
         applyRestingOpacity: @escaping (CGFloat) -> Void,
         applyHoverOpacity: @escaping (CGFloat) -> Void,
@@ -81,13 +75,8 @@ final class TypingPetSettingsModel: ObservableObject {
     var selectedSet: PetImageSet? { imageSets.first { $0.id == selectedSetID } }
     var inputMonitoringGranted: Bool { CGPreflightListenEventAccess() }
 
-    func thumbnail(for set: PetImageSet) -> NSImage? {
-        library.thumbnail(for: set)
-    }
-
-    func ruleImage(for rule: KeyReactionRule) -> NSImage? {
-        keyStore.imageURL(for: rule).flatMap { library.image(for: $0) }
-    }
+    func thumbnail(for set: PetImageSet) -> NSImage? { library.thumbnail(for: set) }
+    func ruleImage(for rule: KeyReactionRule) -> NSImage? { keyStore.imageURL(for: rule).flatMap { library.image(for: $0) } }
 
     func refresh() {
         imageSets = library.imageSets
@@ -224,9 +213,7 @@ final class TypingPetSettingsModel: ObservableObject {
         } catch { errorMessage = error.localizedDescription }
     }
 
-    func openInputMonitoringSettings() {
-        openInputMonitoringSettingsAction()
-    }
+    func openInputMonitoringSettings() { openInputMonitoringSettingsAction() }
 }
 
 @MainActor
@@ -238,6 +225,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         window.setContentSize(NSSize(width: 780, height: 600))
         window.minSize = NSSize(width: 700, height: 540)
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
+        window.isReleasedWhenClosed = false
         window.center()
         super.init(window: window)
         window.delegate = self
@@ -270,10 +258,9 @@ private struct SettingsRootView: View {
                 .tabItem { Label("按键反应", systemImage: "keyboard") }
         }
         .padding(SettingsMetrics.space4)
-        .alert("错误", isPresented: Binding(
-            get: { model.errorMessage != nil },
-            set: { if !$0 { model.errorMessage = nil } }
-        )) { Button("好") { model.errorMessage = nil } } message: {
+        .alert("错误", isPresented: Binding(get: { model.errorMessage != nil }, set: { if !$0 { model.errorMessage = nil } })) {
+            Button("好") { model.errorMessage = nil }
+        } message: {
             Text(model.errorMessage ?? "")
         }
     }
@@ -380,20 +367,12 @@ private struct GeneralSettingsView: View {
                         SettingsSliderRow(
                             title: "尺寸",
                             value: Binding(get: { model.scale }, set: model.setScale),
-                            range: 0.35...1.25
+                            range: Double(AppPreferencesDefault.minScale)...Double(AppPreferencesDefault.maxScale)
                         )
                         Divider()
-                        SettingsSliderRow(
-                            title: "常驻不透明度",
-                            value: Binding(get: { model.restingOpacity }, set: model.setRestingOpacity),
-                            range: 0...1
-                        )
+                        SettingsSliderRow(title: "常驻不透明度", value: Binding(get: { model.restingOpacity }, set: model.setRestingOpacity), range: 0...1)
                         Divider()
-                        SettingsSliderRow(
-                            title: "悬停不透明度",
-                            value: Binding(get: { model.hoverOpacity }, set: model.setHoverOpacity),
-                            range: 0...1
-                        )
+                        SettingsSliderRow(title: "悬停不透明度", value: Binding(get: { model.hoverOpacity }, set: model.setHoverOpacity), range: 0...1)
                         Divider()
                         SettingsNote(text: "100% 为完全不透明，0% 为完全透明。")
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -413,15 +392,9 @@ private struct GeneralSettingsView: View {
                             }
                         }
                         Divider()
-                        SettingsToggleRow(
-                            title: "始终置顶显示",
-                            isOn: Binding(get: { model.alwaysOnTop }, set: model.setAlwaysOnTop)
-                        )
+                        SettingsToggleRow(title: "始终置顶显示", isOn: Binding(get: { model.alwaysOnTop }, set: model.setAlwaysOnTop))
                         Divider()
-                        SettingsToggleRow(
-                            title: "锁定位置 (点击穿透)",
-                            isOn: Binding(get: { model.positionLocked }, set: model.setPositionLocked)
-                        )
+                        SettingsToggleRow(title: "锁定位置 (点击穿透)", isOn: Binding(get: { model.positionLocked }, set: model.setPositionLocked))
                         Divider()
                         SettingsToggleRow(
                             title: "位置锁定下避开鼠标",
@@ -436,10 +409,7 @@ private struct GeneralSettingsView: View {
 
                 FlatSettingsSection("系统") {
                     VStack(spacing: 0) {
-                        SettingsToggleRow(
-                            title: "登录时自动启动",
-                            isOn: Binding(get: { model.launchAtLogin }, set: model.toggleLaunchAtLogin)
-                        )
+                        SettingsToggleRow(title: "登录时自动启动", isOn: Binding(get: { model.launchAtLogin }, set: model.toggleLaunchAtLogin))
                         Divider()
                         SettingsRow {
                             HStack(spacing: SettingsMetrics.space3) {
@@ -486,7 +456,7 @@ private struct GallerySettingsView: View {
             Divider()
             HStack(spacing: SettingsMetrics.space2) {
                 if let set = model.selectedSet {
-                    Text("\(set.name) · 反应图像 \(model.library.reactionURLs(for: set).count) 张")
+                    Text("\(set.name) · 反应图像 \(set.reactionFileNames.count) 张")
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -566,12 +536,7 @@ private struct KeyReactionSettingsView: View {
                             .buttonStyle(.borderless)
                     }
                     .padding(.vertical, SettingsMetrics.space2)
-                    .listRowInsets(EdgeInsets(
-                        top: 0,
-                        leading: SettingsMetrics.space1,
-                        bottom: 0,
-                        trailing: SettingsMetrics.space1
-                    ))
+                    .listRowInsets(EdgeInsets(top: 0, leading: SettingsMetrics.space1, bottom: 0, trailing: SettingsMetrics.space1))
                 }
                 .listStyle(.plain)
             }
@@ -607,18 +572,22 @@ private struct KeyCaptureSheet: View {
     @State private var captured: KeyStroke?
 
     var body: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "keyboard.badge.ellipsis").font(.system(size: 42)).foregroundStyle(.tint)
-            Text("请按下要绑定的按键或按键组合").font(.title3).bold()
-            Text(captured?.displayName ?? "例如: K, ⌘K, ⌃⌥Space")
-                .font(.system(size: 22, weight: .semibold, design: .rounded)).frame(minHeight: 32)
-            KeyCaptureView { captured = $0 }.frame(width: 1, height: 1)
-            HStack {
-                Button("取消", action: onCancel)
-                Button("确定") { if let captured { onCapture(captured) } }
-                    .buttonStyle(.borderedProminent).disabled(captured == nil)
+        ZStack {
+            KeyCaptureView { captured = $0 }
+            VStack(spacing: 20) {
+                Image(systemName: "keyboard.badge.ellipsis").font(.system(size: 42)).foregroundStyle(.tint)
+                Text("请按下要绑定的按键或按键组合").font(.title3).bold()
+                Text(captured?.displayName ?? "例如: K, ⌘K, ⌃⌥Space")
+                    .font(.system(size: 22, weight: .semibold, design: .rounded)).frame(minHeight: 32)
+                HStack {
+                    Button("取消", action: onCancel)
+                    Button("确定") { if let captured { onCapture(captured) } }
+                        .buttonStyle(.borderedProminent).disabled(captured == nil)
+                }
             }
-        }.padding(32).frame(width: 420, height: 260)
+            .padding(32)
+        }
+        .frame(width: 420, height: 260)
     }
 }
 
@@ -636,12 +605,22 @@ private struct KeyCaptureView: NSViewRepresentable {
     final class CaptureNSView: NSView {
         var onCapture: ((KeyStroke) -> Void)?
         override var acceptsFirstResponder: Bool { true }
+
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
-            DispatchQueue.main.async { [weak self] in if let self { self.window?.makeFirstResponder(self) } }
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.window?.makeFirstResponder(self)
+            }
         }
+
+        override func mouseDown(with event: NSEvent) {
+            window?.makeFirstResponder(self)
+        }
+
         override func keyDown(with event: NSEvent) {
-            let modifiers = KeyModifiers(eventFlags: CGEventFlags(rawValue: UInt64(event.modifierFlags.rawValue)))
+            let flags = event.cgEvent?.flags ?? CGEventFlags(rawValue: UInt64(event.modifierFlags.rawValue))
+            let modifiers = KeyModifiers(eventFlags: flags)
             onCapture?(KeyStroke(keyCode: event.keyCode, modifiers: modifiers))
         }
     }

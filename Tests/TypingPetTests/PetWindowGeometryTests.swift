@@ -125,6 +125,18 @@ import Testing
         #expect(target.y + frame.height <= bounds.maxY)
     }
 
+    @Test func pointerAvoidanceReturnsNilWhenPinnedInCornerCannotMoveFurther() {
+        let tightBounds = CGRect(x: 0, y: 0, width: 100, height: 100)
+        let frame = CGRect(x: 0, y: 0, width: 100, height: 100)
+        let mouse = CGPoint(x: 50, y: 50)
+        let target = PetPointerAvoidance.targetOrigin(
+            mouseLocation: mouse,
+            petFrame: frame,
+            bounds: tightBounds
+        )
+        #expect(target == nil)
+    }
+
     @Test func opacitySelectsRestingAndHoverValuesImmediately() {
         #expect(
             abs(PetOpacityBehavior.opacity(

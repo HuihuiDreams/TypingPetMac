@@ -128,8 +128,8 @@ import Testing
         let suite = "TypingPetMigrationTests.\(UUID())"
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
-        defaults.set("legacy.png", forKey: "customIdleImageFile")
-        defaults.set(["legacy.png"], forKey: "customReactionImageFiles")
+        defaults.set("legacy.png", forKey: AppPreferencesKey.legacyIdleFile)
+        defaults.set(["legacy.png"], forKey: AppPreferencesKey.legacyReactionFiles)
 
         let library = PetImageLibrary(fileManager: fileManager, defaults: defaults, imagesDirectory: root)
         #expect(library.imageSets.count == 2)

@@ -120,6 +120,18 @@ internal final class PetController: NSObject {
         updatePointerAvoidance()
     }
 
+    deinit {
+        if let globalMouseMonitor {
+            NSEvent.removeMonitor(globalMouseMonitor)
+        }
+        if let localMouseMonitor {
+            NSEvent.removeMonitor(localMouseMonitor)
+        }
+        inertiaTimer?.invalidate()
+        avoidanceTimer?.invalidate()
+        idleWorkItem?.cancel()
+    }
+
     var isAlwaysOnTop: Bool {
         get { panel.level == .floating }
         set {
@@ -242,13 +254,27 @@ internal final class PetController: NSObject {
     func resetPosition() {
         stopInertia(savePosition: false)
         stopPointerAvoidance(savePosition: false)
-        guard let screen = NSScreen.main else { return }
+        guard let screen = panel.screen ?? NSScreen.main ?? NSScreen.screens.first else { return }
         let size = panel.frame.size
         let visible = screen.visibleFrame
         let origin = NSPoint(
             x: visible.maxX - size.width - 24,
             y: visible.minY + 24
         )
+        panel.setFrameOrigin(origin)
+        panel.saveFrame(usingName: AppPreferencesKey.windowFrame)
+    }
+
+    func clampToVisibleScreen() {
+        guard let screen = panel.screen ?? NSScreen.main ?? NSScreen.screens.first else { return }
+        let visible = screen.visibleFrame
+        let frame = panel.frame
+        let origin = PetPointerAvoidance.clampedOrigin(
+            frame.origin,
+            size: frame.size,
+            bounds: visible
+        )
+        guard origin != frame.origin else { return }
         panel.setFrameOrigin(origin)
         panel.saveFrame(usingName: AppPreferencesKey.windowFrame)
     }
@@ -323,7 +349,7 @@ internal final class PetController: NSObject {
         }
         inertiaVelocity = velocity
         inertiaLastTimestamp = ProcessInfo.processInfo.systemUptime
-        inertiaBounds = (panel.screen ?? NSScreen.main)?.visibleFrame
+        inertiaBounds = (panel.screen ?? NSScreen.main ?? NSScreen.screens.first)?.visibleFrame
         let timer = Timer(timeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.advanceInertia() }
         }
@@ -398,7 +424,7 @@ internal final class PetController: NSObject {
 
     private func updatePointerAvoidance() {
         guard panel.isVisible, isPositionLocked, avoidsPointerWhenLocked else { return }
-        let bounds = avoidanceBounds ?? (panel.screen ?? NSScreen.main)?.visibleFrame ?? panel.frame
+        let bounds = avoidanceBounds ?? (panel.screen ?? NSScreen.main ?? NSScreen.screens.first)?.visibleFrame ?? panel.frame
         guard PetPointerAvoidance.targetOrigin(
             mouseLocation: NSEvent.mouseLocation,
             petFrame: panel.frame,
@@ -463,7 +489,7 @@ internal final class PetController: NSObject {
         panel.setFrameOrigin(nextOrigin)
         updatePetOpacity()
 
-        if target == nil, hypot(avoidanceVelocity.dx, avoidanceVelocity.dy) < PetConstants.avoidanceStopSpeed {
+        if (target == nil || hypot(delta.dx, delta.dy) < 0.5), hypot(avoidanceVelocity.dx, avoidanceVelocity.dy) < PetConstants.avoidanceStopSpeed {
             stopPointerAvoidance(savePosition: true)
         }
     }

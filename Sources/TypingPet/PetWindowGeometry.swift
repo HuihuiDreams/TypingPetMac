@@ -59,7 +59,7 @@ struct PetPointerAvoidance {
         }
         let travel = min(max(triggerDistance - currentDistance + 46, 46), 130)
 
-        return directions.map { direction -> (CGPoint, CGFloat) in
+        guard let bestOrigin = directions.map({ direction -> (CGPoint, CGFloat) in
             let proposed = CGPoint(
                 x: petFrame.origin.x + direction.dx * travel,
                 y: petFrame.origin.y + direction.dy * travel
@@ -74,9 +74,11 @@ struct PetPointerAvoidance {
                 + diagonalness * 18
                 + actualTravel * 0.03
             return (origin, score)
+        }).max(by: { $0.1 < $1.1 })?.0,
+              hypot(bestOrigin.x - petFrame.origin.x, bestOrigin.y - petFrame.origin.y) >= 0.5 else {
+            return nil
         }
-        .max(by: { $0.1 < $1.1 })?
-        .0
+        return bestOrigin
     }
 
     static func clampedOrigin(_ origin: CGPoint, size: CGSize, bounds: CGRect) -> CGPoint {

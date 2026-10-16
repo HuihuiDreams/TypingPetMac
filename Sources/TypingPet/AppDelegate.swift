@@ -1,7 +1,6 @@
 import AppKit
 import CoreGraphics
 import ServiceManagement
-import UniformTypeIdentifiers
 
 // MARK: - AppDelegate
 
@@ -44,12 +43,27 @@ internal final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegat
 
         startMonitoringOrRequestPermission(shouldShowAlert: true)
 
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self,
+            selector: #selector(retryMonitoringIfAuthorized),
+            name: NSWorkspace.didWakeNotification,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleScreenParametersChanged),
+            name: NSApplication.didChangeScreenParametersNotification,
+            object: nil
+        )
+
         if ProcessInfo.processInfo.arguments.contains("--show-settings") {
             DispatchQueue.main.async { [weak self] in self?.showSettings() }
         }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        NSWorkspace.shared.notificationCenter.removeObserver(self)
+        NotificationCenter.default.removeObserver(self)
         permissionRetryTimer?.invalidate()
         keyMonitor.stop()
     }
@@ -76,128 +90,22 @@ internal final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegat
         updateMonitoringStatusItem()
     }
 
-    @objc private func toggleAlwaysOnTop() {
-        petController.isAlwaysOnTop.toggle()
-    }
-
     @objc private func togglePetVisibility() {
         petController.togglePetVisibility()
     }
 
     @objc private func togglePositionLock() {
         petController.isPositionLocked.toggle()
+        settingsModel?.refresh()
     }
 
     @objc private func resetPosition() {
         petController.resetPosition()
+        settingsModel?.refresh()
     }
 
-    @objc private func setSmallSize() {
-        petController.scale = AppPreferencesDefault.smallScale
-    }
-
-    @objc private func setMediumSize() {
-        petController.scale = AppPreferencesDefault.mediumScale
-    }
-
-    @objc private func setLargeSize() {
-        petController.scale = AppPreferencesDefault.largeScale
-    }
-
-    @objc private func setExtraLargeSize() {
-        petController.scale = AppPreferencesDefault.extraLargeScale
-    }
-
-    @objc private func changeIdleImage() {
-        guard let url = chooseImageFiles(
-            title: "选择待机图像",
-            message: "请选择无按键输入时显示的图像。",
-            allowsMultipleSelection: false
-        )?.first else { return }
-
-        do {
-            try imageLibrary.replaceIdle(with: url)
-            petController.reloadImages()
-        } catch {
-            showImageError(error)
-        }
-    }
-
-    @objc private func replaceReactionImages() {
-        guard let urls = chooseImageFiles(
-            title: "选择反应图像",
-            message: "请选择按下按键时随机显示的一张或多张图像。",
-            allowsMultipleSelection: true
-        ), !urls.isEmpty else { return }
-
-        do {
-            try imageLibrary.replaceReactions(with: urls)
-            petController.reloadImages()
-        } catch {
-            showImageError(error)
-        }
-    }
-
-    @objc private func importImageFolder() {
-        NSRunningApplication.current.activate(options: [.activateIgnoringOtherApps])
-        let panel = NSOpenPanel()
-        panel.title = "导入图像文件夹"
-        panel.message = "idle.* 或 pet-idle.* 作为待机图像，其余作为按键输入反应图像导入。"
-        panel.prompt = "导入"
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.allowsMultipleSelection = false
-
-        guard panel.runModal() == .OK, let folderURL = panel.url else { return }
-
-        do {
-            let result = try imageLibrary.importFolder(folderURL)
-            petController.reloadImages()
-
-            var parts: [String] = []
-            if result.changedIdle {
-                parts.append("待机图像 1 张")
-            }
-            if let reactionCount = result.reactionCount {
-                parts.append("反应图像 \(reactionCount) 张")
-            }
-            showAlert(
-                title: "图像导入成功",
-                message: "已应用 " + parts.joined(separator: ", ") + "。",
-                primaryButton: "好"
-            )
-        } catch {
-            showImageError(error)
-        }
-    }
-
-    @objc private func showImageFolderRules() {
-        showAlert(
-            title: "图像集文件夹规则",
-            message: "文件名无限制。若包含 idle.* 或 pet-idle.* 文件，将作为待机图像，其余作为按键输入反应图像。若无待机图像，则按文件名排序的第一张作为待机图像。若仅有 1 张图像，则同时用于待机和反应。支持 PNG、APNG、JPG、GIF、TIFF、HEIC、WebP 格式。",
-            primaryButton: "好"
-        )
-    }
-
-    @objc private func resetImages() {
-        showAlert(
-            title: "确定恢复为默认图像吗？",
-            message: "将当前选中的待机图像和反应图像设置恢复为默认值。不会修改原始图像文件。",
-            primaryButton: "恢复",
-            secondaryButton: "取消"
-        ) { [weak self] response in
-            guard response == .alertFirstButtonReturn else { return }
-            self?.imageLibrary.resetToDefaults()
-            self?.petController.reloadImages()
-        }
-    }
-
-    @objc private func restartMonitoring() {
-        startMonitoringOrRequestPermission(shouldShowAlert: true)
-    }
-
-    @objc private func previewReaction() {
-        petController.handleKeystroke(nil)
+    @objc private func handleScreenParametersChanged() {
+        petController.clampToVisibleScreen()
     }
 
     @objc private func showSettings() {
@@ -320,31 +228,6 @@ internal final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegat
         return item
     }
 
-    private func chooseImageFiles(
-        title: String,
-        message: String,
-        allowsMultipleSelection: Bool
-    ) -> [URL]? {
-        NSRunningApplication.current.activate(options: [.activateIgnoringOtherApps])
-        let panel = NSOpenPanel()
-        panel.title = title
-        panel.message = message
-        panel.prompt = "选择"
-        panel.canChooseDirectories = false
-        panel.canChooseFiles = true
-        panel.allowsMultipleSelection = allowsMultipleSelection
-        panel.allowedContentTypes = [.image]
-        return panel.runModal() == .OK ? panel.urls : nil
-    }
-
-    private func showImageError(_ error: Error) {
-        showAlert(
-            title: "无法应用图像",
-            message: error.localizedDescription,
-            primaryButton: "好"
-        )
-    }
-
     private func startMonitoringOrRequestPermission(shouldShowAlert: Bool) {
         if CGPreflightListenEventAccess(), keyMonitor.start() {
             permissionRetryTimer?.invalidate()
@@ -352,7 +235,7 @@ internal final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegat
             return
         }
 
-        schedulePermissionRetry()
+        startPermissionRetryTimerIfNeeded()
         guard shouldShowAlert, !didShowPermissionAlert else { return }
         didShowPermissionAlert = true
         _ = CGRequestListenEventAccess()
@@ -368,15 +251,21 @@ internal final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegat
         }
     }
 
-    private func schedulePermissionRetry() {
+    private func startPermissionRetryTimerIfNeeded() {
         guard permissionRetryTimer == nil else { return }
-        permissionRetryTimer = Timer.scheduledTimer(
+        let timer = Timer.scheduledTimer(
             timeInterval: 1,
             target: self,
             selector: #selector(retryMonitoringIfAuthorized),
             userInfo: nil,
             repeats: true
         )
+        timer.tolerance = 0.5
+        permissionRetryTimer = timer
+    }
+
+    private func schedulePermissionRetry() {
+        startPermissionRetryTimerIfNeeded()
     }
 
     @objc private func retryMonitoringIfAuthorized() {
