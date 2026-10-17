@@ -98,7 +98,7 @@ final class KeyReactionStore {
             throw KeyReactionError.unsupportedFormat(sourceURL.lastPathComponent)
         }
         let values = try? sourceURL.resourceValues(forKeys: [.isSymbolicLinkKey, .isRegularFileKey])
-        if values?.isSymbolicLink == true {
+        guard values?.isSymbolicLink == false, values?.isRegularFile == true else {
             throw KeyReactionError.unreadableImage(sourceURL.lastPathComponent)
         }
         guard NSImage(contentsOf: sourceURL) != nil else {

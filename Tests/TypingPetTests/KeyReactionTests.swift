@@ -56,4 +56,29 @@ import Testing
         #expect(restored.rules.count == 1)
         #expect(restored.imageURL(matching: stroke) != nil)
     }
+
+    @Test @MainActor
+    func rejectsSymlinkedRuleImage() throws {
+        let fileManager = FileManager.default
+        let root = fileManager.temporaryDirectory.appendingPathComponent("TypingPetKeySymlink-\(UUID())", isDirectory: true)
+        let stored = root.appendingPathComponent("Rules", isDirectory: true)
+        try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: root) }
+
+        let packageRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let realImage = packageRoot.appendingPathComponent("Sources/TypingPet/Resources/left.png")
+        let symlinkImage = root.appendingPathComponent("symlink.png")
+        try fileManager.createSymbolicLink(at: symlinkImage, withDestinationURL: realImage)
+
+        let suite = "TypingPetKeySymlinkTests.\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let store = KeyReactionStore(fileManager: fileManager, defaults: defaults, directory: stored)
+        let stroke = KeyStroke(keyCode: 40, modifiers: [.command])
+        #expect(throws: KeyReactionError.self) {
+            try store.setRule(for: stroke, image: symlinkImage)
+        }
+        #expect(store.rules.isEmpty)
+    }
 }

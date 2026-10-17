@@ -339,7 +339,7 @@ final class PetImageLibrary {
             throw PetImageLibraryError.unsupportedFormat(sourceURL.lastPathComponent)
         }
         let values = try? sourceURL.resourceValues(forKeys: [.isSymbolicLinkKey, .isRegularFileKey])
-        if values?.isSymbolicLink == true {
+        guard values?.isSymbolicLink == false, values?.isRegularFile == true else {
             throw PetImageLibraryError.unreadableImage(sourceURL.lastPathComponent)
         }
         guard NSImage(contentsOf: sourceURL) != nil else {

@@ -76,16 +76,16 @@ if [[ -z "$signing_identity" ]]; then
 fi
 
 entitlements_file="$project_dir/Sources/TypingPet/Resources/TypingPet.entitlements"
-entitlements_arg=()
-if [[ -f "$entitlements_file" ]]; then
-    entitlements_arg=(--entitlements "$entitlements_file")
+if [[ ! -f "$entitlements_file" ]]; then
+    echo "Error: missing entitlements file at $entitlements_file" >&2
+    exit 1
 fi
 
 if [[ "$signing_identity" == "Developer ID Application:"* ]]; then
-    codesign --force --options runtime "${entitlements_arg[@]}" --timestamp --sign "$signing_identity" "$app_dir"
+    codesign --force --options runtime --entitlements "$entitlements_file" --timestamp --sign "$signing_identity" "$app_dir"
     echo "Signed for distribution with $signing_identity"
 else
-    codesign --force --options runtime "${entitlements_arg[@]}" --timestamp=none --sign "$signing_identity" "$app_dir"
+    codesign --force --options runtime --entitlements "$entitlements_file" --timestamp=none --sign "$signing_identity" "$app_dir"
     echo "Warning: this build is not signed with Developer ID and cannot be notarized."
 fi
 echo "$app_dir"

@@ -4,13 +4,13 @@
 
 ### Added
 
-- 新增 `Sources/TypingPet/Resources/TypingPet.entitlements` 运行时强化权限描述文件，显式禁用 JIT、未签名可执行内存并强制启用库验证（Library Validation），防御本地 dylib 注入。
-- 在 `scripts/build_app.sh` 中增加 `--entitlements` 签名入参，并在打包完成时自动计算并输出 `dist/TypingPet-macOS.zip` 的 SHA-256 校验哈希。
-- 在 `Tests/TypingPetTests/FolderImageSelectionTests.swift` 中新增 `ignoresSymlinkedImagesDuringFolderImport` 符号链接过滤与拒绝导入回归测试。
+- 新增 `Sources/TypingPet/Resources/TypingPet.entitlements` 运行时强化权限描述文件，显式禁用 JIT、未签名可执行内存并保持库验证（Library Validation，在具备 Team ID 证书签名时生效）。
+- 在 `scripts/build_app.sh` 中强制校验并传入 `--entitlements` 签名入参，并在打包完成时自动计算并输出 `dist/TypingPet-macOS.zip` 的 SHA-256 校验哈希。
+- 在 `Tests/TypingPetTests/FolderImageSelectionTests.swift` 与 `Tests/TypingPetTests/KeyReactionTests.swift` 中新增 `ignoresSymlinkedImagesDuringFolderImport` 与 `rejectsSymlinkedRuleImage` 符号链接过滤与拒绝导入回归测试。
 
 ### Security
 
-- 强化图库与规则导入安全：`PetImageLibrary.addSet` 在遍历文件夹时通过 `isSymbolicLinkKey` 主动过滤符号链接；`copyImage` 与 `KeyReactionStore.setRule` 明确拦截拒绝符号链接文件，防御潜在跨目录软链接穿透风险。
+- 强化图库与规则导入安全：`PetImageLibrary.addSet`、`copyImage` 与 `KeyReactionStore.setRule` 统一采用 Fail-Closed 校验（要求 `isSymbolicLink == false && isRegularFile == true`），过滤并拦截符号链接及非普通文件，防御跨目录软链接穿透风险。
 - 完善分发安全指引：在 `README.md` 与 `README.txt` 中增加基于 `shasum -a 256` 的文件完整性校验指引，提供源码本地构建指引，并将“绝对安全”文案优化为诚实、可技术验证的零网络离线运行与纯按键码响应承诺。
 - 建立威胁模型分析文档（`docs/TypingPetMac-threat-model.md`），系统梳理 macOS `ListenEvent` 权限、无网络离线边界与分发安全加固策略。
 
