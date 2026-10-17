@@ -81,4 +81,48 @@ import Testing
         }
         #expect(store.rules.isEmpty)
     }
+
+    @Test @MainActor
+    func ruleLookupUpdatesOnRuleModificationAndPhysicalFileRemoval() throws {
+        let fileManager = FileManager.default
+        let root = fileManager.temporaryDirectory.appendingPathComponent("TypingPetKeyCache-\(UUID())", isDirectory: true)
+        let stored = root.appendingPathComponent("Rules", isDirectory: true)
+        try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: root) }
+
+        let packageRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let image1 = packageRoot.appendingPathComponent("Sources/TypingPet/Resources/left.png")
+        let image2 = packageRoot.appendingPathComponent("Sources/TypingPet/Resources/right.png")
+        let suite = "TypingPetKeyCacheTests.\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let stroke = KeyStroke(keyCode: 40, modifiers: [.command])
+        let store = KeyReactionStore(fileManager: fileManager, defaults: defaults, directory: stored)
+
+        // Initial lookup before rule is added
+        #expect(store.imageURL(matching: stroke) == nil)
+
+        // Set rule
+        let rule1 = try store.setRule(for: stroke, image: image1)
+        let url1 = store.imageURL(matching: stroke)
+        #expect(url1 != nil)
+        #expect(url1?.lastPathComponent == rule1.imageFileName)
+
+        // Override rule with new image
+        let rule2 = try store.setRule(for: stroke, image: image2)
+        let url2 = store.imageURL(matching: stroke)
+        #expect(url2 != nil)
+        #expect(url2?.lastPathComponent == rule2.imageFileName)
+
+        // Remove rule
+        try store.removeRule(id: rule2.id)
+        #expect(store.imageURL(matching: stroke) == nil)
+
+        // Re-add rule and test external physical file deletion invalidation
+        _ = try store.setRule(for: stroke, image: image1)
+        let url3 = try #require(store.imageURL(matching: stroke))
+        try fileManager.removeItem(at: url3)
+        #expect(store.imageURL(matching: stroke) == nil)
+    }
 }

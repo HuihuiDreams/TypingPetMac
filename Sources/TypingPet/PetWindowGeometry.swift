@@ -11,6 +11,13 @@ struct PetOpacityBehavior {
 }
 
 struct PetPointerAvoidance {
+    private static let rotationFactors: [(cos: CGFloat, sin: CGFloat)] = [
+        0.0, 28.0, -28.0, 55.0, -55.0, 90.0, -90.0
+    ].map { degrees in
+        let radians = CGFloat(degrees * .pi / 180)
+        return (cos: cos(radians), sin: sin(radians))
+    }
+
     static func distance(from point: CGPoint, to rect: CGRect) -> CGFloat {
         let horizontal = max(max(rect.minX - point.x, 0), point.x - rect.maxX)
         let vertical = max(max(rect.minY - point.y, 0), point.y - rect.maxY)
@@ -49,12 +56,10 @@ struct PetPointerAvoidance {
             away.dy /= length
         }
 
-        let angles = [0.0, 28.0, -28.0, 55.0, -55.0, 90.0, -90.0]
-        let directions = angles.map { degrees -> CGVector in
-            let radians = CGFloat(degrees * .pi / 180)
-            return CGVector(
-                dx: away.dx * cos(radians) - away.dy * sin(radians),
-                dy: away.dx * sin(radians) + away.dy * cos(radians)
+        let directions = rotationFactors.map { factor in
+            CGVector(
+                dx: away.dx * factor.cos - away.dy * factor.sin,
+                dy: away.dx * factor.sin + away.dy * factor.cos
             )
         }
         let travel = min(max(triggerDistance - currentDistance + 46, 46), 130)

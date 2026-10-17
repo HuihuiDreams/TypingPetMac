@@ -70,4 +70,41 @@ struct ThumbnailCacheTests {
         #expect(image2 != nil)
         #expect(image1 !== image2)
     }
+
+    @Test func activateSetInvalidatesPreviousSetReactionCache() throws {
+        let fileManager = FileManager.default
+        let tempRoot = fileManager.temporaryDirectory.appendingPathComponent("TypingPetActivateCacheTest-\(UUID().uuidString)", isDirectory: true)
+        let inputDir1 = tempRoot.appendingPathComponent("CatSet1", isDirectory: true)
+        let inputDir2 = tempRoot.appendingPathComponent("CatSet2", isDirectory: true)
+        let storedDir = tempRoot.appendingPathComponent("Stored", isDirectory: true)
+        try fileManager.createDirectory(at: inputDir1, withIntermediateDirectories: true)
+        try fileManager.createDirectory(at: inputDir2, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: tempRoot) }
+
+        let packageRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let basic = packageRoot.appendingPathComponent("Sources/TypingPet/Resources/basic.png")
+        let left = packageRoot.appendingPathComponent("Sources/TypingPet/Resources/left.png")
+        try fileManager.copyItem(at: basic, to: inputDir1.appendingPathComponent("idle.png"))
+        try fileManager.copyItem(at: left, to: inputDir1.appendingPathComponent("reaction.png"))
+        try fileManager.copyItem(at: basic, to: inputDir2.appendingPathComponent("idle.png"))
+
+        let suite = "TypingPetActivateCacheTest.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let library = PetImageLibrary(fileManager: fileManager, defaults: defaults, imagesDirectory: storedDir)
+        let set1 = try library.addSet(from: inputDir1, name: "Set 1")
+        let set2 = try library.addSet(from: inputDir2, name: "Set 2")
+
+        try library.activateSet(id: set1.id)
+        let reactionURL = try #require(library.reactionURLs.first)
+        let cachedImg1 = library.image(for: reactionURL)
+        #expect(cachedImg1 != nil)
+
+        // Switching sets invalidates reaction cache of set1
+        try library.activateSet(id: set2.id)
+        let cachedImg2 = library.image(for: reactionURL)
+        #expect(cachedImg2 != nil)
+        #expect(cachedImg1 !== cachedImg2)
+    }
 }

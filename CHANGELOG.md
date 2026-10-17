@@ -7,6 +7,17 @@
 - 新增 `Sources/TypingPet/Resources/TypingPet.entitlements` 运行时强化权限描述文件，显式禁用 JIT、未签名可执行内存并保持库验证（Library Validation，在具备 Team ID 证书签名时生效）。
 - 在 `scripts/build_app.sh` 中强制校验并传入 `--entitlements` 签名入参，并在打包完成时自动计算并输出 `dist/TypingPet-macOS.zip` 的 SHA-256 校验哈希。
 - 在 `Tests/TypingPetTests/FolderImageSelectionTests.swift` 与 `Tests/TypingPetTests/KeyReactionTests.swift` 中新增 `ignoresSymlinkedImagesDuringFolderImport` 与 `rejectsSymlinkedRuleImage` 符号链接过滤与拒绝导入回归测试。
+- 在 `KeyReactionTests` 中新增按键规则字典查找与物理文件失效测试 `ruleLookupUpdatesOnRuleModificationAndPhysicalFileRemoval`。
+- 在 `ThumbnailCacheTests` 中新增切换激活图集时自动释放旧图集反应帧缓存测试 `activateSetInvalidatesPreviousSetReactionCache`。
+
+### Changed
+
+- 优化高频热路径偏好读取：在 `PetController` 内存中常驻缓存 `scale`、`restingOpacity`、`hoverOpacity`、`avoidsPointerWhenLocked` 与 `shakeLevel`，消除鼠标移动及击键事件中对 `UserDefaults` 的反复读取。
+- 优化按键响应热路径：`KeyReactionStore` 建立 O(1) 字典缓存 `ruleURLsByStroke`，无规则击键直接返回 `nil`，消除每击键磁盘 `stat` 开销；`PetController` 预热缓存 `reactionPicker` 与 `reactionURLsByPath`，消除每击键临时数组与 `URL` 对象的内存分配；`showImage` 增加同路径短路，避免重复赋值。
+- 按需启停鼠标悬停监控：仅在悬停与常驻透明度不同或锁定避让开启时注册全局/局部鼠标监控器，其余状态注销监控，降低 CPU/GPU 唤醒。
+- 指针躲避算法预计算与短路防抖：`PetPointerAvoidance` 预计算旋转方向常量避免重复三角函数计算；避让定时器运行期间短路重复的 `targetOrigin` 冗余重算。
+- 设置面板缩放滑块流畅度优化：调整缩放时直接应用无动画平滑重设，消除连续拖拽滑块时的 AppKit 阻塞式窗口动画卡顿。
+- 图集切换内存卫生加固：`PetImageLibrary.activateSet` 切换不同图集时主动释放上一图集的反应图像内存缓存，防止大图集残留占用内存。
 
 ### Security
 

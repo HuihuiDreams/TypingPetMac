@@ -64,6 +64,7 @@ final class KeyReactionStore {
     private let defaults: UserDefaults
     private let directory: URL
     private(set) var rules: [KeyReactionRule]
+    private var ruleURLsByStroke: [KeyStroke: URL] = [:]
 
     init(fileManager: FileManager = .default, defaults: UserDefaults = .standard, directory: URL? = nil) {
         self.fileManager = fileManager
@@ -79,16 +80,34 @@ final class KeyReactionStore {
         } else {
             rules = []
         }
+        rebuildLookup()
     }
 
     func imageURL(matching stroke: KeyStroke) -> URL? {
-        rules.first(where: { $0.stroke == stroke }).flatMap(imageURL(for:))
+        guard let url = ruleURLsByStroke[stroke] else { return nil }
+        guard fileManager.fileExists(atPath: url.path) else {
+            ruleURLsByStroke.removeValue(forKey: stroke)
+            return nil
+        }
+        return url
     }
 
     func imageURL(for rule: KeyReactionRule) -> URL? {
         guard StoredFileName.isSafe(rule.imageFileName) else { return nil }
         let url = directory.appendingPathComponent(rule.imageFileName)
         return fileManager.fileExists(atPath: url.path) ? url : nil
+    }
+
+    private func rebuildLookup() {
+        var lookup: [KeyStroke: URL] = [:]
+        for rule in rules {
+            guard StoredFileName.isSafe(rule.imageFileName) else { continue }
+            let url = directory.appendingPathComponent(rule.imageFileName)
+            if fileManager.fileExists(atPath: url.path) {
+                lookup[rule.stroke] = url
+            }
+        }
+        ruleURLsByStroke = lookup
     }
 
     @discardableResult
@@ -121,6 +140,7 @@ final class KeyReactionStore {
             throw error
         }
         rules = nextRules
+        rebuildLookup()
         persist()
         return rule
     }
@@ -132,6 +152,7 @@ final class KeyReactionStore {
             try deleteImageFileIfOrphaned(rule.imageFileName, remainingRules: nextRules)
         }
         rules = nextRules
+        rebuildLookup()
         persist()
     }
 

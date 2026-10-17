@@ -142,7 +142,12 @@ final class PetImageLibrary {
 
     func activateSet(id: UUID) throws {
         guard imageSets.contains(where: { $0.id == id }) else { throw PetImageLibraryError.imageSetNotFound }
+        let previousSet = activeSet
         activeSetID = id
+        if previousSet.id != id {
+            let idle = idleURL(for: previousSet)
+            reactionURLs(for: previousSet).filter { $0 != idle }.forEach { invalidateCache(for: $0) }
+        }
     }
 
     @discardableResult
