@@ -26,6 +26,18 @@ GitHub Releases에서 `TypingPet-macOS-arm64.zip`을 내려받아 압축을 풀�
 - 0.75초 동안 입력이 없으면 idle 이미지로 돌아갑니다.
 - 일반 입력 문자는 읽거나 저장하지 않습니다. 키 반응 규칙에는 선택한 물리 키 코드와 보조 키 조합만 로컬에 저장합니다.
 
+## Todo and focus timer
+
+Move the pointer near the pet and select `할 일`. Enter a title and press Enter.
+Each Todo has its own countdown or count-up setting. The arrow changes the setting. The main button starts the timer.
+The focus view supports pause, resume, stop, and countdown extension.
+
+The app saves Todos and measured session time in `~/Library/Application Support/TypingPet/todo-state.json`.
+Settings > `할 일` > `기록 데이터 열기` reveals the file.
+Sleep and app restart keep the active timer paused. Offline time does not count.
+
+See [Todo use, storage, and tests](docs/TODO.md).
+
 ## 설정 창
 
 메뉴 막대의 발바닥 아이콘에서 `설정`을 선택합니다.
@@ -83,6 +95,8 @@ CODE_SIGN_IDENTITY="Developer ID Application: 이름 (TEAMID)" ./scripts/build_a
 - 일반 입력 문자를 저장하거나 네트워크로 전송하지 않습니다.
 - 특정 키 반응에는 사용자가 등록한 물리 키 코드와 보조 키 조합만 로컬에 저장합니다.
 - 앱 자체에는 네트워크 통신 기능이 없습니다.
+- The Todo JSON file stores titles, completion dates, timer preferences, and measured session times on this Mac.
+- Todo records have no server upload, account, or sync.
 
 ## 라이선스
 

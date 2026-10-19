@@ -218,8 +218,8 @@ final class TypingPetSettingsModel: ObservableObject {
 
 @MainActor
 final class SettingsWindowController: NSWindowController, NSWindowDelegate {
-    init(model: TypingPetSettingsModel) {
-        let root = SettingsRootView(model: model)
+    init(model: TypingPetSettingsModel, todoStore: TodoStore) {
+        let root = SettingsRootView(model: model, todoStore: todoStore)
         let window = NSWindow(contentViewController: NSHostingController(rootView: root))
         window.title = "Typing Pet 설정"
         window.setContentSize(NSSize(width: 780, height: 600))
@@ -246,11 +246,14 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
 private struct SettingsRootView: View {
     @ObservedObject var model: TypingPetSettingsModel
+    @ObservedObject var todoStore: TodoStore
 
     var body: some View {
         TabView {
             GeneralSettingsView(model: model)
                 .tabItem { Label("일반", systemImage: "gearshape") }
+            TodoSettingsView(store: todoStore)
+                .tabItem { Label("할 일", systemImage: "checklist") }
             GallerySettingsView(model: model)
                 .tabItem { Label("갤러리", systemImage: "photo.on.rectangle.angled") }
             KeyReactionSettingsView(model: model)

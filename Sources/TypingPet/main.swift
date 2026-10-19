@@ -354,6 +354,9 @@ private final class PetController: NSObject, NSWindowDelegate {
     private let library: PetImageLibrary
     private let keyStore: KeyReactionStore
     private let panel: PetPanel
+    var todoAnchorWindow: NSWindow { panel }
+    var shouldHoldPosition: (() -> Bool)?
+    var onPresentationChanged: (() -> Void)?
     private let contentView: PetContentView
     private let imageView: NSImageView
     private let onScaleChanged: (CGFloat) -> Void
@@ -445,6 +448,7 @@ private final class PetController: NSObject, NSWindowDelegate {
         get { panel.level == .floating }
         set {
             panel.level = newValue ? .floating : .normal
+            onPresentationChanged?()
             UserDefaults.standard.set(newValue, forKey: "alwaysOnTop")
         }
     }
@@ -545,11 +549,13 @@ private final class PetController: NSObject, NSWindowDelegate {
         stopPointerAvoidance(savePosition: true)
         contentView.hideControls()
         panel.orderOut(nil)
+        onPresentationChanged?()
     }
 
     func showPet() {
         contentView.hideControls()
         panel.orderFrontRegardless()
+        onPresentationChanged?()
         updatePetOpacity()
         updatePointerAvoidance()
     }
@@ -719,6 +725,10 @@ private final class PetController: NSObject, NSWindowDelegate {
     }
 
     private func updatePointerAvoidance() {
+        if shouldHoldPosition?() == true {
+            stopPointerAvoidance(savePosition: true)
+            return
+        }
         guard panel.isVisible, isPositionLocked, avoidsPointerWhenLocked else { return }
         let bounds = avoidanceBounds ?? (panel.screen ?? NSScreen.main)?.visibleFrame ?? panel.frame
         guard PetPointerAvoidance.targetOrigin(
@@ -741,6 +751,10 @@ private final class PetController: NSObject, NSWindowDelegate {
     }
 
     private func advancePointerAvoidance() {
+        if shouldHoldPosition?() == true {
+            stopPointerAvoidance(savePosition: true)
+            return
+        }
         guard panel.isVisible, isPositionLocked, avoidsPointerWhenLocked,
               let lastTimestamp = avoidanceLastTimestamp else {
             stopPointerAvoidance(savePosition: true)
@@ -994,6 +1008,15 @@ private final class GlobalKeyMonitor {
 private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let imageLibrary = PetImageLibrary()
     private let keyReactionStore = KeyReactionStore()
+    private let todoStore: TodoStore = {
+        #if DEBUG
+        if let path = ProcessInfo.processInfo.environment["TYPINGPET_TODO_TEST_PATH"] {
+            return TodoStore(url: URL(fileURLWithPath: path))
+        }
+        #endif
+        return TodoStore()
+    }()
+    private var todoBubble: TodoBubbleWindowController?
     private var statusItem: NSStatusItem!
     private var petController: PetController!
     private var keyMonitor: GlobalKeyMonitor!
@@ -1014,6 +1037,9 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
             keyStore: keyReactionStore,
             onScaleChanged: { [weak self] scale in self?.settingsModel?.syncScale(scale) }
         )
+        todoBubble = TodoBubbleWindowController(store: todoStore, pet: petController.todoAnchorWindow)
+        petController.shouldHoldPosition = { [weak self] in self?.todoBubble?.isInteracting == true }
+        petController.onPresentationChanged = { [weak self] in self?.todoBubble?.synchronize() }
         configureStatusItem()
 
         keyMonitor = GlobalKeyMonitor { [weak self] stroke in
@@ -1022,10 +1048,35 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
             }
         }
 
+        #if DEBUG
+        if !ProcessInfo.processInfo.arguments.contains("--todo-preview") {
+            startMonitoringOrRequestPermission(shouldShowAlert: true)
+        }
+        if ProcessInfo.processInfo.arguments.contains("--show-todos") { showTodos() }
+        #else
         startMonitoringOrRequestPermission(shouldShowAlert: true)
+        #endif
 
         if ProcessInfo.processInfo.arguments.contains("--show-settings") {
             DispatchQueue.main.async { [weak self] in self?.showSettings() }
+        }
+    }
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        todoStore.pauseForSleepOrTermination()
+        guard let error = todoStore.errorMessage, !todoStore.loadBlocked else { return .terminateNow }
+        let alert = NSAlert()
+        alert.messageText = "Cannot save Todo data"
+        alert.informativeText = error
+        alert.addButton(withTitle: "Retry save")
+        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: "Quit without saving")
+        switch alert.runModal() {
+        case .alertFirstButtonReturn:
+            todoStore.persist()
+            return todoStore.errorMessage == nil ? .terminateNow : .terminateCancel
+        case .alertThirdButtonReturn: return .terminateNow
+        default: return .terminateCancel
         }
     }
 
@@ -1180,6 +1231,11 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         petController.handleKeystroke(nil)
     }
 
+    @objc private func showTodos() {
+        petController.showPet()
+        todoBubble?.show()
+    }
+
     @objc private func showSettings() {
         if settingsModel == nil {
             settingsModel = TypingPetSettingsModel(
@@ -1205,7 +1261,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         }
         settingsModel?.refresh()
         if settingsWindowController == nil, let settingsModel {
-            settingsWindowController = SettingsWindowController(model: settingsModel)
+            settingsWindowController = SettingsWindowController(model: settingsModel, todoStore: todoStore)
         }
         settingsWindowController?.show()
     }
@@ -1255,6 +1311,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         menu.delegate = self
         menu.autoenablesItems = false
 
+        menu.addItem(makeMenuItem("할 일 표시", action: #selector(showTodos)))
         menu.addItem(makeMenuItem("설정", action: #selector(showSettings), keyEquivalent: ","))
         petVisibilityItem = makeMenuItem("펫 숨기기", action: #selector(togglePetVisibility))
         menu.addItem(petVisibilityItem)
@@ -1359,6 +1416,9 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     }
 
     @objc private func retryMonitoringIfAuthorized() {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--todo-preview") { return }
+        #endif
         guard !keyMonitor.isRunning, CGPreflightListenEventAccess() else { return }
         if keyMonitor.start() {
             permissionRetryTimer?.invalidate()
