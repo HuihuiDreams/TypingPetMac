@@ -65,11 +65,10 @@ final class KeyReactionStore {
     private let directory: URL
     private(set) var rules: [KeyReactionRule]
 
-    init(fileManager: FileManager = .default, defaults: UserDefaults = .standard, directory: URL? = nil) {
+    init(fileManager: FileManager = .default, defaults: UserDefaults = AppEnvironment.defaults, directory: URL? = nil) {
         self.fileManager = fileManager
         self.defaults = defaults
-        self.directory = directory ?? fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-            .appendingPathComponent("TypingPet", isDirectory: true)
+        self.directory = directory ?? AppEnvironment.supportDirectory
             .appendingPathComponent("KeyReactions", isDirectory: true)
         if let data = defaults.data(forKey: Keys.rules),
            let decoded = try? JSONDecoder().decode([KeyReactionRule].self, from: data) {

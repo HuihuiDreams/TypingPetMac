@@ -84,7 +84,7 @@ struct TodoBubbleView: View {
     private var expandedList: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("오늘 할 일").font(.headline)
+                Text(AppEnvironment.isDevelopment ? "오늘 할 일 · DEV" : "오늘 할 일").font(.headline)
                 Spacer()
                 if session != nil {
                     Button { store.expanded = false } label: { Image(systemName: "chevron.down") }

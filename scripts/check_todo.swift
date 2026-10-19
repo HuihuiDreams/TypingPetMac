@@ -24,6 +24,34 @@ struct TodoChecks {
         func test(_ name: String, _ operation: () throws -> Void) throws {
             try operation(); passed += 1; print("PASS: \(name)")
         }
+        try test("Development and production identities and data paths are separate") {
+            let dev = AppProfile.development; let prod = AppProfile.production
+            let base = folder.appendingPathComponent("Application Support")
+            try check(dev.bundleIdentifier != prod.bundleIdentifier, "Shared bundle identity")
+            try check(dev.preferencesDomain != prod.preferencesDomain, "Shared preferences")
+            try check(dev.preferencesDomain != dev.bundleIdentifier, "macOS rejects a suite with its own bundle identity")
+            _ = AppEnvironment.defaults
+            try check(dev.supportDirectory(in: base) != prod.supportDirectory(in: base), "Shared data path")
+            try check(dev.frameAutosaveName != prod.frameAutosaveName, "Shared frame key")
+            try check(dev.displayName == "TypingPet Dev", "Missing Dev label")
+            try check(AppProfile.resolve(channel: nil, bundleIdentifier: nil) == .development, "swift run selected production")
+            try check(AppProfile.resolve(channel: "production", bundleIdentifier: "unknown") == .development, "Unknown bundle selected production")
+            try check(AppProfile.resolve(channel: "production", bundleIdentifier: prod.bundleIdentifier) == .production, "Explicit production is broken")
+            try check(AppEnvironment.isDevelopment, "Executable checks must use development")
+            try check(TodoFileStorage.defaultURL.deletingLastPathComponent().lastPathComponent == "TypingPetDev", "Todo path not isolated")
+        }
+        try test("A second development process cannot acquire the same record lock") {
+            let file = folder.appendingPathComponent("dev/.runtime.lock")
+            var first: DevelopmentRunLock? = DevelopmentRunLock()
+            let acquired = try first!.acquire(at: file)
+            try check(acquired, "First runtime lock failed")
+            let second = DevelopmentRunLock()
+            let duplicate = try second.acquire(at: file)
+            try check(!duplicate, "Duplicate runtime can write the same data")
+            first = nil
+            let restarted = try second.acquire(at: file)
+            try check(restarted, "Exited runtime did not release the lock")
+        }
         try test("25 + 18 + 21 minutes equals 64 minutes") {
             let c = Clock(); var e = c.engine(); let id = e.addTodo("Work")!
             e.setPreference(.countdown(minutes: 25)!, for: id); e.start(id)

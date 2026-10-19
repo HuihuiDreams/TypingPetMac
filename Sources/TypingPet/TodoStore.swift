@@ -4,8 +4,7 @@ import Combine
 struct TodoFileStorage {
     let url: URL
     static var defaultURL: URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("TypingPet", isDirectory: true).appendingPathComponent("todo-state.json")
+        AppEnvironment.supportDirectory.appendingPathComponent("todo-state.json")
     }
     func load() throws -> TodoState {
         guard FileManager.default.fileExists(atPath: url.path) else { return TodoState() }

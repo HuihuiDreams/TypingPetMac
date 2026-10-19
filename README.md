@@ -26,6 +26,18 @@ GitHub Releases에서 `TypingPet-macOS-arm64.zip`을 내려받아 압축을 풀�
 - 0.75초 동안 입력이 없으면 idle 이미지로 돌아갑니다.
 - 일반 입력 문자는 읽거나 저장하지 않습니다. 키 반응 규칙에는 선택한 물리 키 코드와 보조 키 조합만 로컬에 저장합니다.
 
+## Local development
+
+Local builds use **TypingPet Dev** with separate app identity, settings, images, and Todo records.
+The installed production app can stay running.
+
+```sh
+./scripts/run_dev.sh
+```
+
+This builds and opens the debug app. Quit Dev and run the script again after changes.
+See [development setup and data separation](docs/DEVELOPMENT.md).
+
 ## Todo and focus timer
 
 Move the pointer near the pet and select `할 일`. Enter a title and press Enter.
@@ -74,7 +86,7 @@ See [Todo use, storage, and tests](docs/TODO.md).
 ```shell
 swift test
 ./scripts/build_app.sh
-open dist/TypingPet.app
+open "dist/TypingPet Dev.app"
 ```
 
 빌드 스크립트는 Keychain에서 `Developer ID Application`, `Apple Development`, 임시 서명 순으로 사용합니다. 특정 인증서를 쓰려면 `CODE_SIGN_IDENTITY` 환경 변수로 지정할 수 있습니다.
@@ -82,7 +94,7 @@ open dist/TypingPet.app
 공개 배포용 공증에는 Apple Developer Program과 `Developer ID Application` 인증서가 필요합니다. 인증서를 준비한 뒤 `xcrun notarytool store-credentials typingpet-notary`를 한 번 실행하고 다음 스크립트를 사용합니다.
 
 ```shell
-CODE_SIGN_IDENTITY="Developer ID Application: 이름 (TEAMID)" ./scripts/build_app.sh
+TYPINGPET_BUILD_CHANNEL=production CODE_SIGN_IDENTITY="Developer ID Application: 이름 (TEAMID)" ./scripts/build_app.sh
 ./scripts/notarize_release.sh
 ```
 

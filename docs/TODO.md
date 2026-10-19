@@ -48,13 +48,16 @@ Settings has a `할 일` tab with feature and visibility controls.
 
 ## Time and local storage
 
-The record file is:
+The production record file is:
 
 ```text
 ~/Library/Application Support/TypingPet/todo-state.json
 ```
 
-Settings > `할 일` > `기록 데이터 열기` reveals this file in Finder.
+Development builds use `~/Library/Application Support/TypingPetDev/todo-state.json`.
+See [local development](DEVELOPMENT.md) for the separate app identity and runtime command.
+
+Settings > `할 일` > `기록 데이터 열기` reveals the active file in Finder.
 The file holds schema version 1, feature preferences, Todos, sessions, and extension segments.
 Dates use UTC ISO 8601. The completed list uses the current local calendar.
 Actual seconds keep fractions. Each session total equals the sum of its segments.

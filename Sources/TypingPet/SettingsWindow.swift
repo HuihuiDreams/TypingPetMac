@@ -221,7 +221,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     init(model: TypingPetSettingsModel, todoStore: TodoStore) {
         let root = SettingsRootView(model: model, todoStore: todoStore)
         let window = NSWindow(contentViewController: NSHostingController(rootView: root))
-        window.title = "Typing Pet 설정"
+        window.title = AppEnvironment.displayName + " 설정"
         window.setContentSize(NSSize(width: 780, height: 600))
         window.minSize = NSSize(width: 700, height: 540)
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable]

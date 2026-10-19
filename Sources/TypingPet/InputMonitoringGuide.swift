@@ -183,7 +183,7 @@ final class InputMonitoringGuideController: NSObject, NSWindowDelegate {
         let panel = NSPanel(contentViewController: hostingController)
         panel.setContentSize(NSSize(width: 404, height: panelHeight))
         panel.styleMask = [.titled, .closable, .utilityWindow, .fullSizeContentView, .nonactivatingPanel]
-        panel.title = "Typing Pet 입력 모니터링 안내"
+        panel.title = AppEnvironment.displayName + " 입력 모니터링 안내"
         panel.titleVisibility = .hidden
         panel.titlebarAppearsTransparent = true
         panel.isOpaque = false
@@ -302,7 +302,7 @@ private struct InputMonitoringGuideView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Typing Pet을 목록에 추가하세요")
+                Text("\(AppEnvironment.displayName)을 목록에 추가하세요")
                     .font(.title3.bold())
                 Text("앱 아이콘을 입력 모니터링 목록으로 드래그한 뒤 오른쪽 스위치를 켜세요.")
                     .font(.callout)
@@ -345,7 +345,7 @@ private struct InputMonitoringGuideView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            Text("드래그가 안 되면 입력 모니터링 목록 아래의 + 버튼을 누르고 TypingPet.app을 선택하세요.")
+            Text("드래그가 안 되면 입력 모니터링 목록 아래의 + 버튼을 누르고 \(appURL.lastPathComponent)을 선택하세요.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -409,8 +409,8 @@ private final class AppBundleDragView: NSView, NSDraggingSource {
         iconView.image = icon
         iconView.imageScaling = .scaleProportionallyUpOrDown
         addSubview(iconView)
-        toolTip = "TypingPet.app을 입력 모니터링 목록으로 드래그"
-        setAccessibilityLabel("드래그 가능한 TypingPet.app")
+        toolTip = "\(appURL.lastPathComponent)을 입력 모니터링 목록으로 드래그"
+        setAccessibilityLabel("드래그 가능한 \(appURL.lastPathComponent)")
         setAccessibilityHelp("입력 모니터링 목록으로 드래그하여 앱을 추가합니다.")
     }
 

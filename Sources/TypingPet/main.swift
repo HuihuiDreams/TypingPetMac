@@ -418,6 +418,7 @@ private final class PetController: NSObject, NSWindowDelegate {
         contentView.onMoveDragged = { [weak self] in self?.continueMove(with: $0) }
         contentView.onMoveEnded = { [weak self] in self?.endMove(with: $0) }
 
+        panel.title = AppEnvironment.displayName + " · 펫"
         panel.contentView = contentView
         panel.delegate = self
         panel.isOpaque = false
@@ -431,7 +432,7 @@ private final class PetController: NSObject, NSWindowDelegate {
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         contentView.controlsEnabled = !Self.savedPositionLocked
 
-        let restoredPosition = panel.setFrameUsingName("TypingPetWindow")
+        let restoredPosition = panel.setFrameUsingName(AppEnvironment.frameAutosaveName)
         resizePanelForCurrentCanvas(animate: false)
         if !restoredPosition {
             resetPosition()
@@ -449,7 +450,7 @@ private final class PetController: NSObject, NSWindowDelegate {
         set {
             panel.level = newValue ? .floating : .normal
             onPresentationChanged?()
-            UserDefaults.standard.set(newValue, forKey: "alwaysOnTop")
+            AppEnvironment.defaults.set(newValue, forKey: "alwaysOnTop")
         }
     }
 
@@ -459,7 +460,7 @@ private final class PetController: NSObject, NSWindowDelegate {
             if newValue { stopInertia(savePosition: true) }
             panel.ignoresMouseEvents = newValue
             contentView.controlsEnabled = !newValue
-            UserDefaults.standard.set(newValue, forKey: "positionLocked")
+            AppEnvironment.defaults.set(newValue, forKey: "positionLocked")
             if newValue {
                 updatePointerAvoidance()
             } else {
@@ -478,7 +479,7 @@ private final class PetController: NSObject, NSWindowDelegate {
     var restingOpacity: CGFloat {
         get { Self.savedRestingOpacity }
         set {
-            UserDefaults.standard.set(Double(min(max(newValue, 0), 1)), forKey: "restingOpacity")
+            AppEnvironment.defaults.set(Double(min(max(newValue, 0), 1)), forKey: "restingOpacity")
             updatePetOpacity()
         }
     }
@@ -486,7 +487,7 @@ private final class PetController: NSObject, NSWindowDelegate {
     var hoverOpacity: CGFloat {
         get { Self.savedHoverOpacity }
         set {
-            UserDefaults.standard.set(Double(min(max(newValue, 0), 1)), forKey: "hoverOpacity")
+            AppEnvironment.defaults.set(Double(min(max(newValue, 0), 1)), forKey: "hoverOpacity")
             updatePetOpacity()
         }
     }
@@ -494,7 +495,7 @@ private final class PetController: NSObject, NSWindowDelegate {
     var avoidsPointerWhenLocked: Bool {
         get { Self.savedAvoidsPointerWhenLocked }
         set {
-            UserDefaults.standard.set(newValue, forKey: "avoidsPointerWhenLocked")
+            AppEnvironment.defaults.set(newValue, forKey: "avoidsPointerWhenLocked")
             if newValue {
                 updatePointerAvoidance()
             } else {
@@ -505,10 +506,10 @@ private final class PetController: NSObject, NSWindowDelegate {
 
     var shakeLevel: Int {
         get {
-            let stored = UserDefaults.standard.object(forKey: "shakeLevel") as? Int
+            let stored = AppEnvironment.defaults.object(forKey: "shakeLevel") as? Int
             return max(0, min(stored ?? 2, 3))
         }
-        set { UserDefaults.standard.set(max(0, min(newValue, 3)), forKey: "shakeLevel") }
+        set { AppEnvironment.defaults.set(max(0, min(newValue, 3)), forKey: "shakeLevel") }
     }
 
     func handleKeystroke(_ stroke: KeyStroke? = nil) {
@@ -575,11 +576,11 @@ private final class PetController: NSObject, NSWindowDelegate {
             y: visible.minY + 24
         )
         panel.setFrameOrigin(origin)
-        panel.saveFrame(usingName: "TypingPetWindow")
+        panel.saveFrame(usingName: AppEnvironment.frameAutosaveName)
     }
 
     func windowDidMove(_ notification: Notification) {
-        panel.saveFrame(usingName: "TypingPetWindow")
+        panel.saveFrame(usingName: AppEnvironment.frameAutosaveName)
     }
 
     private func showIdleImage() {
@@ -602,7 +603,7 @@ private final class PetController: NSObject, NSWindowDelegate {
             y: oldFrame.minY
         )
         panel.setFrame(NSRect(origin: newOrigin, size: newSize), display: true, animate: animate)
-        panel.saveFrame(usingName: "TypingPetWindow")
+        panel.saveFrame(usingName: AppEnvironment.frameAutosaveName)
     }
 
     private func beginResize(at mouseLocation: NSPoint) {
@@ -647,7 +648,7 @@ private final class PetController: NSObject, NSWindowDelegate {
     private func startInertia(with velocity: CGVector) {
         let speed = hypot(velocity.dx, velocity.dy)
         guard speed >= 45 else {
-            panel.saveFrame(usingName: "TypingPetWindow")
+            panel.saveFrame(usingName: AppEnvironment.frameAutosaveName)
             return
         }
         inertiaVelocity = velocity
@@ -687,7 +688,7 @@ private final class PetController: NSObject, NSWindowDelegate {
         inertiaVelocity = .zero
         inertiaLastTimestamp = nil
         inertiaBounds = nil
-        if savePosition { panel.saveFrame(usingName: "TypingPetWindow") }
+        if savePosition { panel.saveFrame(usingName: AppEnvironment.frameAutosaveName) }
     }
 
     private func startMouseHoverMonitoring() {
@@ -810,7 +811,7 @@ private final class PetController: NSObject, NSWindowDelegate {
         avoidanceVelocity = .zero
         avoidanceLastTimestamp = nil
         avoidanceBounds = nil
-        if savePosition { panel.saveFrame(usingName: "TypingPetWindow") }
+        if savePosition { panel.saveFrame(usingName: AppEnvironment.frameAutosaveName) }
     }
 
     private func continueResize(at mouseLocation: NSPoint) {
@@ -833,7 +834,7 @@ private final class PetController: NSObject, NSWindowDelegate {
         resizeInitialMouseLocation = nil
         resizeInitialFrame = nil
         resizeInitialScale = nil
-        panel.saveFrame(usingName: "TypingPetWindow")
+        panel.saveFrame(usingName: AppEnvironment.frameAutosaveName)
     }
 
     private func applyScale(_ value: CGFloat, anchorOrigin: NSPoint?, animate: Bool) {
@@ -845,9 +846,9 @@ private final class PetController: NSObject, NSWindowDelegate {
             y: oldFrame.minY
         )
         panel.setFrame(NSRect(origin: newOrigin, size: newSize), display: true, animate: animate)
-        UserDefaults.standard.set(Double(clamped), forKey: "petScale")
+        AppEnvironment.defaults.set(Double(clamped), forKey: "petScale")
         onScaleChanged(clamped)
-        if animate { panel.saveFrame(usingName: "TypingPetWindow") }
+        if animate { panel.saveFrame(usingName: AppEnvironment.frameAutosaveName) }
     }
 
     private func bounce() {
@@ -889,37 +890,37 @@ private final class PetController: NSObject, NSWindowDelegate {
     }
 
     private static var savedScale: CGFloat {
-        let value = UserDefaults.standard.double(forKey: "petScale")
+        let value = AppEnvironment.defaults.double(forKey: "petScale")
         return value > 0 ? CGFloat(value) : 0.62
     }
 
     private static var savedRestingOpacity: CGFloat {
-        guard let value = UserDefaults.standard.object(forKey: "restingOpacity") as? Double else {
+        guard let value = AppEnvironment.defaults.object(forKey: "restingOpacity") as? Double else {
             return 1
         }
         return min(max(CGFloat(value), 0), 1)
     }
 
     private static var savedHoverOpacity: CGFloat {
-        guard let value = UserDefaults.standard.object(forKey: "hoverOpacity") as? Double else {
+        guard let value = AppEnvironment.defaults.object(forKey: "hoverOpacity") as? Double else {
             return 0.3
         }
         return min(max(CGFloat(value), 0), 1)
     }
 
     private static var savedAvoidsPointerWhenLocked: Bool {
-        UserDefaults.standard.bool(forKey: "avoidsPointerWhenLocked")
+        AppEnvironment.defaults.bool(forKey: "avoidsPointerWhenLocked")
     }
 
     private static var savedAlwaysOnTop: Bool {
-        if UserDefaults.standard.object(forKey: "alwaysOnTop") == nil {
+        if AppEnvironment.defaults.object(forKey: "alwaysOnTop") == nil {
             return true
         }
-        return UserDefaults.standard.bool(forKey: "alwaysOnTop")
+        return AppEnvironment.defaults.bool(forKey: "alwaysOnTop")
     }
 
     private static var savedPositionLocked: Bool {
-        UserDefaults.standard.bool(forKey: "positionLocked")
+        AppEnvironment.defaults.bool(forKey: "positionLocked")
     }
 }
 
@@ -1050,11 +1051,11 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
 
         #if DEBUG
         if !ProcessInfo.processInfo.arguments.contains("--todo-preview") {
-            startMonitoringOrRequestPermission(shouldShowAlert: true)
+            startMonitoringOrRequestPermission(shouldShowAlert: !AppEnvironment.isDevelopment)
         }
         if ProcessInfo.processInfo.arguments.contains("--show-todos") { showTodos() }
         #else
-        startMonitoringOrRequestPermission(shouldShowAlert: true)
+        startMonitoringOrRequestPermission(shouldShowAlert: !AppEnvironment.isDevelopment)
         #endif
 
         if ProcessInfo.processInfo.arguments.contains("--show-settings") {
@@ -1300,11 +1301,16 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     }
 
     private func configureStatusItem() {
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        statusItem = NSStatusBar.system.statusItem(withLength: AppEnvironment.isDevelopment ? NSStatusItem.variableLength : NSStatusItem.squareLength)
         if let button = statusItem.button {
-            let image = NSImage(systemSymbolName: "pawprint.fill", accessibilityDescription: "Typing Pet")
+            let image = NSImage(systemSymbolName: AppEnvironment.isDevelopment ? "flask.fill" : "pawprint.fill", accessibilityDescription: AppEnvironment.displayName)
             image?.isTemplate = true
             button.image = image
+            button.toolTip = AppEnvironment.displayName
+            if AppEnvironment.isDevelopment {
+                button.title = " DEV"
+                button.imagePosition = .imageLeading
+            }
         }
 
         menu = NSMenu()
@@ -1330,7 +1336,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
 
         loginItem = makeMenuItem("로그인 시 자동 실행", action: #selector(toggleLaunchAtLogin))
         menu.addItem(loginItem)
-        menu.addItem(makeMenuItem("Typing Pet 종료", action: #selector(quit), keyEquivalent: "q"))
+        menu.addItem(makeMenuItem("\(AppEnvironment.displayName) 종료", action: #selector(quit), keyEquivalent: "q"))
         statusItem.menu = menu
     }
 
@@ -1394,7 +1400,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         _ = CGRequestListenEventAccess()
         showAlert(
             title: "키 입력 감지 권한이 필요합니다",
-            message: "Typing Pet은 입력 내용을 읽거나 저장하지 않고, 키가 눌렸다는 사실만 감지합니다. 시스템 설정에서 Typing Pet의 입력 모니터링을 허용하면 앱이 자동으로 다시 연결합니다.",
+            message: "\(AppEnvironment.displayName)은 입력 내용을 읽거나 저장하지 않고, 키가 눌렸다는 사실만 감지합니다. 시스템 설정에서 \(AppEnvironment.displayName)의 입력 모니터링을 허용하면 앱이 자동으로 다시 연결합니다.",
             primaryButton: "시스템 설정 열기",
             secondaryButton: "나중에"
         ) { [weak self] response in
@@ -1449,8 +1455,26 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
 
 MainActor.assumeIsolated {
     let application = NSApplication.shared
+    let runLock = DevelopmentRunLock()
+    if AppEnvironment.isDevelopment {
+        do {
+            guard try runLock.acquire(at: AppEnvironment.supportDirectory.appendingPathComponent(".runtime.lock")) else {
+                let alert = NSAlert()
+                alert.messageText = "TypingPet Dev가 이미 실행 중입니다"
+                alert.informativeText = "메뉴 막대의 DEV 앱을 사용하세요. 다시 실행하려면 기존 Dev 앱을 종료하세요."
+                alert.runModal()
+                exit(0)
+            }
+        } catch {
+            let alert = NSAlert()
+            alert.messageText = "TypingPet Dev를 시작할 수 없습니다"
+            alert.informativeText = error.localizedDescription
+            alert.runModal()
+            exit(1)
+        }
+    }
     let delegate = AppDelegate()
     application.delegate = delegate
     application.setActivationPolicy(.accessory)
-    application.run()
+    withExtendedLifetime(runLock) { application.run() }
 }

@@ -3,8 +3,23 @@ set -euo pipefail
 
 project_dir="${0:A:h:h}"
 destination="${1:-$project_dir/dist}"
-configuration="release"
-app_name="TypingPet"
+configuration="${SWIFT_BUILD_CONFIGURATION:-release}"
+channel="${TYPINGPET_BUILD_CHANNEL:-development}"
+case "$channel" in
+    development)
+        app_name="TypingPet Dev"
+        executable_name="TypingPetDev"
+        bundle_id="ing.miel.typingpet.dev"
+        display_name="TypingPet Dev"
+        ;;
+    production)
+        app_name="TypingPet"
+        executable_name="TypingPet"
+        bundle_id="ing.miel.typingpet"
+        display_name="Typing Pet"
+        ;;
+    *) echo "Unknown build channel: $channel" >&2; exit 1 ;;
+esac
 app_dir="$destination/$app_name.app"
 contents_dir="$app_dir/Contents"
 macos_dir="$contents_dir/MacOS"
@@ -13,47 +28,34 @@ resources_dir="$contents_dir/Resources"
 cd "$project_dir"
 swift build -c "$configuration"
 
-binary_path="$(swift build -c "$configuration" --show-bin-path)/$app_name"
+binary_path="$(swift build -c "$configuration" --show-bin-path)/TypingPet"
 rm -rf "$app_dir"
 mkdir -p "$macos_dir" "$resources_dir"
-cp "$binary_path" "$macos_dir/$app_name"
+cp "$binary_path" "$macos_dir/$executable_name"
 cp Sources/TypingPet/Resources/*.png "$resources_dir/"
 cp Sources/TypingPet/Resources/*.icns "$resources_dir/"
 
-cat > "$contents_dir/Info.plist" <<'PLIST'
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>CFBundleDevelopmentRegion</key>
-    <string>ko</string>
-    <key>CFBundleDisplayName</key>
-    <string>Typing Pet</string>
-    <key>CFBundleExecutable</key>
-    <string>TypingPet</string>
-    <key>CFBundleIdentifier</key>
-    <string>ing.miel.typingpet</string>
-    <key>CFBundleIconFile</key>
-    <string>AppIcon</string>
-    <key>CFBundleInfoDictionaryVersion</key>
-    <string>6.0</string>
-    <key>CFBundleName</key>
-    <string>TypingPet</string>
-    <key>CFBundlePackageType</key>
-    <string>APPL</string>
-    <key>CFBundleShortVersionString</key>
-    <string>0.11.2</string>
-    <key>CFBundleVersion</key>
-    <string>17</string>
-    <key>LSMinimumSystemVersion</key>
-    <string>13.0</string>
-    <key>LSUIElement</key>
-    <true/>
-    <key>NSHumanReadableCopyright</key>
-    <string>Personal macOS build</string>
-</dict>
-</plist>
-PLIST
+python3 - "$contents_dir/Info.plist" "$app_name" "$executable_name" "$bundle_id" "$display_name" "$channel" <<'PYPLIST'
+import plistlib, sys
+path, name, executable, bundle_id, display, channel = sys.argv[1:]
+with open(path, "wb") as file:
+    plistlib.dump({
+        "CFBundleDevelopmentRegion": "ko",
+        "CFBundleDisplayName": display,
+        "CFBundleExecutable": executable,
+        "CFBundleIdentifier": bundle_id,
+        "CFBundleIconFile": "AppIcon",
+        "CFBundleInfoDictionaryVersion": "6.0",
+        "CFBundleName": name,
+        "CFBundlePackageType": "APPL",
+        "CFBundleShortVersionString": "0.11.2",
+        "CFBundleVersion": "17",
+        "LSMinimumSystemVersion": "13.0",
+        "LSUIElement": True,
+        "TypingPetBuildChannel": channel,
+        "NSHumanReadableCopyright": "Personal macOS build",
+    }, file)
+PYPLIST
 
 signing_identity="${CODE_SIGN_IDENTITY:-}"
 if [[ -z "$signing_identity" ]]; then

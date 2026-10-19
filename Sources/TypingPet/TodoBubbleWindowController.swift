@@ -59,6 +59,7 @@ final class TodoBubbleWindowController {
 
     private static func makePanel(size: NSSize) -> TodoPanel {
         let panel = TodoPanel(contentRect: NSRect(origin: .zero, size: size), styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        panel.title = AppEnvironment.displayName + " · 할 일"
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = true
