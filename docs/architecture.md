@@ -1,6 +1,6 @@
 # TypingPetMac 架构设计文档
 
-> **最后更新**：2026-10-16
+> **最后更新**：2026-10-18
 >
 > **基准版本**：0.12.2（以当前仓库代码与配置为准；ADR 保留历史决策背景）
 
@@ -214,30 +214,37 @@ sequenceDiagram
   - 遇到当前屏幕的 `visibleFrame`（自动避开 Dock 栏与顶部菜单栏）边界时触发弹性反弹（`edgeRestitution = 0.14`）。
 - **多显示器自适应指针避让 (`PetPointerAvoidance`)**：
   - 当宠物处于位置锁定且开启鼠标避让时，若全局光标距离宠物边界小于触发阈值（默认 `90 pt`），启动平滑躲避。
-  - 算法以光标背向向量为基准，向周围采样 7 个逃逸方向（`0°`, `±28°`, `±55°`, `±90°`）。
+  - 算法以光标背向向量为基准，使用预计算的静态旋转因子（`rotationFactors`）向周围采样 7 个逃逸方向（`0°`, `±28°`, `±55°`, `±90°`），避免每次移动事件重复执行三角函数运算。
   - 评估函数综合考虑：远离光标距离、方向对齐度、对角线偏好（避免单纯水平/垂直呆滞移动）以及实际可位移空间，选出最佳避让坐标，并利用阻尼弹簧运动平滑溜走。
 
 ### 4.4 能耗敏感与 CoreAnimation 事务守卫 (`PetController.swift`)
 
 - **背景与痛点**：
-  为实现鼠标滑入半透明（`hoverOpacity`）与鼠标滑出常态透明（`restingOpacity`），控制器需追踪全局光标位置。若鼠标每移动 1 像素即执行一次 `CATransaction`，会导致 CPU 频繁唤醒与 GPU 绘制浪费。
-- **优化方案 (差值守卫)**：
-  ```swift
-  private func updatePetOpacity() {
-      guard panel.isVisible, let imageLayer = imageView.layer else { return }
-      let targetOpacity = PetOpacityBehavior.opacity(...)
-      guard abs(CGFloat(imageLayer.opacity) - targetOpacity) > 0.001 else { return }
-      CATransaction.begin()
-      CATransaction.setDisableActions(true)
-      imageLayer.opacity = Float(targetOpacity)
-      CATransaction.commit()
-  }
-  ```
-  通过增加 `0.001` 的差值判断，仅在透明度发生实际跃迁时提交事务；配合 `setDisableActions(true)` 消除冗余隐式动画插值计算，彻底阻断空转能耗。
+  为实现鼠标滑入半透明（`hoverOpacity`）与鼠标滑出常态透明（`restingOpacity`），控制器需追踪全局光标位置。若鼠标每移动 1 像素即执行一次 `CATransaction` 或查询 `UserDefaults`，会导致 CPU 频繁唤醒与 GPU 绘制浪费。
+- **优化方案 (多层能耗与热路径守卫)**：
+  1. **按需启停全局鼠标监控 (`updateMouseMonitoringState`)**：仅当宠物可见且满足「常驻与悬停不透明度存在差异（`> 0.001`）」或「已开启锁定状态下避开鼠标」时，才注册全局/局部鼠标移动监听器；其余状态下自动注销监听器，实现静默零鼠标唤醒。
+  2. **热路径偏好内存常驻**：`scale`、`restingOpacity`、`hoverOpacity`、`avoidsPointerWhenLocked` 与 `shakeLevel` 在控制器内存中常驻缓存，仅在初始化时读取、在值变更时写回 `UserDefaults`，彻底消除鼠标移动（120Hz~1000Hz）与击键热路径上的 `UserDefaults` 查询开销。
+  3. **CoreAnimation 透明度差值守卫**：
+     ```swift
+     private func updatePetOpacity() {
+         guard panel.isVisible, let imageLayer = imageView.layer else { return }
+         let targetOpacity = PetOpacityBehavior.opacity(
+             isHovering: panel.frame.contains(NSEvent.mouseLocation),
+             restingOpacity: cachedRestingOpacity,
+             hoverOpacity: cachedHoverOpacity
+         )
+         guard abs(CGFloat(imageLayer.opacity) - targetOpacity) > 0.001 else { return }
+         CATransaction.begin()
+         CATransaction.setDisableActions(true)
+         imageLayer.opacity = Float(targetOpacity)
+         CATransaction.commit()
+     }
+     ```
+     通过 `0.001` 差值判断，仅在透明度发生实际跃迁时提交事务；配合 `setDisableActions(true)` 消除隐式动画插值计算。同时在 60Hz 指针躲避计时器运行期间，短路鼠标移动事件触发的冗余 `targetOrigin` 计算。
 - **位置与缩放持久化**：
-  拖拽、惯性滑行和指针躲避都以 60Hz 移动窗口，因此不在每次移动时写入 `UserDefaults`。窗口位置只在 `endMove` / `stopInertia` / `stopPointerAvoidance` / `endResize` 等动作结束时保存；拖拽缩放过程中只更新窗口与设置界面，`petScale` 在 `endResize()` 时写入一次。惯性、躲避与弹跳参数集中在 `PetConstants`。
+  拖拽、惯性滑行和指针躲避都以 60Hz 移动窗口，因此不在每次移动时写入 `UserDefaults`。窗口位置只在 `endMove` / `stopInertia` / `stopPointerAvoidance` / `endResize` 等动作结束时保存；拖拽缩放与设置面板缩放滑块均使用无阻塞更新（`animate: false`），消除连续拖动时的窗口动画卡顿。惯性、躲避与弹跳参数集中在 `PetConstants`。
 
-### 4.5 集中配置与磁盘生命周期 (`PetPreferences.swift`, `PetImageLibrary.swift`)
+### 4.5 集中配置与磁盘生命周期 (`PetPreferences.swift`, `PetImageLibrary.swift`, `KeyReactions.swift`)
 
 - **集中式配置契约 (`PetPreferences.swift`)**：
   收敛所有 13 个 `UserDefaults` 持久化键至 `AppPreferencesKey`，所有数值范围、预设与回退默认值至 `AppPreferencesDefault`。彻底杜绝裸字符串字面量（Magic Strings）引起的拼写错误与契约漂移。
@@ -249,8 +256,10 @@ sequenceDiagram
   删除图集（`PetImageLibrary.deleteSet`）或删除/覆盖按键绑定（`KeyReactionStore.removeRule` / `setRule`）时，同步清理应用存储中的目录与孤立文件。删除失败会向调用方抛出错误，保留图库或规则记录，以便重试；设置窗口会显示错误。旧版图集只清理 `Images/` 下不再被其他图集引用的文件，不删除共享目录或用户源图像。该行为由 `DiskCleanupTests` 和 `ImageStorageFailureTests` 验证。
 - **导入与替换的失败处理**：
   图集替换先在新目录准备待机图和反应图，保留未替换的图片，再清理旧存储并更新图库与当前选择。这也让旧版图集在迁入 `Sets/` 时保留另一组图片。导入或复制失败会清理新副本；从默认图集发起的失败替换不会创建图库记录或切换选择。按键规则覆盖会先复制新图，旧文件清理失败时清理新副本并保留原规则。
-- **显示与缩略图共享缓存**：
-  `PetImageLibrary` 使用系统托管的 `NSCache<NSURL, NSImage>` 缓存图像，宠物显示与设置缩略图共同复用。替换或删除图集时显式清除旧图像的缓存；按键规则变更时由设置模型清除对应缓存。`PetController` 在初始化和 `reloadImages()` 时解析反应图列表，避免每次击键都检查整个图集的文件。缓存可在内存承压时被系统逐出，之后按需重新加载。
+- **显示缓存、O(1) 规则查找与图集切换内存卫生**：
+  - `PetImageLibrary` 使用系统托管的 `NSCache<NSURL, NSImage>` 缓存图像，宠物显示与设置缩略图共同复用。替换或删除图集时显式清除旧图像的缓存；切换激活图集（`activateSet`）时自动清理上一图集的非待机反应帧缓存（保留待机缩略图供图库流畅展示），防止高分辨率反应图长期驻留内存。
+  - `KeyReactionStore` 维护 `[KeyStroke: URL]` 内存字典索引（`ruleURLsByStroke`），使每次击键的专属规则匹配达到 O(1) 且未命中规则时零磁盘 `stat` 开销；当外部物理文件被移除时自动失效对应索引。
+  - `PetController` 在初始化和 `reloadImages()` 时预构建 `reactionPicker` 与路径映射字典 `reactionURLsByPath`，并在 `showImage(at:)` 中对相同图像路径直接短路，消除击键路径中的临时数组分配与重复图层赋值。
 - **设置状态同步**：
   `TypingPetSettingsModel.refresh()` 通过 `AppDelegate` 注入的 `currentPositionLock` 回调读取控制器的实际锁定状态，使菜单栏修改后重新打开或刷新设置窗口时，锁定开关及鼠标避让选项的启用状态保持一致。
 
