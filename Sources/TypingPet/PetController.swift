@@ -287,6 +287,9 @@ internal final class PetController: NSObject {
     }
 
     func clampToVisibleScreen() {
+        // Motion bounds belong to the previous screen configuration.
+        stopInertia(savePosition: false)
+        stopPointerAvoidance(savePosition: false)
         guard let screen = panel.screen ?? NSScreen.main ?? NSScreen.screens.first else { return }
         let bounds = screen.visibleFrame
         let origin = PetPointerAvoidance.clampedOrigin(panel.frame.origin, size: panel.frame.size, bounds: bounds)

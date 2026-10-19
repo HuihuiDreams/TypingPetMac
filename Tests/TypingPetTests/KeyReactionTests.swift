@@ -83,7 +83,7 @@ import Testing
     }
 
     @Test @MainActor
-    func ruleLookupUpdatesOnRuleModificationAndPhysicalFileRemoval() throws {
+    func ruleLookupUpdatesOnRuleModificationAndPhysicalFileRestoration() throws {
         let fileManager = FileManager.default
         let root = fileManager.temporaryDirectory.appendingPathComponent("TypingPetKeyCache-\(UUID())", isDirectory: true)
         let stored = root.appendingPathComponent("Rules", isDirectory: true)
@@ -124,5 +124,14 @@ import Testing
         let url3 = try #require(store.imageURL(matching: stroke))
         try fileManager.removeItem(at: url3)
         #expect(store.imageURL(matching: stroke) == nil)
+
+        // A store loaded while the file is missing must also recover without a rule edit.
+        let reloadedStore = KeyReactionStore(fileManager: fileManager, defaults: defaults, directory: stored)
+        #expect(reloadedStore.imageURL(matching: stroke) == nil)
+        #expect(reloadedStore.rules == store.rules)
+
+        try fileManager.copyItem(at: image1, to: url3)
+        #expect(store.imageURL(matching: stroke) == url3)
+        #expect(reloadedStore.imageURL(matching: stroke) == url3)
     }
 }

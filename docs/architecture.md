@@ -243,6 +243,7 @@ sequenceDiagram
      通过 `0.001` 差值判断，仅在透明度发生实际跃迁时提交事务；配合 `setDisableActions(true)` 消除隐式动画插值计算。同时在 60Hz 指针躲避计时器运行期间，短路鼠标移动事件触发的冗余 `targetOrigin` 计算。
 - **位置与缩放持久化**：
   拖拽、惯性滑行和指针躲避都以 60Hz 移动窗口，因此不在每次移动时写入 `UserDefaults`。窗口位置只在 `endMove` / `stopInertia` / `stopPointerAvoidance` / `endResize` 等动作结束时保存；拖拽缩放与设置面板缩放滑块均使用无阻塞更新（`animate: false`），消除连续拖动时的窗口动画卡顿。惯性、躲避与弹跳参数集中在 `PetConstants`。
+  屏幕配置变化时先停止惯性与指针避让、清除旧运动边界，再将窗口限制到当前屏幕可视区，避免后续定时器覆盖归位结果。
 
 ### 4.5 集中配置与磁盘生命周期 (`PetPreferences.swift`, `PetImageLibrary.swift`, `KeyReactions.swift`)
 
@@ -258,7 +259,7 @@ sequenceDiagram
   图集替换先在新目录准备待机图和反应图，保留未替换的图片，再清理旧存储并更新图库与当前选择。这也让旧版图集在迁入 `Sets/` 时保留另一组图片。导入或复制失败会清理新副本；从默认图集发起的失败替换不会创建图库记录或切换选择。按键规则覆盖会先复制新图，旧文件清理失败时清理新副本并保留原规则。
 - **显示缓存、O(1) 规则查找与图集切换内存卫生**：
   - `PetImageLibrary` 使用系统托管的 `NSCache<NSURL, NSImage>` 缓存图像，宠物显示与设置缩略图共同复用。替换或删除图集时显式清除旧图像的缓存；切换激活图集（`activateSet`）时自动清理上一图集的非待机反应帧缓存（保留待机缩略图供图库流畅展示），防止高分辨率反应图长期驻留内存。
-  - `KeyReactionStore` 维护 `[KeyStroke: URL]` 内存字典索引（`ruleURLsByStroke`），使每次击键的专属规则匹配达到 O(1) 且未命中规则时零磁盘 `stat` 开销；当外部物理文件被移除时自动失效对应索引。
+  - `KeyReactionStore` 维护 `[KeyStroke: URL]` 内存字典索引（`ruleURLsByStroke`），使每次击键的专属规则匹配达到 O(1) 且未命中规则时零磁盘 `stat` 开销；索引保留安全路径，图像文件缺失时返回 `nil`，文件恢复后自动重新命中，包括启动时文件缺失的情况。
   - `PetController` 在初始化和 `reloadImages()` 时预构建 `reactionPicker` 与路径映射字典 `reactionURLsByPath`，并在 `showImage(at:)` 中对相同图像路径直接短路，消除击键路径中的临时数组分配与重复图层赋值。
 - **设置状态同步**：
   `TypingPetSettingsModel.refresh()` 通过 `AppDelegate` 注入的 `currentPositionLock` 回调读取控制器的实际锁定状态，使菜单栏修改后重新打开或刷新设置窗口时，锁定开关及鼠标避让选项的启用状态保持一致。
@@ -340,6 +341,8 @@ sequenceDiagram
 | `ImagePickerTests` | 随机图像选择 | 验证优先排除当前图像、只有一张图像时的回退及空列表处理。 |
 
 0.12.1 的 Linux 辅助验证使用临时替代的 macOS 接口，运行了 6 个套件中的 32 个用例；全部 Swift 文件通过语法检查。这些结果不等同于原生 macOS 测试：发布前仍需在 macOS 上执行 `swift test` 和 `./scripts/build_app.sh`，并验证窗口交互及输入监控权限流程。
+
+屏幕变化的手动回归步骤（需 macOS）：分别在惯性滑动期间、锁定位置并开启指针避让期间，缩小屏幕分辨率或断开宠物所在的外接显示器；确认窗口归位后持续留在当前可视区，再移动鼠标确认避让可以重新启动。
 
 > [!IMPORTANT]
 > **CI / Headless 无头环境测试隔离准则**：  

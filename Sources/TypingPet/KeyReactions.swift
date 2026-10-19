@@ -85,11 +85,7 @@ final class KeyReactionStore {
 
     func imageURL(matching stroke: KeyStroke) -> URL? {
         guard let url = ruleURLsByStroke[stroke] else { return nil }
-        guard fileManager.fileExists(atPath: url.path) else {
-            ruleURLsByStroke.removeValue(forKey: stroke)
-            return nil
-        }
-        return url
+        return fileManager.fileExists(atPath: url.path) ? url : nil
     }
 
     func imageURL(for rule: KeyReactionRule) -> URL? {
@@ -103,9 +99,8 @@ final class KeyReactionStore {
         for rule in rules {
             guard StoredFileName.isSafe(rule.imageFileName) else { continue }
             let url = directory.appendingPathComponent(rule.imageFileName)
-            if fileManager.fileExists(atPath: url.path) {
-                lookup[rule.stroke] = url
-            }
+            // Keep the path indexed so a temporarily missing image can recover.
+            lookup[rule.stroke] = url
         }
         ruleURLsByStroke = lookup
     }

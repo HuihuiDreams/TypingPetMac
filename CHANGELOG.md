@@ -7,7 +7,7 @@
 - 新增 `Sources/TypingPet/Resources/TypingPet.entitlements` 运行时强化权限描述文件，显式禁用 JIT、未签名可执行内存并保持库验证（Library Validation，在具备 Team ID 证书签名时生效）。
 - 在 `scripts/build_app.sh` 中强制校验并传入 `--entitlements` 签名入参，并在打包完成时自动计算并输出 `dist/TypingPet-macOS.zip` 的 SHA-256 校验哈希。
 - 在 `Tests/TypingPetTests/FolderImageSelectionTests.swift` 与 `Tests/TypingPetTests/KeyReactionTests.swift` 中新增 `ignoresSymlinkedImagesDuringFolderImport` 与 `rejectsSymlinkedRuleImage` 符号链接过滤与拒绝导入回归测试。
-- 在 `KeyReactionTests` 中新增按键规则字典查找与物理文件失效测试 `ruleLookupUpdatesOnRuleModificationAndPhysicalFileRemoval`。
+- 在 `KeyReactionTests` 中新增按键规则字典查找与物理文件恢复测试 `ruleLookupUpdatesOnRuleModificationAndPhysicalFileRestoration`，覆盖运行中删除后恢复、启动时文件缺失后恢复。
 - 在 `ThumbnailCacheTests` 中新增切换激活图集时自动释放旧图集反应帧缓存测试 `activateSetInvalidatesPreviousSetReactionCache`。
 
 ### Changed
@@ -18,6 +18,11 @@
 - 指针躲避算法预计算与短路防抖：`PetPointerAvoidance` 预计算旋转方向常量避免重复三角函数计算；避让定时器运行期间短路重复的 `targetOrigin` 冗余重算。
 - 设置面板缩放滑块流畅度优化：调整缩放时直接应用无动画平滑重设，消除连续拖拽滑块时的 AppKit 阻塞式窗口动画卡顿。
 - 图集切换内存卫生加固：`PetImageLibrary.activateSet` 切换不同图集时主动释放上一图集的反应图像内存缓存，防止大图集残留占用内存。
+
+### Fixed
+
+- 屏幕配置变化时先停止惯性滑动和指针避让，再将宠物窗口限制到当前可视区，防止运动定时器继续使用旧屏幕边界覆盖归位结果。
+- 按键规则索引保留安全的图像路径，文件暂时缺失时仅返回未命中；文件恢复后无需重启或修改规则即可重新响应。
 
 ### Security
 
