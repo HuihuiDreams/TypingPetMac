@@ -78,14 +78,13 @@ final class PetImageLibrary {
     private let setsDirectory: URL
     private var customSets: [PetImageSet]
 
-    init(fileManager: FileManager = .default, defaults: UserDefaults = .standard, imagesDirectory: URL? = nil) {
+    init(fileManager: FileManager = .default, defaults: UserDefaults = AppEnvironment.defaults, imagesDirectory: URL? = nil) {
         self.fileManager = fileManager
         self.defaults = defaults
         if let imagesDirectory {
             self.imagesDirectory = imagesDirectory
         } else {
-            self.imagesDirectory = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-                .appendingPathComponent("TypingPet", isDirectory: true)
+            self.imagesDirectory = AppEnvironment.supportDirectory
                 .appendingPathComponent("Images", isDirectory: true)
         }
         setsDirectory = self.imagesDirectory.appendingPathComponent("Sets", isDirectory: true)

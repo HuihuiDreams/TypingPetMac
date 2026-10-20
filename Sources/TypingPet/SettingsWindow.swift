@@ -218,10 +218,10 @@ final class TypingPetSettingsModel: ObservableObject {
 
 @MainActor
 final class SettingsWindowController: NSWindowController, NSWindowDelegate {
-    init(model: TypingPetSettingsModel) {
-        let root = SettingsRootView(model: model)
+    init(model: TypingPetSettingsModel, todoStore: TodoStore) {
+        let root = SettingsRootView(model: model, todoStore: todoStore)
         let window = NSWindow(contentViewController: NSHostingController(rootView: root))
-        window.title = "Typing Pet 설정"
+        window.title = AppEnvironment.displayName + " 설정"
         window.setContentSize(NSSize(width: 780, height: 600))
         window.minSize = NSSize(width: 700, height: 540)
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
@@ -246,11 +246,14 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
 private struct SettingsRootView: View {
     @ObservedObject var model: TypingPetSettingsModel
+    @ObservedObject var todoStore: TodoStore
 
     var body: some View {
         TabView {
             GeneralSettingsView(model: model)
                 .tabItem { Label("일반", systemImage: "gearshape") }
+            TodoSettingsView(store: todoStore)
+                .tabItem { Label("할 일", systemImage: "checklist") }
             GallerySettingsView(model: model)
                 .tabItem { Label("갤러리", systemImage: "photo.on.rectangle.angled") }
             KeyReactionSettingsView(model: model)
@@ -447,6 +450,147 @@ private struct GeneralSettingsView: View {
             }
             .padding(SettingsMetrics.space4)
         }
+    }
+}
+
+private struct TodoSettingsView: View {
+    @ObservedObject var store: TodoStore
+
+    private var enabled: Bool { store.engine.state.featurePreferences.enabled }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: SettingsMetrics.space6) {
+                FlatSettingsSection("할 일과 집중 타이머") {
+                    VStack(spacing: 0) {
+                        SettingsToggleRow(
+                            title: "할 일 기능 사용",
+                            isOn: Binding(get: { enabled }, set: { value in
+                                store.expanded = true
+                                store.change { $0.setFeature(enabled: value, hidden: false) }
+                            }),
+                            isEnabled: !store.loadBlocked
+                        )
+                        Divider()
+                        SettingsToggleRow(
+                            title: "말풍선 표시",
+                            isOn: Binding(
+                                get: { !store.engine.state.featurePreferences.bubbleHidden },
+                                set: { value in if value { store.show() } else { store.hide() } }
+                            ),
+                            isEnabled: enabled && !store.loadBlocked
+                        )
+                        Divider()
+                        SettingsNote(text: "말풍선을 숨겨도 실행 중인 타이머는 유지합니다. 잠자기와 앱 종료 시에는 일시정지합니다.")
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+
+                FlatSettingsSection("말풍선") {
+                    VStack(spacing: 0) {
+                        SettingsRow {
+                            HStack(spacing: SettingsMetrics.space3) {
+                                Text("크기")
+                                    .frame(width: SettingsMetrics.labelWidth, alignment: .leading)
+                                Spacer(minLength: SettingsMetrics.space3)
+                                HStack(spacing: SettingsMetrics.space1) {
+                                    ZoomStepButton(symbol: "minus", label: "작게 보기", enabled: store.canZoomOut) { store.zoomOut() }
+                                    Text("\(store.zoomPercent)%")
+                                        .monospacedDigit()
+                                        .frame(width: 52)
+                                        .accessibilityLabel("말풍선 크기 \(store.zoomPercent)%")
+                                    ZoomStepButton(symbol: "plus", label: "크게 보기", enabled: store.canZoomIn) { store.zoomIn() }
+                                }
+                                Button("100%로") { store.resetZoom() }
+                                    .disabled(store.zoom == 1)
+                            }
+                        }
+                        Divider()
+                        SettingsNote(text: "브라우저처럼 80%부터 200%까지 단계별로 바뀝니다. 말풍선에 입력하는 중에는 ⌘+, ⌘−, ⌘0으로도 조절할 수 있어요.")
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Divider()
+                        SettingsRow {
+                            HStack(spacing: SettingsMetrics.space3) {
+                                Text("표시 방식")
+                                Spacer(minLength: SettingsMetrics.space3)
+                                Picker("", selection: Binding(get: { store.bubbleVisibility }, set: store.setBubbleVisibility)) {
+                                    Text("항상 표시").tag(TodoBubbleVisibility.always)
+                                    Text("마우스를 올렸을 때").tag(TodoBubbleVisibility.hover)
+                                }
+                                .labelsHidden()
+                                .frame(width: 168)
+                            }
+                        }
+                        Divider()
+                        SettingsSliderRow(
+                            title: "상시 투명도",
+                            value: Binding(get: { store.bubbleRestingOpacity }, set: store.setBubbleRestingOpacity),
+                            range: 0...1
+                        )
+                        .disabled(store.bubbleVisibility == .hover)
+                        Divider()
+                        SettingsSliderRow(
+                            title: "호버 시 투명도",
+                            value: Binding(get: { store.bubbleHoverOpacity }, set: store.setBubbleHoverOpacity),
+                            range: 0...1
+                        )
+                        Divider()
+                        SettingsNote(text: store.bubbleVisibility == .always
+                            ? "100%는 선명하게, 0%는 완전히 투명하게 표시됩니다. 펫이나 말풍선에 마우스를 올리면 호버 시 투명도를 씁니다. 입력 중이거나 집중 시간이 끝났을 때는 항상 선명하게 보여요."
+                            : "펫에 마우스를 올리면 말풍선이 호버 시 투명도로 나타나고, 말풍선 위에 있는 동안 유지됩니다. 입력 중이거나 집중 시간이 끝났을 때는 항상 선명하게 보여요.")
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+
+                FlatSettingsSection("기록") {
+                    VStack(spacing: 0) {
+                        SettingsRow {
+                            HStack(spacing: SettingsMetrics.space3) {
+                                Text("기록 파일")
+                                Spacer(minLength: SettingsMetrics.space3)
+                                Button("기록 데이터 열기") { NSWorkspace.shared.activateFileViewerSelecting([store.storage.url]) }
+                            }
+                        }
+                        Divider()
+                        Text(store.storage.url.path)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.vertical, SettingsMetrics.space2)
+                        SettingsNote(text: "할 일 제목, 완료 날짜, 타이머 설정과 실제 집중 시간을 이 Mac의 JSON 파일에 저장합니다.")
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        if let error = store.errorMessage {
+                            Text(error)
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                                .textSelection(.enabled)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+                }
+            }
+            .padding(SettingsMetrics.space4)
+        }
+    }
+}
+
+// Both steps share one frame, so the minus and plus buttons render at the same size.
+private struct ZoomStepButton: View {
+    let symbol: String
+    let label: String
+    let enabled: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 11, weight: .semibold))
+                .frame(width: 16, height: 16)
+        }
+        .disabled(!enabled)
+        .help(label)
+        .accessibilityLabel(label)
     }
 }
 
