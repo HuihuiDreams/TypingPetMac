@@ -25,18 +25,38 @@ struct TodoFileStorage {
     }
 }
 
+enum TodoBubbleVisibility: String, CaseIterable {
+    case always, hover
+}
+
 @MainActor
 final class TodoStore: ObservableObject {
     @Published private(set) var engine: FocusTimerEngine
     @Published private(set) var errorMessage: String?
     @Published private(set) var loadBlocked = false
     @Published var expanded = true
+    // A display preference, so it lives in UserDefaults instead of the record file.
+    @Published private(set) var zoom: Double
+    @Published private(set) var bubbleVisibility: TodoBubbleVisibility
+    // Same model as the pet: opacity while the pointer is away, and while it is over the pet or bubble.
+    @Published private(set) var bubbleRestingOpacity: Double
+    @Published private(set) var bubbleHoverOpacity: Double
     let storage: TodoFileStorage
     private var lastCheckpoint: TimeInterval
     private let monotonicNow: () -> TimeInterval
+    private let defaults: UserDefaults
+    private static let zoomKey = "todoBubbleZoom"
+    private static let visibilityKey = "todoBubbleVisibility"
+    private static let restingOpacityKey = "todoBubbleRestingOpacity"
+    private static let hoverOpacityKey = "todoBubbleHoverOpacity"
 
-    init(url: URL = TodoFileStorage.defaultURL, monotonicNow: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }, wallNow: @escaping () -> Date = Date.init) {
+    init(url: URL = TodoFileStorage.defaultURL, defaults: UserDefaults = AppEnvironment.defaults, monotonicNow: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }, wallNow: @escaping () -> Date = Date.init) {
         storage = TodoFileStorage(url: url)
+        self.defaults = defaults
+        zoom = (defaults.object(forKey: Self.zoomKey) as? Double).map(TodoBubbleZoom.normalized) ?? 1
+        bubbleVisibility = defaults.string(forKey: Self.visibilityKey).flatMap(TodoBubbleVisibility.init(rawValue:)) ?? .always
+        bubbleRestingOpacity = (defaults.object(forKey: Self.restingOpacityKey) as? Double).map(Self.clampedOpacity) ?? 1
+        bubbleHoverOpacity = (defaults.object(forKey: Self.hoverOpacityKey) as? Double).map(Self.clampedOpacity) ?? 1
         self.monotonicNow = monotonicNow
         lastCheckpoint = monotonicNow()
         do {
@@ -44,7 +64,7 @@ final class TodoStore: ObservableObject {
         } catch {
             engine = FocusTimerEngine(monotonicNow: monotonicNow, wallNow: wallNow)
             loadBlocked = true
-            errorMessage = "Cannot read the Todo record. The original file is unchanged. \(error.localizedDescription)"
+            errorMessage = "할 일 기록을 읽지 못했어요. 원본 파일은 그대로 두었어요. \(error.localizedDescription)"
         }
         if engine.activeSession != nil { expanded = false }
         if !loadBlocked { persist() }
@@ -74,6 +94,36 @@ final class TodoStore: ObservableObject {
         change { $0.setFeature(enabled: true, hidden: false) }
     }
     func hide() { change { $0.setFeature(enabled: true, hidden: true) } }
+    var zoomPercent: Int { Int((zoom * 100).rounded()) }
+    var canZoomIn: Bool { zoom < TodoBubbleZoom.steps[TodoBubbleZoom.steps.count - 1] }
+    var canZoomOut: Bool { zoom > TodoBubbleZoom.steps[0] }
+    func zoomIn() { setZoom(TodoBubbleZoom.larger(than: zoom)) }
+    func zoomOut() { setZoom(TodoBubbleZoom.smaller(than: zoom)) }
+    func resetZoom() { setZoom(1) }
+    func setBubbleVisibility(_ value: TodoBubbleVisibility) {
+        guard value != bubbleVisibility else { return }
+        bubbleVisibility = value
+        defaults.set(value.rawValue, forKey: Self.visibilityKey)
+    }
+    func setBubbleRestingOpacity(_ value: Double) {
+        let value = Self.clampedOpacity(value)
+        guard value != bubbleRestingOpacity else { return }
+        bubbleRestingOpacity = value
+        defaults.set(value, forKey: Self.restingOpacityKey)
+    }
+    func setBubbleHoverOpacity(_ value: Double) {
+        let value = Self.clampedOpacity(value)
+        guard value != bubbleHoverOpacity else { return }
+        bubbleHoverOpacity = value
+        defaults.set(value, forKey: Self.hoverOpacityKey)
+    }
+    private static func clampedOpacity(_ value: Double) -> Double { min(max(value, 0), 1) }
+    func setZoom(_ value: Double) {
+        let value = TodoBubbleZoom.normalized(value)
+        guard value != zoom else { return }
+        zoom = value
+        defaults.set(value, forKey: Self.zoomKey)
+    }
     func persist() {
         guard !loadBlocked else { return }
         do {
@@ -81,7 +131,7 @@ final class TodoStore: ObservableObject {
             lastCheckpoint = monotonicNow()
             errorMessage = nil
         } catch {
-            errorMessage = "Cannot save the Todo record. Recent changes can be lost. \(error.localizedDescription)"
+            errorMessage = "할 일 기록을 저장하지 못했어요. 최근 변경 사항이 사라질 수 있어요. \(error.localizedDescription)"
         }
     }
 }

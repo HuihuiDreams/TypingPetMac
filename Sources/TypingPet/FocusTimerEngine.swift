@@ -35,11 +35,20 @@ struct FocusTimerEngine {
         state.featurePreferences = TodoFeaturePreferences(enabled: enabled, bubbleHidden: hidden)
     }
     @discardableResult mutating func addTodo(_ title: String) -> UUID? {
-        let title = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let title = TodoTitlePolicy.normalized(title)
         guard !title.isEmpty else { return nil }
         let item = TodoItem(title: title, createdAt: wallNow())
         state.todos.append(item)
         return item.id
+    }
+    // Sessions reference the ID, so a new title keeps every record.
+    // An unchanged title is left alone, so older titles above the cap are not cut just by opening the editor.
+    mutating func rename(_ todoID: UUID, to title: String) {
+        guard let i = state.todos.firstIndex(where: { $0.id == todoID && $0.deletedAt == nil }),
+              title.trimmingCharacters(in: .whitespacesAndNewlines) != state.todos[i].title else { return }
+        let title = TodoTitlePolicy.normalized(title)
+        guard !title.isEmpty else { return }
+        state.todos[i].title = title
     }
     mutating func setPreference(_ preference: TimerPreference, for todoID: UUID) {
         guard preference.isValid, let i = state.todos.firstIndex(where: { $0.id == todoID }) else { return }

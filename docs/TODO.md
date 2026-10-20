@@ -5,13 +5,59 @@ The menu bar also has `할 일 표시`.
 
 ## Add and manage Todos
 
-1. Enter a title in `할 일 추가…`.
-2. Press Enter.
-3. Select the circle to complete the Todo.
+1. Enter a title in `할 일 추가…` at the top of the list.
+2. Press Enter. The new Todo appears right below the field, and the field keeps focus for the next one.
+   Open Todos are listed newest first.
+3. Select the circle to complete the Todo. The check appears first, then the row moves to `오늘 완료`.
 
 The list keeps open Todos across dates. `오늘 완료` shows only Todos completed on the current local date.
-Open that section to undo completion. Use the row menu to delete a Todo. Deletion hides the Todo and keeps its sessions.
-The title tooltip shows the full title.
+Open that section to undo completion.
+Click a title to rename the Todo in place. The caret lands where you click; nothing is selected or swapped, so the row does not move.
+Each title is one AppKit field (`InlineTitleField`) that shows two lines with a trailing `…` and edits in place.
+Enter saves and Esc restores the old title.
+Clicking another title, the add field, or another app also saves. An empty title keeps the old one.
+The row menu and context menu also offer `제목 수정`.
+The add field and the title editor are ghost inputs with no box or underline.
+The add field shows a faint plus and gains a light wash on hover or while a draft exists. An edited title keeps the row wash and shows the caret.
+
+### Long titles
+
+| Where | Rule |
+|---|---|
+| Length | 1–120 characters after trimming. Hangul syllables and emoji count as one character each. |
+| Spacing | Line breaks and runs of spaces, typed or pasted, become one space. |
+| Typing | A `n/120` counter appears from 100 characters. Input stops at 120. |
+| Add field | Grows to three lines, then scrolls. |
+| List rows | Two lines, then a trailing `…`. The tooltip shows the full title. |
+| Editing | Up to four lines. Titles of up to two lines keep the row height; longer titles open up while editing. |
+| Focus bubble, active card, delete prompt | One line with a trailing `…`. |
+| Switch prompt | Each quoted title is cut at 24 characters. |
+| Older records | Titles saved before this rule stay as they are until you change them. |
+
+The rule lives in `TodoTitlePolicy` in `TodoState.swift`.
+
+Text fields in the bubble accept ⌘A, ⌘C, ⌘V, ⌘X, ⌘Z, and ⇧⌘Z, including with a Korean input source.
+The app has no menu bar, so the bubble panel routes these shortcuts itself, and a hidden Edit menu covers popovers and Settings.
+With Full Keyboard Access, Tab reaches each title as a button. VoiceOver offers `완료`, `타이머 시작`, and `삭제` actions on it.
+The row menu and context menu also delete a Todo. The row asks for confirmation in place.
+Deletion hides the Todo and keeps its sessions. The title tooltip shows the full title.
+
+The bubble sizes itself to its content. Its tail points at the pet.
+The header shows the local date and the number of open Todos.
+
+## Bubble size and visibility
+
+The text size button in the header (가가 on a Korean system) and Settings > `할 일` > `말풍선` change the bubble size.
+Sizes step like a browser: 80, 90, 100, 110, 125, 150, 175, and 200%. Text and controls are laid out at each size, not scaled as an image.
+While the bubble has keyboard focus, ⌘+ (or ⌘=), ⌘−, and ⌘0 also work. A short badge shows the new size.
+
+`표시 방식` keeps the bubble visible (`항상 표시`, the default) or shows it only on pointer hover (`마우스를 올렸을 때`).
+In hover mode, move the pointer over the pet to show the bubble. It stays while the pointer is over the bubble and fades out shortly after the pointer leaves.
+`상시 투명도` and `호버 시 투명도` work like the pet settings of the same names. 100% is opaque and 0% is invisible.
+`상시 투명도` applies in `항상 표시` mode while the pointer is away. `호버 시 투명도` applies while the pointer is over the pet or the bubble.
+A bubble at 0% passes clicks through until the pointer shows it again.
+Typing, an open popover or menu, an expired countdown, and save errors keep the bubble visible and fully opaque.
+Size and visibility are stored in the app preferences, not in the Todo record.
 
 ## Use a timer
 
@@ -21,22 +67,35 @@ Custom durations use whole minutes from 1 through 999. Selecting a setting does 
 Each Todo keeps its own setting.
 
 Starting a timer opens the compact focus view. It shows the title, a tomato, and the timer.
+The ring around the tomato shows the remaining countdown. Count-up has no limit, so it shows the tomato alone in the same place.
+A paused timer shows a gray tomato and `일시정지`.
 Move the pointer over the view to show pause, resume, and stop controls.
-Select the title or time to open the list. The timer continues while you use the list.
-The header button returns to the compact view.
+Select the view to open the list. The timer continues while you use the list.
+The list shows the active Todo in a card at the top with its own controls.
+The header chevron or Esc returns to the compact view.
 
 A countdown stops at zero. The compact expiry view offers extension and finish.
 The extension arrow changes the duration. The main extension button starts that duration in the same session.
 Time spent at zero does not count. Finishing a timer leaves its Todo open.
 Completing the active Todo finishes its timer first.
 
-Starting another Todo asks for confirmation. The old timer keeps its current state until you select `전환`.
+Starting another Todo asks for confirmation inside the bubble. The old timer keeps its current state until you select `전환`.
 Cancel keeps the old session. Confirmation finishes it and starts one new session.
 
 ## Show, hide, and move
 
 The pet and Todo UI use separate panels. Position lock keeps mouse clicks passing through the pet.
-The Todo panel and entry button continue to receive clicks. The Todo panel can receive keyboard focus.
+The Todo panel and entry button continue to receive clicks.
+The Todo panel is a fixed transparent canvas beside the pet, so the bubble animates without the window resizing.
+The bubble draws its own shadow, so the shadow follows animations and does not change when the panel takes keyboard focus.
+Clicks outside the bubble, and all clicks while it is hidden, pass through to the windows below.
+Hover inside the bubble comes from the pointer position and SwiftUI's current layout, not from AppKit tracking areas,
+so row actions stay reachable while a title grows during editing or the list scrolls.
+Icon buttons and the `…` and size menus show a round wash on hover. Text inputs show a text cursor on hover before the panel is clicked.
+macOS ignores cursor changes from an app that is not frontmost, so `BackgroundCursor` enables an undocumented WindowServer property at launch.
+It is looked up at run time; if a future macOS removes it, the pointer keeps the arrow until a panel is clicked.
+Buttons in the Todo panel work without keyboard focus, so typing stays in the frontmost app.
+The panel takes keyboard focus only when you open it with `할 일`, select the input field, rename a Todo, or enter a custom duration.
 The Todo panel follows pet movement and size changes. It uses the pet display's visible frame.
 It first tries the space above the pet, then the sides and the space below.
 The Todo panel uses the same window level and Space policy as the pet.

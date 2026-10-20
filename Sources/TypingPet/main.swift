@@ -1033,6 +1033,8 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     private var inputMonitoringGuideController: InputMonitoringGuideController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        TextEditingShortcuts.installEditMenu(appName: AppEnvironment.displayName)
+        BackgroundCursor.enable()
         petController = PetController(
             library: imageLibrary,
             keyStore: keyReactionStore,
@@ -1067,11 +1069,11 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         todoStore.pauseForSleepOrTermination()
         guard let error = todoStore.errorMessage, !todoStore.loadBlocked else { return .terminateNow }
         let alert = NSAlert()
-        alert.messageText = "Cannot save Todo data"
+        alert.messageText = "할 일 기록을 저장하지 못했어요"
         alert.informativeText = error
-        alert.addButton(withTitle: "Retry save")
-        alert.addButton(withTitle: "Cancel")
-        alert.addButton(withTitle: "Quit without saving")
+        alert.addButton(withTitle: "다시 저장")
+        alert.addButton(withTitle: "취소")
+        alert.addButton(withTitle: "저장하지 않고 종료")
         switch alert.runModal() {
         case .alertFirstButtonReturn:
             todoStore.persist()

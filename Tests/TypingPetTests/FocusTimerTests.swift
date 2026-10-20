@@ -99,6 +99,22 @@ final class FocusTimerTests: XCTestCase {
         XCTAssertEqual(e.totalSeconds(for: b), 120)
     }
 
+    func testRenameKeepsSessionsAndRejectsBlankTitles() throws {
+        let c = TestClock()
+        var e = c.engine()
+        let id = try XCTUnwrap(e.addTodo("Draft"))
+        XCTAssertTrue(e.start(id)); c.advance(90)
+        e.rename(id, to: "  Final title  ")
+        XCTAssertEqual(e.activeSession?.todoId, id)
+        e.finish()
+        e.rename(id, to: " \n ")
+        XCTAssertEqual(e.state.todos[0].title, "Final title")
+        XCTAssertEqual(e.totalSeconds(for: id), 90, accuracy: 0.0001)
+        e.delete(id); e.rename(id, to: "Hidden")
+        XCTAssertEqual(e.state.todos[0].title, "Final title")
+        try e.state.validate()
+    }
+
     func testSettingsAreIndependentAndDoNotStartTimer() throws {
         var e = TestClock().engine(); let a = e.addTodo("Same")!; let b = e.addTodo("Same")!
         XCTAssertNil(e.addTodo(" \n "))

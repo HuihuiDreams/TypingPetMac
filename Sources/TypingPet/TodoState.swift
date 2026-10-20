@@ -18,6 +18,22 @@ struct TimerPreference: Codable, Equatable {
     }
 }
 
+// One place for title rules, so typing, adding, and renaming agree.
+enum TodoTitlePolicy {
+    static let maxLength = 120
+    // Show a counter from here on while typing.
+    static let warningLength = 100
+    // Line breaks and runs of whitespace become one space; the result is trimmed and capped.
+    static func normalized(_ title: String) -> String {
+        String(title.split(whereSeparator: \.isWhitespace).joined(separator: " ").prefix(maxLength))
+    }
+    // While typing, keep the user's spacing but drop line breaks and stop at the cap.
+    static func limitedDraft(_ text: String) -> String {
+        let flat = text.contains(where: \.isNewline) ? text.components(separatedBy: .newlines).joined(separator: " ") : text
+        return flat.count > maxLength ? String(flat.prefix(maxLength)) : flat
+    }
+}
+
 struct TodoItem: Codable, Identifiable, Equatable {
     var id = UUID()
     var title: String
@@ -135,8 +151,8 @@ enum TodoDataError: LocalizedError {
     case unsupportedSchema, invalidState
     var errorDescription: String? {
         switch self {
-        case .unsupportedSchema: return "This record uses an unsupported data version. The original file is unchanged."
-        case .invalidState: return "The record contains invalid data. The original file is unchanged."
+        case .unsupportedSchema: return "지원하지 않는 기록 버전이에요. 원본 파일은 그대로 두었어요."
+        case .invalidState: return "기록에 잘못된 데이터가 있어요. 원본 파일은 그대로 두었어요."
         }
     }
 }
