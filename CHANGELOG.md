@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.12.0 - 2026-10-21
+
+- Add a Todo speech bubble beside the pet with a per-Todo countdown or count-up focus timer and measured session time.
+- Edit Todo titles in place, zoom the bubble from 80% to 200%, and show it always or only on hover.
+- Pause a running timer after a configurable idle period, on screen lock, or on sleep, then ask how to treat the time away.
+- Bounce the bubble like a Dock icon when a countdown ends or a missed notice is waiting.
+- Build local development copies as a separate TypingPet Dev app with its own settings, images, and Todo records.
+
 ## 0.11.2 - 2026-09-27
 
 - Replace the permission guide's Finder shortcut with a prominent button that reopens Input Monitoring settings.
