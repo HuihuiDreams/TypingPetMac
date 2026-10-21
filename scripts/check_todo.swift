@@ -315,6 +315,97 @@ struct TodoChecks {
             try check(e.state.todos[0].title == "새 제목 입니다", "Rename did not apply the policy")
             try e.state.validate()
         }
+        try test("An absence takes back idle time, and including it resumes as if never paused") {
+            let c = Clock(); var e = c.engine(); let id = e.addTodo("Work")!
+            e.setPreference(.countup, for: id); e.start(id)
+            c.advance(1000); e.pause(excludingLast: 900)
+            try check(e.activeSession?.status == .paused && e.activeSession?.totalActiveSeconds == 100, "Idle time was not taken back")
+            c.advance(3600); e.tick()
+            e.resume(adding: 4500)
+            try check(e.activeSession?.status == .running && e.activeSession?.totalActiveSeconds == 4600, "Included time is wrong")
+            c.advance(10); e.pause(excludingLast: 99_999)
+            try check(e.activeSession?.totalActiveSeconds == 0, "Removal went below zero")
+            try e.state.validate()
+            e.finish()
+            e.setPreference(.countdown(minutes: 20)!, for: id); e.start(id)
+            c.advance(600); e.pause(excludingLast: 300)
+            try check(e.displaySeconds == 900, "Countdown did not get its idle time back")
+            e.resume(adding: 2000)
+            try check(e.activeSession?.status == .expired && e.activeSession?.activeSegments.last?.actualActiveSeconds == 1200, "Including passed the countdown limit")
+            try e.state.validate()
+        }
+        try test("Idle, lock, and sleep pause the timer, and the notice follows the answer") {
+            let c = Clock(); var idle = 0.0
+            let suite = "TypingPetChecks-\(UUID().uuidString)"; let defaults = UserDefaults(suiteName: suite)!
+            defer { defaults.removePersistentDomain(forName: suite) }
+            let url = folder.appendingPathComponent("absence.json")
+            var store = TodoStore(url: url, defaults: defaults, monotonicNow: { c.uptime }, wallNow: { c.date }, idleSeconds: { idle })
+            try check(store.idleMinutes == 15, "Wrong default idle minutes")
+            var id: UUID?
+            store.change { id = $0.addTodo("Work"); $0.setPreference(.countup, for: id!); $0.start(id!) }
+            let start = c.date
+            c.advance(600); idle = 300; store.tick()
+            try check(store.engine.activeSession?.status == .running && store.absence == nil, "Paused before the threshold")
+            c.advance(600); idle = 900; store.tick()
+            try check(store.engine.activeSession?.status == .paused && store.engine.activeSession?.totalActiveSeconds == 300, "Idle pause kept idle time")
+            try check(store.absence?.reason == .idle && store.absence?.since == start + 300, "Wrong absence record")
+            c.advance(3600); idle = 4500; store.tick()
+            try check(store.absence?.returnedAt == nil, "Return noticed without input")
+            idle = 1; store.tick()
+            try check(store.absence?.returnedAt == c.date && store.absence?.awaySeconds(now: c.date + 99) == 4500, "Return or away time is wrong")
+            c.advance(10); store.includeAbsence()
+            try check(store.engine.activeSession?.status == .running && store.engine.activeSession?.totalActiveSeconds == 4810 && store.absence == nil, "Including did not restore the whole absence")
+            idle = 2; store.screenDidLock()
+            try check(store.absence?.reason == .locked && store.engine.activeSession?.status == .paused, "Lock did not pause")
+            c.advance(60); idle = 0.5; store.tick()
+            try check(store.absence?.returnedAt == nil, "Input on the lock screen counted as a return")
+            store.screenDidUnlock()
+            try check(store.absence?.returnedAt == c.date, "Unlock was not a return")
+            store.change { $0.resume() }
+            try check(store.absence == nil && store.engine.activeSession?.status == .running, "Resuming kept the notice")
+            idle = 3; store.pauseForSleep()
+            try check(store.absence?.reason == .sleep, "Sleep did not leave a notice")
+            store.change { $0.finish() }
+            try check(store.absence == nil, "Finishing kept the notice")
+            store.change { $0.start(id!) }
+            store.setIdleMinutes(7); store.setIdleMinutes(0)
+            try check(store.idleMinutes == 0, "Idle choice not applied or invalid choice accepted")
+            c.advance(5); idle = 99_999; store.tick(); store.screenDidLock()
+            try check(store.engine.activeSession?.status == .running, "Paused while detection is off")
+            store.pauseForSleep()
+            try check(store.engine.activeSession?.status == .paused && store.absence == nil, "Sleep pause changed while detection is off")
+            store.setIdleMinutes(30)
+            store = TodoStore(url: url, defaults: defaults, monotonicNow: { c.uptime }, wallNow: { c.date }, idleSeconds: { idle })
+            try check(store.idleMinutes == 30, "Idle minutes not restored")
+            try TodoFileStorage(url: url).load().validate()
+        }
+        try test("The bubble hops when a countdown ends and when the user returns to a missed notice") {
+            let c = Clock(); var idle = 0.0
+            let suite = "TypingPetChecks-\(UUID().uuidString)"; let defaults = UserDefaults(suiteName: suite)!
+            defer { defaults.removePersistentDomain(forName: suite) }
+            let store = TodoStore(url: folder.appendingPathComponent("attention.json"), defaults: defaults, monotonicNow: { c.uptime }, wallNow: { c.date }, idleSeconds: { idle })
+            var id: UUID?
+            store.change { id = $0.addTodo("Work"); $0.start(id!) }
+            c.advance(1200); store.tick()
+            try check(store.engine.activeSession?.status == .expired && store.attentionRequest == 1, "Expiry did not hop")
+            c.advance(5); idle = 1; store.tick()
+            try check(store.attentionRequest == 1, "Expiry while present hopped twice")
+            store.change { $0.finish(); $0.start(id!) }
+            c.advance(1195); idle = 600; store.tick(); c.advance(5); idle = 605; store.tick()
+            try check(store.attentionRequest == 2, "Expiry while away did not hop at once")
+            c.advance(60); idle = 665; store.tick()
+            try check(store.attentionRequest == 2, "Hopped again without input")
+            idle = 1; store.tick()
+            try check(store.attentionRequest == 3, "Missed expiry did not hop on return")
+            store.change { $0.finish(); $0.setPreference(.countup, for: id!); $0.start(id!) }
+            c.advance(1000); idle = 900; store.tick()
+            try check(store.absence != nil && store.attentionRequest == 3, "Absence hopped while nobody was there")
+            c.advance(600); idle = 1; store.tick()
+            try check(store.attentionRequest == 4, "Return to an absence did not hop")
+            store.change { $0.resume() }
+            idle = 1; store.screenDidLock(); c.advance(30); store.change { $0.finish() }; store.screenDidUnlock(); store.tick()
+            try check(store.attentionRequest == 4, "Hopped for a notice already answered")
+        }
         try test("Existing opacity, pointer avoidance, and resize geometry") {
             try check(PetOpacityBehavior.opacity(isHovering: true, restingOpacity: 1, hoverOpacity: 0.25) == 0.25, "Opacity changed")
             try check(PetResizeGeometry.scale(initialScale: 0.5, initialSize: CGSize(width: 200, height: 200), dragDelta: CGPoint(x: 2000, y: 0)) == 1.25, "Resize bound changed")

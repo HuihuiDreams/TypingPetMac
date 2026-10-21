@@ -13,6 +13,20 @@ private enum TodoTimeText {
         if minutes < 60 { return "누적 \(minutes)분" }
         return String(format: "누적 %d시간 %02d분", minutes / 60, minutes % 60)
     }
+    // Both 분 and 시간 end in a final consonant, so the topic particle is always 은.
+    static func away(_ seconds: Double) -> String {
+        let minutes = Int(max(0, seconds)) / 60
+        guard minutes > 0 else { return "자리를 비운 시간은 빼고 기록했어요" }
+        let length = minutes < 60 ? "\(minutes)분" : (minutes % 60 == 0 ? "\(minutes / 60)시간" : "\(minutes / 60)시간 \(minutes % 60)분")
+        return "자리를 비운 \(length)은 빼고 기록했어요"
+    }
+    static func awayReason(_ reason: TodoAbsence.Reason) -> String {
+        switch reason {
+        case .idle: return "자리 비움"
+        case .locked: return "화면 잠김"
+        case .sleep: return "잠자기"
+        }
+    }
     // Pick 을/를 from the last Hangul syllable. Other scripts get both forms.
     static func objectParticle(after title: String) -> String {
         guard let scalar = title.unicodeScalars.last, (0xAC00...0xD7A3).contains(scalar.value) else { return "을(를)" }
@@ -108,9 +122,11 @@ struct TodoBubbleView: View {
     @State private var addHovering = false
     @State private var zoomBadgeVisible = false
     @State private var zoomBadgeToken = 0
+    @State private var hops: CGFloat = 0
     @FocusState private var addFocused: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    private enum Mode { case list, focus, expired }
+    private enum Mode { case list, focus, away, expired }
     static let motion = Animation.spring(response: 0.34, dampingFraction: 0.86)
 
     private var zoom: CGFloat { CGFloat(store.zoom) }
@@ -118,7 +134,8 @@ struct TodoBubbleView: View {
     private var session: FocusSession? { store.engine.activeSession }
     private var mode: Mode {
         guard let session, !store.expanded else { return .list }
-        return session.status == .expired ? .expired : .focus
+        if session.status == .expired { return .expired }
+        return store.absence == nil ? .focus : .away
     }
     private var paused: Bool { session?.status == .paused }
     private var expired: Bool { session?.status == .expired }
@@ -139,6 +156,7 @@ struct TodoBubbleView: View {
 
     var body: some View {
         bubble
+            .modifier(DockBounce(progress: hops, height: layout.bounceHeight, edge: layout.tailEdge))
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: contentAlignment)
             .padding(TodoBubbleLayout.shadowMargin)
             .background(zoomShortcuts)
@@ -153,6 +171,12 @@ struct TodoBubbleView: View {
                 if mode == .list { DispatchQueue.main.async { focusInput() } }
             }
             .onChange(of: store.zoom) { _ in flashZoomBadge() }
+            .onChange(of: layout.bounce) { _ in
+                guard !reduceMotion else { return }
+                withAnimation(.linear(duration: DockBounce.duration(height: layout.bounceHeight))) { hops += 1 }
+            }
+            // The notice appears from a timer tick, outside any animation.
+            .animation(Self.motion, value: store.absence?.sessionID)
     }
 
     // The shape wraps the content, so it animates with it. The panel is a fixed canvas around it.
@@ -203,6 +227,7 @@ struct TodoBubbleView: View {
                 switch mode {
                 case .list: listView.transition(modeTransition)
                 case .focus: focusView.transition(modeTransition)
+                case .away: awayView.transition(modeTransition)
                 case .expired: expiredView.transition(modeTransition)
                 }
             }
@@ -306,7 +331,7 @@ struct TodoBubbleView: View {
     }
 
     private var listCap: CGFloat {
-        let chrome: CGFloat = session == nil ? 60 : (expired ? 168 : 124)
+        let chrome: CGFloat = session == nil ? 60 : (expired || store.absence != nil ? 168 : 124)
         return max(z(120), layout.maxContentHeight - z(chrome) - addRowHeight - (store.errorMessage == nil ? 0 : z(110)))
     }
 
@@ -356,7 +381,7 @@ struct TodoBubbleView: View {
             HStack(spacing: z(10)) {
                 TomatoRing(fraction: ringFraction, paused: paused, size: 34, showsRing: showsRing)
                 VStack(alignment: .leading, spacing: z(1)) {
-                    Text(expired ? "시간 종료" : (paused ? "일시정지" : "집중 중"))
+                    Text(expired ? "시간 종료" : store.absence.map { TodoTimeText.awayReason($0.reason) } ?? (paused ? "일시정지" : "집중 중"))
                         .font(z.font(10.5, .bold)).foregroundStyle(paused ? BubbleColor.muted : BubbleColor.tomato)
                     Text(activeTitle).font(z.font(12.5, .semibold)).foregroundStyle(BubbleColor.ink)
                         .lineLimit(1).help(activeTitle)
@@ -364,7 +389,8 @@ struct TodoBubbleView: View {
                 Spacer(minLength: z(4))
                 Text(clockText).font(z.font(18, .semibold, .rounded)).monospacedDigit()
                     .foregroundStyle(paused ? BubbleColor.muted : BubbleColor.ink)
-                if !expired {
+                // The notice below has the same choices.
+                if !expired, store.absence == nil {
                     HStack(spacing: 0) {
                         IconButton(symbol: paused ? "play.fill" : "pause.fill", label: paused ? "재개" : "일시정지", tint: BubbleColor.ink, size: 26) { togglePause() }
                         IconButton(symbol: "stop.fill", label: "종료", tint: BubbleColor.ink, size: 26) { finish() }
@@ -372,6 +398,7 @@ struct TodoBubbleView: View {
                 }
             }
             if expired { extensionControls }
+            if let absence = store.absence { awayNotice(absence) }
         }
         .padding(z(10))
         .background(RoundedRectangle(cornerRadius: z(12), style: .continuous).fill(BubbleColor.tomatoWash))
@@ -596,6 +623,51 @@ struct TodoBubbleView: View {
         }
     }
 
+    // Same frame as the expired bubble: what happened, then what to do about it.
+    private var awayView: some View {
+        VStack(alignment: .leading, spacing: z(12)) {
+            HStack(spacing: z(12)) {
+                TomatoRing(fraction: ringFraction, paused: true, size: 42, showsRing: showsRing)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(activeTitle).font(z.font(12, .medium)).foregroundStyle(BubbleColor.muted)
+                        .lineLimit(1).frame(maxWidth: z(190), alignment: .leading).help(activeTitle)
+                    HStack(alignment: .firstTextBaseline, spacing: z(8)) {
+                        Text(clockText).font(z.font(26, .semibold, .rounded)).monospacedDigit()
+                            .foregroundStyle(BubbleColor.muted)
+                        Text(store.absence.map { TodoTimeText.awayReason($0.reason) } ?? "")
+                            .font(z.font(11.5, .semibold)).foregroundStyle(BubbleColor.ink)
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+            if let absence = store.absence { awayNotice(absence) }
+        }
+        .padding(.horizontal, z(14)).padding(.vertical, z(13))
+        .contextMenu {
+            Button("목록 펼치기") { setExpanded(true) }
+            Button("할 일 숨기기") { store.hide() }
+        }
+    }
+
+    // Every answer resolves the absence: continue without it, continue with it, or end the session.
+    // Until then the timer stays paused and the time stays out.
+    private func awayNotice(_ absence: TodoAbsence) -> some View {
+        VStack(alignment: .leading, spacing: z(8)) {
+            Text(TodoTimeText.away(absence.awaySeconds(now: Date())))
+                .font(z.font(11.5)).foregroundStyle(BubbleColor.muted).monospacedDigit()
+                .contentTransition(.identity)
+            HStack(spacing: z(8)) {
+                PillButton(title: "이어서 재기", role: .timer) { withAnimation(Self.motion) { store.change { $0.resume() } } }
+                    .help("자리를 비운 시간은 빼고 이어서 재요")
+                PillButton(title: "포함해서 재기") { withAnimation(Self.motion) { store.includeAbsence() } }
+                    .help("자리를 비운 시간도 기록에 넣고 이어서 재요")
+                PillButton(title: "끝내기") { finish() }
+                    .help("자리를 비운 시간은 빼고 이 집중을 끝내요")
+                Spacer(minLength: 0)
+            }
+        }
+    }
+
     private var extensionControls: some View {
         HStack(spacing: z(8)) {
             TimerSplitButton(preference: extensionPreference, suffix: "연장", allowsCountup: false, prominent: true,
@@ -706,6 +778,49 @@ struct TodoBubbleView: View {
         }
     }
     private func revealData() { NSWorkspace.shared.activateFileViewerSelecting([store.storage.url]) }
+}
+
+// The bounce of a Dock icon asking for attention, measured frame by frame from the macOS Dock:
+// three parabolic hops, each half as high as the one before, lasting 0.50, 0.32, and 0.22 seconds.
+// A lower bounce keeps the same gravity, so its timing shrinks with the square root of its height.
+// One whole step of `progress` is one bounce. It rests on whole numbers, so adding to it never jumps.
+private struct DockBounce: ViewModifier, Animatable {
+    var progress: CGFloat
+    let height: CGFloat
+    let edge: TodoBubbleEdge
+    var animatableData: CGFloat {
+        get { progress }
+        set { progress = newValue }
+    }
+
+    private static let hops: [(height: CGFloat, duration: Double)] = [(1, 0.50), (0.5, 0.32), (0.25, 0.22)]
+    private static let total = hops.reduce(0) { $0 + $1.duration }
+
+    static func duration(height: CGFloat) -> Double {
+        total * sqrt(Double(min(max(height, 0), TodoBubbleLayout.attentionHopHeight) / TodoBubbleLayout.attentionHopHeight))
+    }
+
+    private static func lift(at phase: Double, height: CGFloat) -> CGFloat {
+        var time = phase * total
+        for hop in hops {
+            if time < hop.duration {
+                let f = time / hop.duration
+                return height * hop.height * CGFloat(4 * f * (1 - f))
+            }
+            time -= hop.duration
+        }
+        return 0
+    }
+
+    func body(content: Content) -> some View {
+        let lift = Self.lift(at: Double(progress - progress.rounded(.down)), height: height)
+        switch edge {
+        case .bottom: return content.offset(x: 0, y: -lift)
+        case .top: return content.offset(x: 0, y: lift)
+        case .leading: return content.offset(x: lift, y: 0)
+        case .trailing: return content.offset(x: -lift, y: 0)
+        }
+    }
 }
 
 // Preferences do not cross the hosting view and scroll view reliably, so report sizes directly.

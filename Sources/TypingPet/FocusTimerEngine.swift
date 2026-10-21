@@ -88,10 +88,38 @@ struct FocusTimerEngine {
         state.sessions[i].status = .paused
         lastSample = nil
     }
+    // Pauses after the user went away and takes back the time since their last input.
+    // That time is all in the last segment, because starting or resuming a timer is itself input.
+    @discardableResult mutating func pause(excludingLast seconds: Double) -> Double {
+        tick()
+        guard let i = activeIndex, state.sessions[i].status == .running else { return 0 }
+        let j = state.sessions[i].activeSegments.count - 1
+        let removed = min(max(0, seconds), state.sessions[i].activeSegments[j].actualActiveSeconds)
+        state.sessions[i].activeSegments[j].actualActiveSeconds -= removed
+        state.sessions[i].status = .paused
+        lastSample = nil
+        return removed
+    }
     mutating func resume() {
         guard let i = activeIndex, state.sessions[i].status == .paused else { return }
         state.sessions[i].status = .running
         lastSample = monotonicNow()
+    }
+    // Resumes as if the timer never paused, for an absence the user says was work.
+    // A countdown cannot pass its limit, so it ends there instead.
+    mutating func resume(adding seconds: Double) {
+        guard let i = activeIndex, state.sessions[i].status == .paused else { return }
+        let j = state.sessions[i].activeSegments.count - 1
+        let total = state.sessions[i].activeSegments[j].actualActiveSeconds + max(0, seconds)
+        if let configured = state.sessions[i].activeSegments[j].configuredSeconds, total >= configured {
+            state.sessions[i].activeSegments[j].actualActiveSeconds = configured
+            state.sessions[i].status = .expired
+            lastSample = nil
+        } else {
+            state.sessions[i].activeSegments[j].actualActiveSeconds = total
+            state.sessions[i].status = .running
+            lastSample = monotonicNow()
+        }
     }
     mutating func extend(minutes: Int) {
         guard let preference = TimerPreference.countdown(minutes: minutes), let i = activeIndex,
