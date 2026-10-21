@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import CoreGraphics
 
 struct TodoFileStorage {
     let url: URL
@@ -29,6 +30,28 @@ enum TodoBubbleVisibility: String, CaseIterable {
     case always, hover
 }
 
+// Seconds since the last keyboard, mouse, or trackpad input in this login session. Needs no permission.
+enum SystemIdle {
+    static func seconds() -> Double {
+        CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: CGEventType(rawValue: ~0)!)
+    }
+}
+
+// Why a running timer stopped on its own. Kept in memory only: a relaunch restores the session paused anyway.
+struct TodoAbsence: Equatable {
+    enum Reason { case idle, locked, sleep }
+    let reason: Reason
+    let sessionID: UUID
+    // The last input before the user left, in wall time for display and uptime for adding time back.
+    // Uptime stops while the Mac sleeps, so sleep is never added back.
+    let since: Date
+    let sinceUptime: TimeInterval
+    let pausedAt: Date
+    // The first input after the user came back. The shown duration stops here.
+    var returnedAt: Date?
+    func awaySeconds(now: Date) -> Double { max(0, (returnedAt ?? now).timeIntervalSince(since)) }
+}
+
 @MainActor
 final class TodoStore: ObservableObject {
     @Published private(set) var engine: FocusTimerEngine
@@ -41,18 +64,33 @@ final class TodoStore: ObservableObject {
     // Same model as the pet: opacity while the pointer is away, and while it is over the pet or bubble.
     @Published private(set) var bubbleRestingOpacity: Double
     @Published private(set) var bubbleHoverOpacity: Double
+    // Minutes without input before a running timer pauses itself. 0 turns this and the lock pause off.
+    @Published private(set) var idleMinutes: Int
+    @Published private(set) var absence: TodoAbsence?
+    // Bumped when the bubble should bounce for attention like a Dock icon: when a countdown ends,
+    // and when the user comes back to an absence notice or an ending they did not see.
+    @Published private(set) var attentionRequest = 0
+    static let idleMinuteChoices = [0, 5, 10, 15, 30, 60]
     let storage: TodoFileStorage
     private var lastCheckpoint: TimeInterval
     private let monotonicNow: () -> TimeInterval
+    private let wallNow: () -> Date
+    private let idleSeconds: () -> Double
+    private var screenLocked = false
+    private var attentionOnReturn: Date?
     private let defaults: UserDefaults
     private static let zoomKey = "todoBubbleZoom"
     private static let visibilityKey = "todoBubbleVisibility"
     private static let restingOpacityKey = "todoBubbleRestingOpacity"
     private static let hoverOpacityKey = "todoBubbleHoverOpacity"
+    private static let idleMinutesKey = "todoIdleMinutes"
 
-    init(url: URL = TodoFileStorage.defaultURL, defaults: UserDefaults = AppEnvironment.defaults, monotonicNow: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }, wallNow: @escaping () -> Date = Date.init) {
+    init(url: URL = TodoFileStorage.defaultURL, defaults: UserDefaults = AppEnvironment.defaults, monotonicNow: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }, wallNow: @escaping () -> Date = Date.init, idleSeconds: @escaping () -> Double = SystemIdle.seconds) {
         storage = TodoFileStorage(url: url)
         self.defaults = defaults
+        self.wallNow = wallNow
+        self.idleSeconds = idleSeconds
+        idleMinutes = (defaults.object(forKey: Self.idleMinutesKey) as? Int).flatMap { Self.idleMinuteChoices.contains($0) ? $0 : nil } ?? 15
         zoom = (defaults.object(forKey: Self.zoomKey) as? Double).map(TodoBubbleZoom.normalized) ?? 1
         bubbleVisibility = defaults.string(forKey: Self.visibilityKey).flatMap(TodoBubbleVisibility.init(rawValue:)) ?? .always
         bubbleRestingOpacity = (defaults.object(forKey: Self.restingOpacityKey) as? Double).map(Self.clampedOpacity) ?? 1
@@ -74,7 +112,9 @@ final class TodoStore: ObservableObject {
         let previous = engine.activeSession?.status
         engine.tick()
         operation(&engine)
-        if engine.activeSession?.status == .expired, previous != .expired { expanded = false }
+        if engine.activeSession?.status == .expired, previous != .expired { didExpire() }
+        // Resuming, finishing, or switching answers the notice.
+        if let absence, engine.activeSession?.id != absence.sessionID || engine.activeSession?.status != .paused { self.absence = nil }
         persist()
     }
     func tick() {
@@ -83,12 +123,77 @@ final class TodoStore: ObservableObject {
         engine.tick()
         // Also publish date changes while the timer is idle.
         objectWillChange.send()
-        if engine.activeSession?.status == .expired, previous != .expired { expanded = false }
+        if engine.activeSession?.status == .expired, previous != .expired { didExpire() }
         if previous != engine.activeSession?.status || monotonicNow() - lastCheckpoint >= 5 {
             if engine.activeSession?.status == .running || previous != engine.activeSession?.status || errorMessage != nil { persist() }
         }
+        checkPresence()
     }
     func pauseForSleepOrTermination() { change { $0.pause() } }
+    private func didExpire() {
+        expanded = false
+        requestAttention()
+    }
+    // Bounce now, and again at the next input when the user seems away and may have missed it.
+    private func requestAttention(onlyOnReturn: Bool = false) {
+        if !onlyOnReturn { attentionRequest += 1 }
+        if onlyOnReturn || screenLocked || idleSeconds() >= 30 { attentionOnReturn = wallNow() }
+    }
+    private var needsAnswer: Bool { absence != nil || engine.activeSession?.status == .expired }
+
+    // MARK: Absence
+
+    func setIdleMinutes(_ value: Int) {
+        guard Self.idleMinuteChoices.contains(value), value != idleMinutes else { return }
+        idleMinutes = value
+        defaults.set(value, forKey: Self.idleMinutesKey)
+    }
+    // Sleep always pauses. With absence detection on, it also takes back the idle time before it.
+    func pauseForSleep() {
+        if idleMinutes > 0 { pauseForAbsence(.sleep) } else { pauseForSleepOrTermination() }
+    }
+    func screenDidLock() {
+        screenLocked = true
+        if idleMinutes > 0 { pauseForAbsence(.locked) }
+    }
+    func screenDidUnlock() {
+        screenLocked = false
+        markReturned()
+    }
+    // Puts the whole absence back and keeps counting, as if the timer had never paused.
+    func includeAbsence() {
+        guard let absence else { return }
+        change { $0.resume(adding: monotonicNow() - absence.sinceUptime) }
+    }
+
+    // Pauses a running timer once the user has been away long enough, and notices when they come back.
+    private func checkPresence() {
+        let idle = idleSeconds()
+        if idleMinutes > 0, engine.activeSession?.status == .running, idle >= Double(idleMinutes * 60) {
+            pauseForAbsence(.idle, idle: idle)
+        } else if let absence, absence.returnedAt == nil, !screenLocked, idle < wallNow().timeIntervalSince(absence.pausedAt) {
+            markReturned()
+        }
+        if let since = attentionOnReturn, !screenLocked, idle < wallNow().timeIntervalSince(since) {
+            attentionOnReturn = nil
+            if needsAnswer { attentionRequest += 1 }
+        }
+    }
+    private func pauseForAbsence(_ reason: TodoAbsence.Reason, idle: Double? = nil) {
+        guard let session = engine.activeSession, session.status == .running else { return }
+        let idle = max(0, idle ?? idleSeconds())
+        let now = wallNow()
+        change { $0.pause(excludingLast: idle) }
+        absence = TodoAbsence(reason: reason, sessionID: session.id, since: now.addingTimeInterval(-idle),
+                              sinceUptime: monotonicNow() - idle, pausedAt: now)
+        // Nobody is watching yet, so the bounce waits for the return.
+        requestAttention(onlyOnReturn: true)
+    }
+    private func markReturned() {
+        guard var absence, absence.returnedAt == nil else { return }
+        absence.returnedAt = wallNow()
+        self.absence = absence
+    }
     func show() {
         expanded = true
         change { $0.setFeature(enabled: true, hidden: false) }

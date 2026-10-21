@@ -57,6 +57,11 @@ final class TodoBubbleLayout: ObservableObject {
     @Published var maxContentHeight: CGFloat = 520
     // Bumped when the user opens the list on purpose. Only then may the input take keyboard focus.
     @Published var focusRequest = 0
+    // Bumped for each attention bounce. The height fits the room the canvas has on the far side from the pet.
+    @Published var bounce = 0
+    var bounceHeight = TodoBubbleLayout.attentionHopHeight
+    // The first hop of the macOS Dock asking for attention, measured with a 48 pt Dock.
+    static let attentionHopHeight: CGFloat = 53
     let pointer = BubblePointer()
     weak var window: NSWindow?
     // A nonactivating key panel receives keystrokes meant for the frontmost app.
@@ -91,6 +96,8 @@ final class TodoBubbleWindowController {
     private var hideWork: DispatchWorkItem?
     private var menuTracking = false
     private var alphaTarget: CGFloat = 1
+    private var bouncesLeft = 0
+    private var bounceWork: DispatchWorkItem?
 
     init(store: TodoStore, pet: NSWindow) {
         self.store = store
@@ -103,6 +110,9 @@ final class TodoBubbleWindowController {
         layout.onContentSizeChange = { [weak self] in self?.synchronize() }
         store.objectWillChange.sink { [weak self] _ in
             DispatchQueue.main.async { self?.synchronize() }
+        }.store(in: &subscriptions)
+        store.$attentionRequest.dropFirst().sink { [weak self] _ in
+            DispatchQueue.main.async { self?.beginBouncing() }
         }.store(in: &subscriptions)
         for name in [NSWindow.didMoveNotification, NSWindow.didResizeNotification, NSWindow.didChangeScreenNotification] {
             notificationTokens.append(NotificationCenter.default.addObserver(forName: name, object: pet, queue: .main) { [weak self] _ in
@@ -130,8 +140,14 @@ final class TodoBubbleWindowController {
             })
         }
         notificationTokens.append(NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.willSleepNotification, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.store.pauseForSleepOrTermination() }
+            MainActor.assumeIsolated { self?.store.pauseForSleep() }
         })
+        // Locking the screen is the clearest sign of leaving. The display can sleep without it, which idle time covers.
+        for (name, locked) in [("com.apple.screenIsLocked", true), ("com.apple.screenIsUnlocked", false)] {
+            notificationTokens.append(DistributedNotificationCenter.default().addObserver(forName: Notification.Name(name), object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { if locked { self?.store.screenDidLock() } else { self?.store.screenDidUnlock() } }
+            })
+        }
         let timer = Timer(timeInterval: 0.2, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self else { return }
@@ -229,10 +245,15 @@ final class TodoBubbleWindowController {
         let overBubble = interactiveFrame.insetBy(dx: -12, dy: -12).contains(mouse)
         let overPet = pet.frame.insetBy(dx: -8, dy: -8).contains(mouse) || (entry.isVisible && entry.frame.contains(mouse))
         let pointerWants = store.bubbleVisibility == .always ? overBubble || overPet : overPet || (revealed && overBubble)
-        // Typing, open popovers and menus, an expired timer, and errors always keep the bubble readable.
+        // Typing, open popovers and menus, an expired timer, an absence notice, and errors always keep the bubble readable.
         let popoverOpen = NSApp.windows.contains { $0.isVisible && String(describing: type(of: $0)).contains("Popover") }
         mustShow = panel.isKeyWindow || popoverOpen || menuTracking
-            || store.engine.activeSession?.status == .expired || store.errorMessage != nil
+            || store.engine.activeSession?.status == .expired || store.absence != nil || store.errorMessage != nil
+        // Pointing at the bubble or the pet stops the bouncing.
+        if bouncesLeft > 0, overBubble || overPet {
+            bouncesLeft = 0
+            bounceWork?.cancel()
+        }
         if pointerWants || mustShow {
             hideWork?.cancel()
             hideWork = nil
@@ -254,6 +275,34 @@ final class TodoBubbleWindowController {
         if panel.ignoresMouseEvents == inside { panel.ignoresMouseEvents = !inside }
         let location = inside ? panel.contentView.map { $0.convert(panel.convertPoint(fromScreen: mouse), from: nil) } : nil
         if layout.pointer.location != location { layout.pointer.location = location }
+    }
+
+    // Like a Dock icon making a critical request: bounce every 2 seconds until the pointer comes over or the user answers.
+    // It stops after five rounds so a bubble nobody watches does not bounce for hours; the return bounces again.
+    private func beginBouncing() {
+        bouncesLeft = 5
+        bounceAgain()
+    }
+
+    private func bounceAgain() {
+        bounceWork?.cancel()
+        let waiting = store.absence != nil || store.engine.activeSession?.status == .expired
+        guard bouncesLeft > 0, waiting, panel.isVisible else { bouncesLeft = 0; return }
+        bouncesLeft -= 1
+        // Keep the bubble and its shadow inside the canvas.
+        let room: CGFloat
+        switch layout.tailEdge {
+        case .bottom: room = panel.frame.maxY - bubbleFrame.maxY
+        case .top: room = bubbleFrame.minY - panel.frame.minY
+        case .leading: room = panel.frame.maxX - bubbleFrame.maxX
+        case .trailing: room = bubbleFrame.minX - panel.frame.minX
+        }
+        layout.bounceHeight = min(TodoBubbleLayout.attentionHopHeight, room - 12)
+        if layout.bounceHeight >= 6 { layout.bounce += 1 }
+        guard bouncesLeft > 0 else { return }
+        let work = DispatchWorkItem { [weak self] in self?.bounceAgain() }
+        bounceWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2, execute: work)
     }
 
     private func applyOpacity() {

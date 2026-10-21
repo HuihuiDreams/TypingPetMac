@@ -75,12 +75,41 @@ The list shows the active Todo in a card at the top with its own controls.
 The header chevron or Esc returns to the compact view.
 
 A countdown stops at zero. The compact expiry view offers extension and finish.
+The bubble bounces away from the pet, like a Dock icon asking for attention.
+If you were away when it ended, it bounces again at your next keyboard or mouse input.
 The extension arrow changes the duration. The main extension button starts that duration in the same session.
 Time spent at zero does not count. Finishing a timer leaves its Todo open.
 Completing the active Todo finishes its timer first.
 
 Starting another Todo asks for confirmation inside the bubble. The old timer keeps its current state until you select `전환`.
 Cancel keeps the old session. Confirmation finishes it and starts one new session.
+
+### Away from the Mac
+
+A running timer pauses itself when you seem to be away: no keyboard or mouse input for 15 minutes, a locked screen, or sleep.
+It also takes back the time since your last input, so a timer you forgot to stop does not collect the night.
+The input check reads the system idle time and needs no permission.
+The bubble stays visible, says how long you were away, and offers three choices.
+It bounces at your first input after the absence, or when you unlock the screen.
+
+| Choice | Away time | Timer |
+| --- | --- | --- |
+| `이어서 재기` | Left out | Runs again |
+| `포함해서 재기` | Counted, as if the timer never paused | Runs again. A countdown that passes its limit ends instead |
+| `끝내기` | Left out | Session ends |
+
+Until you choose, the timer stays paused and the time stays out of the record.
+The card in the list shows the same choices in place of its own controls.
+`포함해서 재기` measures with uptime, which stops while the Mac sleeps, so it never adds sleep.
+Settings > `할 일` > `자리 비움 감지` sets the idle time to 5, 10, 15, 30, or 60 minutes, or turns detection off.
+Off keeps the earlier behavior: only sleep pauses the timer, and nothing is taken back.
+The notice lives in memory. After a restart the session is paused as usual.
+
+The bounce copies the macOS Dock, measured frame by frame from a 48-point Dock:
+three parabolic hops of 53, 26, and 13 points that last 0.50, 0.32, and 0.22 seconds.
+Where the canvas has less room, the bounce is lower and quicker with the same gravity.
+Like a critical Dock request, it repeats every 2 seconds until the pointer reaches the bubble or the pet, or you answer.
+It stops after five rounds. With Reduce Motion on, the bubble does not bounce.
 
 ## Show, hide, and move
 
@@ -142,7 +171,7 @@ swift test
 swift build -c release
 ```
 
-The tests cover accumulation, extension, pause, switching, local midnight, JSON storage, and recovery.
+The tests cover accumulation, extension, pause, absence, switching, local midnight, JSON storage, and recovery.
 The existing pet tests remain in the test target.
 CI runs tests and a release build on macOS for `main`, `feat/**`, and pull requests.
 

@@ -481,7 +481,24 @@ private struct TodoSettingsView: View {
                             isEnabled: enabled && !store.loadBlocked
                         )
                         Divider()
-                        SettingsNote(text: "말풍선을 숨겨도 실행 중인 타이머는 유지합니다. 잠자기와 앱 종료 시에는 일시정지합니다.")
+                        SettingsRow {
+                            HStack(spacing: SettingsMetrics.space3) {
+                                Text("자리 비움 감지")
+                                Spacer(minLength: SettingsMetrics.space3)
+                                Picker("", selection: Binding(get: { store.idleMinutes }, set: store.setIdleMinutes)) {
+                                    ForEach(TodoStore.idleMinuteChoices, id: \.self) { minutes in
+                                        Text(minutes == 0 ? "끔" : (minutes < 60 ? "\(minutes)분 후" : "\(minutes / 60)시간 후")).tag(minutes)
+                                    }
+                                }
+                                .labelsHidden()
+                                .frame(width: 168)
+                            }
+                        }
+                        .disabled(!enabled || store.loadBlocked)
+                        Divider()
+                        SettingsNote(text: store.idleMinutes == 0
+                            ? "말풍선을 숨겨도 실행 중인 타이머는 유지합니다. 잠자기와 앱 종료 시에는 일시정지합니다."
+                            : "타이머가 도는 동안 \(store.idleMinutes < 60 ? "\(store.idleMinutes)분" : "\(store.idleMinutes / 60)시간") 넘게 키보드와 마우스 입력이 없거나, 화면을 잠그거나, Mac이 잠자기에 들어가면 일시정지하고 마지막 입력 이후의 시간은 기록에서 뺍니다. 돌아오면 말풍선에서 그 시간을 포함할지 고를 수 있어요. 말풍선을 숨겨도 타이머는 유지됩니다.")
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }

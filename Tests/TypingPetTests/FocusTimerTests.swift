@@ -141,6 +141,28 @@ final class FocusTimerTests: XCTestCase {
         XCTAssertEqual(e.totalSeconds(for: id), 13)
         try e.state.validate()
     }
+
+    func testAbsencePauseTakesBackIdleTimeAndIncludingRestoresIt() throws {
+        let c = TestClock(); var e = c.engine(); let id = e.addTodo("Work")!
+        e.setPreference(.countup, for: id); e.start(id)
+        c.advance(1000)
+        XCTAssertEqual(e.pause(excludingLast: 900), 900)
+        XCTAssertEqual(e.activeSession?.status, .paused)
+        XCTAssertEqual(e.activeSession?.totalActiveSeconds, 100)
+        c.advance(3600); e.resume(adding: 4500)
+        XCTAssertEqual(e.activeSession?.status, .running)
+        XCTAssertEqual(e.activeSession?.totalActiveSeconds, 4600)
+        c.advance(10); e.pause(excludingLast: 99_999)
+        XCTAssertEqual(e.activeSession?.totalActiveSeconds, 0)
+        e.finish()
+        e.setPreference(.countdown(minutes: 20)!, for: id); e.start(id)
+        c.advance(600); e.pause(excludingLast: 300)
+        XCTAssertEqual(e.displaySeconds, 900)
+        e.resume(adding: 2000)
+        XCTAssertEqual(e.activeSession?.status, .expired)
+        XCTAssertEqual(e.activeSession?.activeSegments.last?.actualActiveSeconds, 1200)
+        try e.state.validate()
+    }
 }
 
 final class TodoPersistenceTests: XCTestCase {
@@ -221,6 +243,87 @@ final class TodoPersistenceTests: XCTestCase {
         c.advance(1); store.show()
         XCTAssertEqual(store.engine.activeSession?.status, .running)
         XCTAssertEqual(store.engine.activeSession?.totalActiveSeconds, 3.25)
+    }
+
+    @MainActor func testIdleLockAndSleepPauseAndTheNoticeFollowsTheAnswer() throws {
+        let url = try temporaryFile(); let c = TestClock(); var idle = 0.0
+        let suite = "TypingPetTests-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        var store = TodoStore(url: url, defaults: defaults, monotonicNow: { c.uptime }, wallNow: { c.date }, idleSeconds: { idle })
+        XCTAssertEqual(store.idleMinutes, 15)
+        var id: UUID?
+        store.change { id = $0.addTodo("Work"); $0.setPreference(.countup, for: id!); $0.start(id!) }
+        let start = c.date
+        c.advance(600); idle = 300; store.tick()
+        XCTAssertEqual(store.engine.activeSession?.status, .running)
+        c.advance(600); idle = 900; store.tick()
+        XCTAssertEqual(store.engine.activeSession?.status, .paused)
+        XCTAssertEqual(store.engine.activeSession?.totalActiveSeconds, 300)
+        XCTAssertEqual(store.absence?.reason, .idle)
+        XCTAssertEqual(store.absence?.since, start + 300)
+        c.advance(3600); idle = 4500; store.tick()
+        XCTAssertNil(store.absence?.returnedAt)
+        idle = 1; store.tick()
+        XCTAssertEqual(store.absence?.returnedAt, c.date)
+        XCTAssertEqual(store.absence?.awaySeconds(now: c.date + 99), 4500)
+        c.advance(10); store.includeAbsence()
+        XCTAssertEqual(store.engine.activeSession?.status, .running)
+        XCTAssertEqual(store.engine.activeSession?.totalActiveSeconds, 4810)
+        XCTAssertNil(store.absence)
+        idle = 2; store.screenDidLock()
+        XCTAssertEqual(store.absence?.reason, .locked)
+        c.advance(60); idle = 0.5; store.tick()
+        XCTAssertNil(store.absence?.returnedAt)
+        store.screenDidUnlock()
+        XCTAssertEqual(store.absence?.returnedAt, c.date)
+        store.change { $0.resume() }
+        XCTAssertNil(store.absence)
+        idle = 3; store.pauseForSleep()
+        XCTAssertEqual(store.absence?.reason, .sleep)
+        store.change { $0.finish() }
+        XCTAssertNil(store.absence)
+        store.change { $0.start(id!) }
+        store.setIdleMinutes(7); store.setIdleMinutes(0)
+        XCTAssertEqual(store.idleMinutes, 0)
+        c.advance(5); idle = 99_999; store.tick(); store.screenDidLock()
+        XCTAssertEqual(store.engine.activeSession?.status, .running)
+        store.pauseForSleep()
+        XCTAssertEqual(store.engine.activeSession?.status, .paused)
+        XCTAssertNil(store.absence)
+        store.setIdleMinutes(30)
+        store = TodoStore(url: url, defaults: defaults, monotonicNow: { c.uptime }, wallNow: { c.date }, idleSeconds: { idle })
+        XCTAssertEqual(store.idleMinutes, 30)
+        try TodoFileStorage(url: url).load().validate()
+    }
+
+    @MainActor func testBubbleHopsOnExpiryAndOnReturnToAMissedNotice() throws {
+        let c = TestClock(); var idle = 0.0
+        let suite = "TypingPetTests-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = TodoStore(url: try temporaryFile(), defaults: defaults, monotonicNow: { c.uptime }, wallNow: { c.date }, idleSeconds: { idle })
+        var id: UUID?
+        store.change { id = $0.addTodo("Work"); $0.start(id!) }
+        c.advance(1200); store.tick()
+        XCTAssertTrue(store.engine.activeSession?.status == .expired && store.attentionRequest == 1, "Expiry did not hop")
+        c.advance(5); idle = 1; store.tick()
+        XCTAssertTrue(store.attentionRequest == 1, "Expiry while present hopped twice")
+        store.change { $0.finish(); $0.start(id!) }
+        c.advance(1195); idle = 600; store.tick(); c.advance(5); idle = 605; store.tick()
+        XCTAssertTrue(store.attentionRequest == 2, "Expiry while away did not hop at once")
+        c.advance(60); idle = 665; store.tick()
+        XCTAssertTrue(store.attentionRequest == 2, "Hopped again without input")
+        idle = 1; store.tick()
+        XCTAssertTrue(store.attentionRequest == 3, "Missed expiry did not hop on return")
+        store.change { $0.finish(); $0.setPreference(.countup, for: id!); $0.start(id!) }
+        c.advance(1000); idle = 900; store.tick()
+        XCTAssertTrue(store.absence != nil && store.attentionRequest == 3, "Absence hopped while nobody was there")
+        c.advance(600); idle = 1; store.tick()
+        XCTAssertTrue(store.attentionRequest == 4, "Return to an absence did not hop")
+        store.change { $0.resume() }
+        idle = 1; store.screenDidLock(); c.advance(30); store.change { $0.finish() }; store.screenDidUnlock(); store.tick()
+        XCTAssertTrue(store.attentionRequest == 4, "Hopped for a notice already answered")
     }
 
     func testInvalidTotalsAndSessionReferencesAreRejected() throws {
