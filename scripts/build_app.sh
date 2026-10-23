@@ -68,7 +68,7 @@ if [[ -z "$team_id" && "$signing_identity" == "Developer ID Application:"* ]]; t
     team_id="$(sed -n 's/.*(\([A-Z0-9]\{10\}\))$/\1/p' <<<"$signing_identity")"
 fi
 if [[ "$channel" == production && -z "$team_id" ]]; then
-    echo "Warning: no Developer ID Team ID. This production build cannot install updates."
+    echo "Warning: no Developer ID Team ID. Updates are checked by the Ed25519 signature only, and macOS asks for Input Monitoring again after each update."
 fi
 
 python3 - "$contents_dir/Info.plist" "$app_name" "$executable_name" "$bundle_id" "$display_name" "$channel" \

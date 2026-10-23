@@ -87,12 +87,18 @@ final class UpdateTests: XCTestCase {
         XCTAssertTrue(manifest.supports(OperatingSystemVersion(majorVersion: 26, minorVersion: 0, patchVersion: 0)))
     }
 
-    func testProductionUsesFixedHTTPSFeedAndRequiresTeam() throws {
+    func testProductionUsesFixedHTTPSFeedAndTeamOnlyWhenSigned() throws {
         let production = try configuration(.production, team: "ABCDE12345")
         XCTAssertEqual(production.feedURL, UpdateConfiguration.productionFeedURL)
         XCTAssertEqual(production.feedURL.absoluteString, "https://pet.miel.ing/update/production/latest.json")
-        let missingTeam = UpdateConfiguration.resolve(profile: .production, info: info(channel: "production", bundle: "ing.miel.typingpet"), feedOverride: nil)
-        XCTAssertThrowsError(try missingTeam.get())
+        XCTAssertNotNil(production.codeRequirement)
+        let adHoc = try UpdateConfiguration.resolve(
+            profile: .production,
+            info: info(channel: "production", bundle: "ing.miel.typingpet"),
+            feedOverride: "http://localhost:8787/x"
+        ).get()
+        XCTAssertEqual(adHoc.feedURL, UpdateConfiguration.productionFeedURL)
+        XCTAssertNil(adHoc.codeRequirement)
     }
 
     func testDevelopmentNeedsFeedOverrideAndPublicKey() {

@@ -6,6 +6,7 @@
 - Install an update after you accept it, then restart. A later quit installs an accepted update.
 - Verify each update with SHA-256, an Ed25519 signature, the bundle identity, and the Developer ID Team ID.
 - Restore the previous app when the swap fails, and report the result on the next launch.
+- Ad-hoc builds update with the Ed25519 signature alone. Grant Input Monitoring again after each update until builds are Developer ID signed.
 
 ## 0.12.0 - 2026-10-21
 

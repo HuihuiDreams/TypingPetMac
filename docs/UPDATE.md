@@ -7,7 +7,10 @@ The app checks a static JSON feed once a day and installs an update only after t
 | Feed | `UpdateFeedURL` default, unset by default | `https://pet.miel.ing/update/production/latest.json` |
 | Feed scheme | HTTPS, or http on `localhost` / `127.0.0.1` | HTTPS only |
 | Archive check | Size, SHA-256, Ed25519 | Size, SHA-256, Ed25519 |
-| App check | Bundle ID, channel, build, valid signature | Same, plus Developer ID with the app's Team ID and Gatekeeper notarization |
+| App check | Bundle ID, channel, build, valid signature | Same. Once the running app has a Team ID, also Developer ID with that Team ID and Gatekeeper notarization |
+
+An ad-hoc production build has no Team ID, so it trusts the Ed25519 signature alone and can update to the first Developer ID build.
+Each ad-hoc build has a different code signature, so macOS asks for Input Monitoring again after such an update.
 
 The request carries no query and no identifiers. The server sees the default `URLSession` user agent and the IP address.
 

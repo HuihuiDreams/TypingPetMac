@@ -54,7 +54,6 @@ struct UpdateConfiguration {
         let feedURL: URL
         switch profile {
         case .production:
-            guard teamIdentifier != nil else { return .failure(.unavailable("이 빌드에는 Developer ID 팀 정보가 없어요.")) }
             feedURL = productionFeedURL
         case .development:
             guard let override = feedOverride.flatMap(URL.init(string:)) else {
@@ -81,6 +80,8 @@ struct UpdateConfiguration {
         return ["localhost", "127.0.0.1", "::1"].contains(url.host ?? "")
     }
 
+    // An ad-hoc build has no Team ID, so it relies on the Ed25519 signature alone.
+    // Once a Developer ID build is installed, every later update must come from the same team.
     var codeRequirement: String? {
         guard let teamIdentifier else { return nil }
         return "anchor apple generic and identifier \"\(bundleIdentifier)\""

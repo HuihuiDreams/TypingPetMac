@@ -57,7 +57,7 @@ enum UpdateInstaller {
                 .filter { $0.pathExtension == "app" }
             guard apps.count == 1, let app = apps.first else { throw UpdateError.rejected("업데이트 안에 앱이 하나여야 해요.") }
             try UpdateVerifier.verifyApp(at: app, manifest: manifest, configuration: configuration)
-            if configuration.profile == .production {
+            if configuration.profile == .production, configuration.teamIdentifier != nil {
                 try run("/usr/sbin/spctl", ["--assess", "--type", "execute", app.path], failure: "업데이트 앱이 공증되지 않았어요.")
             }
             return StagedUpdate(manifest: manifest, app: app, folder: folder)

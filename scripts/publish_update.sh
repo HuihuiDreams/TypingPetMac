@@ -26,7 +26,7 @@ build="$(plist_value CFBundleVersion)"
 minimum="$(plist_value LSMinimumSystemVersion)"
 executable="$(plist_value CFBundleExecutable)"
 
-if [[ "$channel" == production ]]; then
+if [[ "$channel" == production ]] && /usr/libexec/PlistBuddy -c "Print :TypingPetTeamIdentifier" "$info" >/dev/null 2>&1; then
     spctl --assess --type execute "$app_path" || { echo "Notarize the app first: ./scripts/notarize_release.sh" >&2; exit 1; }
 fi
 
