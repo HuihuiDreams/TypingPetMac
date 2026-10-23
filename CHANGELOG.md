@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.14.0 - 2026-10-23
+
+- Add a compact view for a Todo bubble that stays open: up to three open Todos, one line each with checkboxes, and `+N개 더` to open the full view.
+- Switch views from the bubble header, the hover button, the context menu, or Settings > `할 일` > `목록 보기`. The choice persists across relaunches.
+- Right-click a compact row to pause, resume, or stop its timer, or start it with its saved setting, count-up, or 20 minutes.
+- Keep the compact view when a timer starts from it. Endings and absences show their own bubble until answered, then the compact view returns.
+
 ## 0.13.0 - 2026-10-23
 
 - Check for updates once a day and from the menu bar or the General settings tab.

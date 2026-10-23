@@ -5,8 +5,8 @@ project_dir="${0:A:h:h}"
 destination="${1:-$project_dir/dist}"
 configuration="${SWIFT_BUILD_CONFIGURATION:-release}"
 channel="${TYPINGPET_BUILD_CHANNEL:-development}"
-version="${TYPINGPET_VERSION:-0.13.0}"
-build_number="${TYPINGPET_BUILD:-19}"
+version="${TYPINGPET_VERSION:-0.14.0}"
+build_number="${TYPINGPET_BUILD:-20}"
 update_key_dir="${TYPINGPET_UPDATE_KEY_DIR:-$HOME/.config/typingpet/update-keys}"
 case "$channel" in
     development)
