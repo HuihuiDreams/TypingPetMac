@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.13.0 - 2026-10-23
 
 - Check for updates once a day and from the menu bar or the General settings tab.
 - Install an update after you accept it, then restart. A later quit installs an accepted update.
