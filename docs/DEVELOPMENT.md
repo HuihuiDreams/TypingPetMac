@@ -68,3 +68,8 @@ TYPINGPET_BUILD_CHANNEL=production ./scripts/build_app.sh
 
 The production build keeps the original names and storage locations.
 An unknown or unbundled executable cannot select production mode.
+
+## Updates
+
+`./scripts/check_update.sh` checks the full update flow with two Dev builds and a local server.
+See [automatic updates](UPDATE.md).

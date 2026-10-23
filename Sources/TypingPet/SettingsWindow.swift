@@ -218,8 +218,8 @@ final class TypingPetSettingsModel: ObservableObject {
 
 @MainActor
 final class SettingsWindowController: NSWindowController, NSWindowDelegate {
-    init(model: TypingPetSettingsModel, todoStore: TodoStore) {
-        let root = SettingsRootView(model: model, todoStore: todoStore)
+    init(model: TypingPetSettingsModel, todoStore: TodoStore, updater: UpdateController) {
+        let root = SettingsRootView(model: model, todoStore: todoStore, updater: updater)
         let window = NSWindow(contentViewController: NSHostingController(rootView: root))
         window.title = AppEnvironment.displayName + " 설정"
         window.setContentSize(NSSize(width: 780, height: 600))
@@ -247,10 +247,11 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 private struct SettingsRootView: View {
     @ObservedObject var model: TypingPetSettingsModel
     @ObservedObject var todoStore: TodoStore
+    let updater: UpdateController
 
     var body: some View {
         TabView {
-            GeneralSettingsView(model: model)
+            GeneralSettingsView(model: model, updater: updater)
                 .tabItem { Label("일반", systemImage: "gearshape") }
             TodoSettingsView(store: todoStore)
                 .tabItem { Label("할 일", systemImage: "checklist") }
@@ -361,6 +362,7 @@ private struct SettingsNote: View {
 
 private struct GeneralSettingsView: View {
     @ObservedObject var model: TypingPetSettingsModel
+    @ObservedObject var updater: UpdateController
 
     var body: some View {
         ScrollView {
@@ -444,6 +446,36 @@ private struct GeneralSettingsView: View {
                         }
                         Divider()
                         SettingsNote(text: "키 조합 판별에는 물리 키 코드와 보조 키만 사용하며, 입력 문자는 저장하거나 전송하지 않습니다.")
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+
+                FlatSettingsSection("업데이트") {
+                    VStack(spacing: 0) {
+                        SettingsRow {
+                            HStack(spacing: SettingsMetrics.space3) {
+                                VStack(alignment: .leading, spacing: SettingsMetrics.space1) {
+                                    Text("현재 버전 \(updater.currentVersionText)")
+                                    Text(updater.statusText)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                                Spacer(minLength: SettingsMetrics.space3)
+                                if updater.isBusy { ProgressView().controlSize(.small) }
+                                Button(updater.menuTitle) { updater.performPrimaryAction() }
+                                    .disabled(updater.isBusy || updater.unavailableReason != nil)
+                            }
+                            .padding(.vertical, SettingsMetrics.space2)
+                        }
+                        Divider()
+                        SettingsToggleRow(
+                            title: "자동으로 업데이트 확인",
+                            isOn: $updater.automaticChecks,
+                            isEnabled: updater.unavailableReason == nil
+                        )
+                        Divider()
+                        SettingsNote(text: "하루에 한 번 pet.miel.ing에서 새 버전을 확인합니다. 앱 버전 외의 정보는 보내지 않으며, 서명을 확인한 업데이트만 설치합니다.")
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }

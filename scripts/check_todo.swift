@@ -133,15 +133,15 @@ struct TodoChecks {
         }
         try test("Five-second checkpoint recovers paused after a crash") {
             let c = Clock(); let url = folder.appendingPathComponent("checkpoint.json")
-            var store = TodoStore(url: url, monotonicNow: { c.uptime }, wallNow: { c.date })
+            var store = TodoStore(url: url, monotonicNow: { c.uptime }, wallNow: { c.date }, idleSeconds: { 0 })
             store.change { e in let id = e.addTodo("Work")!; e.start(id) }
             c.advance(5); store.tick(); c.advance(3)
-            store = TodoStore(url: url, monotonicNow: { c.uptime }, wallNow: { c.date })
+            store = TodoStore(url: url, monotonicNow: { c.uptime }, wallNow: { c.date }, idleSeconds: { 0 })
             try check(store.engine.activeSession?.status == .paused, "Recovery resumed")
             try check(store.engine.activeSession?.totalActiveSeconds == 5, "Wrong checkpoint")
             store.change { $0.resume() }; c.advance(2.5); store.pauseForSleepOrTermination()
             c.advance(9000); store.tick()
-            store = TodoStore(url: url, monotonicNow: { c.uptime }, wallNow: { c.date })
+            store = TodoStore(url: url, monotonicNow: { c.uptime }, wallNow: { c.date }, idleSeconds: { 0 })
             try check(store.engine.activeSession?.status == .paused && store.engine.activeSession?.totalActiveSeconds == 7.5, "Offline time added")
         }
         try test("Damaged and future records cannot be overwritten") {
@@ -162,7 +162,7 @@ struct TodoChecks {
         }
         try test("Visibility changes save current time and keep the timer running") {
             let c = Clock(); let url = folder.appendingPathComponent("hidden.json")
-            let store = TodoStore(url: url, monotonicNow: { c.uptime }, wallNow: { c.date })
+            let store = TodoStore(url: url, monotonicNow: { c.uptime }, wallNow: { c.date }, idleSeconds: { 0 })
             store.change { e in let id = e.addTodo("Work")!; e.setPreference(.countup, for: id); e.start(id) }
             c.advance(2.25); store.hide()
             var saved = try TodoFileStorage(url: url).load()

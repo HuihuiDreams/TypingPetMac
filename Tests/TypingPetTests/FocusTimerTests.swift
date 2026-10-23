@@ -190,19 +190,20 @@ final class TodoPersistenceTests: XCTestCase {
         XCTAssertTrue(text.contains("Z"))
     }
 
+    // Stores with a test clock also fake idle time. A CI runner has no input, so real idle time pauses the timer.
     @MainActor func testCheckpointCrashSleepAndNormalTerminationRecovery() throws {
         let url = try temporaryFile(); let c = TestClock()
-        var store = TodoStore(url: url, monotonicNow: { c.uptime }, wallNow: { c.date })
+        var store = TodoStore(url: url, monotonicNow: { c.uptime }, wallNow: { c.date }, idleSeconds: { 0 })
         store.change { e in let id = e.addTodo("Work")!; e.start(id) }
         c.advance(5); store.tick()
         c.advance(3) // Uncommitted time is lost after a crash.
-        store = TodoStore(url: url, monotonicNow: { c.uptime }, wallNow: { c.date })
+        store = TodoStore(url: url, monotonicNow: { c.uptime }, wallNow: { c.date }, idleSeconds: { 0 })
         XCTAssertEqual(store.engine.activeSession?.status, .paused)
         XCTAssertEqual(store.engine.activeSession?.totalActiveSeconds, 5)
         store.change { $0.resume() }; c.advance(2.5)
         store.pauseForSleepOrTermination(); c.advance(9000); store.tick()
         XCTAssertEqual(store.engine.activeSession?.totalActiveSeconds, 7.5)
-        store = TodoStore(url: url, monotonicNow: { c.uptime }, wallNow: { c.date })
+        store = TodoStore(url: url, monotonicNow: { c.uptime }, wallNow: { c.date }, idleSeconds: { 0 })
         XCTAssertEqual(store.engine.activeSession?.status, .paused)
         XCTAssertEqual(store.engine.activeSession?.totalActiveSeconds, 7.5)
     }
@@ -234,7 +235,7 @@ final class TodoPersistenceTests: XCTestCase {
 
     @MainActor func testVisibilitySavesMeasuredTimeAndDoesNotStopTimer() throws {
         let url = try temporaryFile(); let c = TestClock()
-        let store = TodoStore(url: url, monotonicNow: { c.uptime }, wallNow: { c.date })
+        let store = TodoStore(url: url, monotonicNow: { c.uptime }, wallNow: { c.date }, idleSeconds: { 0 })
         store.change { e in let id = e.addTodo("Work")!; e.setPreference(.countup, for: id); e.start(id) }
         c.advance(2.25); store.hide()
         let hidden = try TodoFileStorage(url: url).load()
