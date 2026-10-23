@@ -1026,6 +1026,8 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     private var positionLockedItem: NSMenuItem!
     private var loginItem: NSMenuItem!
     private var monitoringStatusItem: NSMenuItem!
+    private var updateItem: NSMenuItem!
+    private let updater = UpdateController()
     private var permissionRetryTimer: Timer?
     private var didShowPermissionAlert = false
     private var settingsWindowController: SettingsWindowController?
@@ -1044,6 +1046,9 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         petController.shouldHoldPosition = { [weak self] in self?.todoBubble?.isInteracting == true }
         petController.onPresentationChanged = { [weak self] in self?.todoBubble?.synchronize() }
         configureStatusItem()
+        updater.isTimerRunning = { [weak self] in self?.todoStore.engine.activeSession?.status == .running }
+        updater.onChange = { [weak self] in self?.updateUpdateItem() }
+        updater.start()
 
         keyMonitor = GlobalKeyMonitor { [weak self] stroke in
             DispatchQueue.main.async {
@@ -1056,6 +1061,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
             startMonitoringOrRequestPermission(shouldShowAlert: !AppEnvironment.isDevelopment)
         }
         if ProcessInfo.processInfo.arguments.contains("--show-todos") { showTodos() }
+        if ProcessInfo.processInfo.arguments.contains("--install-update-now") { updater.installNowForChecks() }
         #else
         startMonitoringOrRequestPermission(shouldShowAlert: !AppEnvironment.isDevelopment)
         #endif
@@ -1086,6 +1092,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     func applicationWillTerminate(_ notification: Notification) {
         permissionRetryTimer?.invalidate()
         keyMonitor.stop()
+        updater.applicationWillTerminate()
     }
 
     func applicationDidBecomeActive(_ notification: Notification) {
@@ -1108,6 +1115,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         positionLockedItem.state = petController.isPositionLocked ? .on : .off
         loginItem.state = SMAppService.mainApp.status == .enabled ? .on : .off
         updateMonitoringStatusItem()
+        updateUpdateItem()
     }
 
     @objc private func toggleAlwaysOnTop() {
@@ -1264,7 +1272,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         }
         settingsModel?.refresh()
         if settingsWindowController == nil, let settingsModel {
-            settingsWindowController = SettingsWindowController(model: settingsModel, todoStore: todoStore)
+            settingsWindowController = SettingsWindowController(model: settingsModel, todoStore: todoStore, updater: updater)
         }
         settingsWindowController?.show()
     }
@@ -1296,6 +1304,10 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
                 primaryButton: "확인"
             )
         }
+    }
+
+    @objc private func performUpdateAction() {
+        updater.performPrimaryAction()
     }
 
     @objc private func quit() {
@@ -1338,6 +1350,9 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
 
         loginItem = makeMenuItem("로그인 시 자동 실행", action: #selector(toggleLaunchAtLogin))
         menu.addItem(loginItem)
+        updateItem = makeMenuItem("업데이트 확인…", action: #selector(performUpdateAction))
+        menu.addItem(updateItem)
+        updateUpdateItem()
         menu.addItem(makeMenuItem("\(AppEnvironment.displayName) 종료", action: #selector(quit), keyEquivalent: "q"))
         statusItem.menu = menu
     }
@@ -1352,6 +1367,12 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
                 .foregroundColor: isAvailable ? NSColor.systemGreen : NSColor.systemRed
             ]
         )
+    }
+
+    private func updateUpdateItem() {
+        guard let updateItem else { return }
+        updateItem.title = updater.menuTitle
+        updateItem.isEnabled = !updater.isBusy
     }
 
     private func makeMenuItem(

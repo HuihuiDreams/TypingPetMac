@@ -12,6 +12,8 @@ GitHub Releases에서 `TypingPet-macOS-arm64.zip`을 내려받아 압축을 풀�
 
 현재 공개 빌드는 Apple Silicon 전용 프리릴리스입니다. Apple Developer ID 공증 전까지는 Gatekeeper가 개발자 확인 경고를 표시할 수 있습니다. 소스에서 직접 빌드할 수도 있습니다.
 
+Developer ID로 서명한 빌드는 하루에 한 번 새 버전을 확인하고, 허락하면 내려받아 다시 시작합니다. 메뉴 막대의 `업데이트 확인…`이나 설정 > `일반` > `업데이트`에서 직접 확인하거나 자동 확인을 끌 수 있습니다. 자세한 동작은 [자동 업데이트](docs/UPDATE.md)를 봅니다.
+
 ## 동작
 
 - 기본 상태에서는 `pet-idle.png`를 표시합니다.
@@ -54,7 +56,7 @@ See [Todo use, storage, and tests](docs/TODO.md).
 
 메뉴 막대의 발바닥 아이콘에서 `설정`을 선택합니다.
 
-- `일반`: 펫 크기, 상시/호버 투명도, 통통 튀는 정도(끔/약하게/보통/강하게), 항상 위, 위치 잠금/마우스 피하기, 로그인 자동 실행, 입력 모니터링 권한 상태
+- `일반`: 펫 크기, 상시/호버 투명도, 통통 튀는 정도(끔/약하게/보통/강하게), 항상 위, 위치 잠금/마우스 피하기, 로그인 자동 실행, 입력 모니터링 권한 상태, 업데이트 확인
 - `갤러리`: 여러 이미지 세트 추가, 미리보기, 선택/적용, 이름 변경, 목록에서 제거
 - `키 반응`: 이미지와 특정 키 또는 키 조합을 연결하고 삭제
 
@@ -91,7 +93,7 @@ open "dist/TypingPet Dev.app"
 
 빌드 스크립트는 Keychain에서 `Developer ID Application`, `Apple Development`, 임시 서명 순으로 사용합니다. 특정 인증서를 쓰려면 `CODE_SIGN_IDENTITY` 환경 변수로 지정할 수 있습니다.
 
-공개 배포용 공증에는 Apple Developer Program과 `Developer ID Application` 인증서가 필요합니다. 인증서를 준비한 뒤 `xcrun notarytool store-credentials typingpet-notary`를 한 번 실행하고 다음 스크립트를 사용합니다.
+공개 배포용 공증에는 Apple Developer Program과 `Developer ID Application` 인증서가 필요합니다. 가입과 인증서 준비는 [Developer ID 정식 배포 준비](docs/DEVELOPER_ID.md)를 따릅니다. 인증서를 준비한 뒤 `xcrun notarytool store-credentials typingpet-notary`를 한 번 실행하고 다음 스크립트를 사용합니다.
 
 ```shell
 TYPINGPET_BUILD_CHANNEL=production CODE_SIGN_IDENTITY="Developer ID Application: 이름 (TEAMID)" ./scripts/build_app.sh
@@ -106,7 +108,7 @@ TYPINGPET_BUILD_CHANNEL=production CODE_SIGN_IDENTITY="Developer ID Application:
 
 - 일반 입력 문자를 저장하거나 네트워크로 전송하지 않습니다.
 - 특정 키 반응에는 사용자가 등록한 물리 키 코드와 보조 키 조합만 로컬에 저장합니다.
-- 앱 자체에는 네트워크 통신 기능이 없습니다.
+- 네트워크 통신은 업데이트 확인과 내려받기뿐입니다. `pet.miel.ing`에 요청할 때 사용자 정보, 기기 식별자, 입력 기록은 보내지 않습니다. 자동 확인은 설정에서 끌 수 있습니다.
 - The Todo JSON file stores titles, completion dates, timer preferences, and measured session times on this Mac.
 - Todo records have no server upload, account, or sync.
 

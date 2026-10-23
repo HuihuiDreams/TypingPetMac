@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Check for updates once a day and from the menu bar or the General settings tab.
+- Install an update after you accept it, then restart. A later quit installs an accepted update.
+- Verify each update with SHA-256, an Ed25519 signature, the bundle identity, and the Developer ID Team ID.
+- Restore the previous app when the swap fails, and report the result on the next launch.
+
 ## 0.12.0 - 2026-10-21
 
 - Add a Todo speech bubble beside the pet with a per-Todo countdown or count-up focus timer and measured session time.
