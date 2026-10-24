@@ -178,4 +178,7 @@ PYVERIFY
         exit 1
     }
     echo "Public update archive verified"
+    if [[ "${server_root:A}" == "$HOME/TypingPetUpdate" && -f "$HOME/.config/nginx/snippets/typing-pet-latest.conf" && -f "$project_dir/website/scripts/deploy.py" ]]; then
+        python3 "$project_dir/website/scripts/deploy.py" --redirect-only
+    fi
 fi

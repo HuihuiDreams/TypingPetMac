@@ -182,6 +182,31 @@ class ReleaseTests(unittest.TestCase):
         release = self.make_release(homebrew=True)
         self.assertTrue(release.options.github)
 
+    def test_website_requires_all_languages_before_publication(self):
+        directory = self.root / "website/src"
+        directory.mkdir(parents=True)
+        languages = ["ko", "en", "ja", "zh-Hans", "zh-Hant"]
+        (directory / "locales.json").write_text(json.dumps(dict.fromkeys(languages, {})))
+        notes = [{"version": "0.14.4", "ko": {"title": "Fixture", "items": ["Fixture"]}}]
+        (directory / "releases.json").write_text(json.dumps(notes))
+        release = self.make_release()
+        with self.assertRaisesRegex(RuntimeError, "en website notes"):
+            release.check_website_notes()
+        for language in languages[1:]:
+            with self.assertRaisesRegex(RuntimeError, f"{language} website notes"):
+                release.check_website_notes()
+            notes[0][language] = {"title": "Fixture", "items": ["Fixture"]}
+            (directory / "releases.json").write_text(json.dumps(notes))
+        release.check_website_notes()
+
+    def test_website_rejects_notes_for_another_version(self):
+        directory = self.root / "website/src"
+        directory.mkdir(parents=True)
+        (directory / "locales.json").write_text('{"ko":{}}')
+        (directory / "releases.json").write_text('[{"version":"0.14.3"}]')
+        with self.assertRaisesRegex(RuntimeError, "ko website notes for 0.14.4"):
+            self.make_release().check_website_notes()
+
     def test_homebrew_refuses_draft_before_mutating_tap(self):
         release = self.make_release(homebrew=True)
         release.repo = "fixture/repo"

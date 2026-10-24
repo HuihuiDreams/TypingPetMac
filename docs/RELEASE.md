@@ -28,12 +28,12 @@ GitHub 릴리스와 ZIP·SHA-256 첨부까지 함께 게시하려면 다음을 �
 
    ```json
    {
-     "version": "0.16.1",
-     "build": 26
+     "version": "0.17.1",
+     "build": 27
    }
    ```
 
-3. `CHANGELOG.md` 맨 위에 `## 0.16.1 - YYYY-MM-DD` 섹션과 변경 내용을 넣습니다. 이 내용이 자동 업데이트 안내와 GitHub 릴리스 노트가 됩니다. 설치 안내의 버전 링크도 새 버전에 맞게 준비합니다.
+3. `CHANGELOG.md` 맨 위에 `## 0.17.1 - YYYY-MM-DD` 섹션과 변경 내용을 넣습니다. 이 내용이 자동 업데이트 안내와 GitHub 릴리스 노트가 됩니다. 설치 안내의 버전 링크도 새 버전에 맞게 준비합니다.
 4. 소스·버전·문서를 커밋합니다. `--github`를 쓸 때는 먼저 해당 커밋을 GitHub에 push합니다. 스크립트는 소스를 자동 커밋하거나 push하지 않습니다.
 5. 읽기 전용 사전 점검 후 릴리스합니다.
 
@@ -98,6 +98,21 @@ Homebrew까지 게시하거나 tap 게시만 재시도할 때는 `./scripts/rele
 이전 manifest는 복구 참고용으로 보관하며 자동 롤백하지 않습니다. 새 버전을 이미 받은 앱에는 더 높은 빌드 번호의 수정 릴리스를 게시해야 합니다.
 
 공증 실패·시간 초과처럼 `ready.json` 생성 전 중단된 경우에는 `release.log`와 `notary-result.json`을 먼저 확인하세요. 시간 초과 뒤에도 Apple에서 처리가 계속될 수 있습니다. submission ID가 있다면 기존 Keychain 프로필로 `xcrun notarytool info <ID> --keychain-profile typingpet-notary`와 `log`를 확인합니다. 실패한 폴더를 별도 이름으로 보관한 뒤 다시 실행하세요. 스크립트는 실패 기록을 지우거나 기존 폴더를 자동 덮어쓰지 않습니다.
+
+## 랜딩페이지와 다운로드 링크
+
+이 Mac에 랜딩페이지가 배포된 뒤에는 `--github` 또는 `--homebrew` 릴리스가 공개된 후
+`typing-pet.miel.ing`의 다섯 언어 페이지와 패치 노트를 함께 갱신합니다.
+릴리스 전에 `website/src/releases.json`에 해당 버전의 한국어·영어·일본어·중국어 간체·번체 제목과 변경 항목을 추가하세요.
+누락된 번역은 빌드·서명 전에 검사합니다. 웹사이트 기록은 v0.16.0부터 시작합니다.
+
+`pet.miel.ing/download/latest`는 프로덕션 업데이트 배포가 검증될 때마다 최신 고정 빌드 URL로
+갱신합니다. 응답은 `302`와 `Cache-Control: no-store`이며, 고정 ZIP의 1년 immutable 캐시는 유지합니다.
+GitHub 없이 업데이트 서버에만 게시해도 이 다운로드 리디렉션은 갱신됩니다.
+
+앱 게시 후 웹사이트 갱신만 실패했다면 앱을 다시 빌드하거나 게시하지 말고,
+원인을 수정한 뒤 저장소 루트에서 `./scripts/deploy_website.sh`를 실행하세요.
+세부 배포·복구 구조는 [웹사이트 문서](../website/README.md)를 참고하세요.
 
 ## 자동화 자체 검증
 

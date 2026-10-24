@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.17.0 - 2026-10-24
+
+- Add Japanese, Simplified Chinese, and Traditional Chinese throughout the app, alongside Korean and English.
+- Detect Japanese and Chinese system languages, honoring explicit Chinese scripts and regional defaults, and allow a saved language override in Settings.
+- Localize the website, installation guides, FAQs, release notes, accessibility labels, and search and social metadata in all five languages.
+- Keep the current website page and anchor when switching languages, and remember the choice for future visits.
+
 ## 0.16.0 - 2026-10-24
 
 - Keep Settings at a compact 490-point default width, with room to grow for larger accessibility text and manual resizing.

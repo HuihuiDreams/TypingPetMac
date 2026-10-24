@@ -1,0 +1,62 @@
+# Typing Pet landing page
+
+Public Korean, English, Japanese, Simplified Chinese, and Traditional Chinese site at https://typing-pet.miel.ing, served by nginx on the Mac mini.
+React + Base UI (Tabs, Accordion, Button), with a neo-brutalist design, local fonts, and no analytics.
+The ten locale/page combinations are pre-rendered to HTML; React hydrates only their interactions.
+
+```sh
+cd website
+npm ci --ignore-scripts
+npm run sync-release
+npm run build
+npm run preview
+```
+
+`sync-release` reads the production feed and the matching public GitHub release. It checks version,
+archive size and SHA-256, and requires notes in all five languages in `src/releases.json` before building.
+Unpublished notes are omitted. The website journal starts at 0.16.0; historical repository changelogs remain intact.
+
+To publish on this Mac after a public GitHub release:
+
+```sh
+./scripts/deploy_website.sh
+```
+
+Run that command from the repository root. It deploys a new timestamped directory, atomically switches
+the website's `current` link, writes the nginx download redirect, validates nginx, and gracefully reloads it.
+Old directories and redirect backups remain in `~/server/typing-pet-site` for recovery.
+The shared update feed lock prevents switching the download destination during another app deployment.
+The publication command then verifies all ten live pages, Open Graph, assets, the redirect,
+the full downloaded ZIP's SHA-256, and Range requests. Its report is saved under
+`~/server/typing-pet-site/verification/verification.json`. These are requests from this Mac;
+independent Internet probes must be recorded separately.
+
+The fixed `https://pet.miel.ing/download/latest` URL returns `302` with `Cache-Control: no-store`
+and explicit CDN no-store headers. Its destination is the feed's immutable version/build URL.
+That ZIP retains `public, max-age=31536000, immutable`. Published ZIPs are never overwritten.
+
+nginx site configuration: `nginx/typing-pet-site.conf`. The update vhost includes
+`~/.config/nginx/snippets/typing-pet-latest.conf` inside its exact `/download/latest` location.
+The landing hostname is a Cloudflare-proxied CNAME to `pet.miel.ing`, following its existing
+DDNS-managed A record. Only `typing-pet.miel.ing` is proxied; `pet.miel.ing` remains DNS-only.
+HTML uses `no-cache`; hashed JS/CSS/fonts use a one-year immutable policy and other site images
+use a one-day policy. The download host keeps its explicit CDN no-store headers.
+
+For each app release, add bilingual website notes along with the app's `CHANGELOG.md` entry.
+After installation here, the app's `--github` / `--homebrew` release pipeline refreshes this website
+after the matching GitHub release is public. If website publication fails, app artifacts remain published;
+fix the notes or site and rerun `./scripts/deploy_website.sh` without rebuilding or republishing the app.
+
+`deploy_update.sh` also refreshes the `latest` redirect after verifying each production archive,
+including update-server-only releases. The landing page's recommended GitHub link advances after
+the matching GitHub release is public. Generated release metadata stays ignored so publication
+does not dirty the source snapshot or interfere with a prepared app release retry.
+
+The social preview image is a 1200×630 browser rendering of `design/social-card.html`, using
+the app's existing CC0 cat image. Optimized WebP assets derive from the repository's resources
+and example screenshots. No third-party character assets are used.
+
+Locale metadata is shared in `src/locales.json`. The root follows the first browser language,
+recognizing Chinese scripts and regions, and remembers an explicit language choice. Language
+switching preserves the current home/changelog page, query, and anchor. `npm run build` checks
+language detection, translated content and release notes, canonical/alternate metadata, and all ten static pages.

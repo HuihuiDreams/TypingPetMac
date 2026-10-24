@@ -92,6 +92,8 @@ class Release:
         self.env = dict(os.environ)
         self.log = None
         self.deployment_started = False
+        self.website_enabled = ((root / "website/package.json").is_file()
+                                and (Path.home() / "server/typing-pet-site/current").is_dir())
 
     def command(self, *args, capture=False):
         args = [str(arg) for arg in args]
@@ -152,6 +154,8 @@ class Release:
                            if section.startswith(self.version + " ")), "")
         if not self.notes:
             fail(f"Add a nonempty '## {self.version} - YYYY-MM-DD' section to CHANGELOG.md.")
+        if self.options.github and self.website_enabled:
+            self.check_website_notes()
         identities = self.command("security", "find-identity", "-v", "-p", "codesigning", capture=True)
         identities = re.findall(r'"(Developer ID Application:[^"]+)"', identities)
         identity = self.env.get("CODE_SIGN_IDENTITY")
@@ -196,6 +200,17 @@ class Release:
             tap = json.loads(self.command("gh", "api", f"repos/{TAP_REPO}", capture=True))
             if tap["private"] or not tap.get("permissions", {}).get("push"):
                 fail("Homebrew tap must be public and writable by the active GitHub account.")
+
+    def check_website_notes(self):
+        notes = json.loads((self.root / "website/src/releases.json").read_text())
+        note = next((note for note in notes if note.get("version") == self.version), None)
+        for language in json.loads((self.root / "website/src/locales.json").read_text()):
+            localized = (note or {}).get(language, {})
+            items = localized.get("items")
+            if (not isinstance(localized.get("title"), str) or not localized["title"].strip()
+                    or not isinstance(items, list) or not items
+                    or not all(isinstance(item, str) and item.strip() for item in items)):
+                fail(f"Add {language} website notes for {self.version} in website/src/releases.json before releasing.")
 
     def publish_homebrew(self):
         # Only reference the exact bytes of the now-public GitHub asset.
@@ -318,6 +333,8 @@ class Release:
             print("GitHub: draft with ZIP/checksum → publish prerelease after update server verification")
         if self.homebrew:
             print(f"Homebrew: verify public GitHub ZIP → update {TAP_REPO}/{CASK_PATH}")
+        if self.options.github and self.website_enabled:
+            print("Website: verify the public release → refresh all localized pages and latest download redirect")
         if self.options.dry_run:
             print("Dry run complete. No builds, notarization submissions or publication performed.")
             return
@@ -347,6 +364,8 @@ class Release:
                     self.command("gh", "release", "edit", self.tag, "--repo", self.repo, "--draft=false")
                 if self.homebrew:
                     self.publish_homebrew()
+                if self.options.github and self.website_enabled:
+                    self.script("deploy_website.sh")
                 (self.output / "complete.json").write_text(json.dumps({"version": self.version, "build": self.build,
                     "feed": FEED_URL, "github": f"https://github.com/{self.repo}/releases/tag/{self.tag}" if self.options.github else None,
                     "homebrew": f"https://github.com/{TAP_REPO}/blob/main/{CASK_PATH}" if self.homebrew else None}, indent=2) + "\n")

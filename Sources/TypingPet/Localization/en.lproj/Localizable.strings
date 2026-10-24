@@ -335,3 +335,6 @@
 "Language" = "Language";
 "language.korean" = "한국어";
 "language.english" = "English";
+"language.japanese" = "日本語";
+"language.simplifiedChinese" = "简体中文";
+"language.traditionalChinese" = "繁體中文";

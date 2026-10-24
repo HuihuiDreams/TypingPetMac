@@ -86,7 +86,7 @@ import plistlib, sys
 path, name, executable, bundle_id, display, channel, version, build, team_id, public_key = sys.argv[1:]
 info = {
     "CFBundleDevelopmentRegion": "en",
-    "CFBundleLocalizations": ["en", "ko"],
+    "CFBundleLocalizations": ["en", "ko", "ja", "zh-Hans", "zh-Hant"],
     "CFBundleDisplayName": display,
     "CFBundleExecutable": executable,
     "CFBundleIdentifier": bundle_id,

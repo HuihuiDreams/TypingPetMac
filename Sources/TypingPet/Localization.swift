@@ -2,9 +2,10 @@ import Foundation
 import Combine
 
 enum AppLanguageMode: String, CaseIterable {
-    case system, korean, english
+    case system, korean, english, japanese, simplifiedChinese, traditionalChinese
 
     static let defaultsKey = "AppLanguageMode"
+    static let supportedLanguages = ["ko", "en", "ja", "zh-Hans", "zh-Hant"]
 
     static func load(from defaults: UserDefaults) -> Self {
         Self(rawValue: defaults.string(forKey: defaultsKey) ?? "") ?? .system
@@ -14,9 +15,21 @@ enum AppLanguageMode: String, CaseIterable {
         switch self {
         case .korean: return "ko"
         case .english: return "en"
+        case .japanese: return "ja"
+        case .simplifiedChinese: return "zh-Hans"
+        case .traditionalChinese: return "zh-Hant"
         case .system:
             let first = preferredLanguages.first?.lowercased().replacingOccurrences(of: "_", with: "-") ?? "en"
-            return first == "ko" || first.hasPrefix("ko-") ? "ko" : "en"
+            let parts = first.split(separator: "-").map(String.init)
+            switch parts.first {
+            case "ko": return "ko"
+            case "ja": return "ja"
+            case "zh":
+                if parts.contains("hant") { return "zh-Hant" }
+                if parts.contains("hans") { return "zh-Hans" }
+                return parts.contains(where: { ["tw", "hk", "mo"].contains($0) }) ? "zh-Hant" : "zh-Hans"
+            default: return "en"
+            }
         }
     }
 }
@@ -42,7 +55,10 @@ final class AppLocalization: ObservableObject {
         if let localeObserver { NotificationCenter.default.removeObserver(localeObserver) }
     }
 
-    var locale: Locale { Locale(identifier: language == "ko" ? "ko_KR" : "en_US") }
+    var locale: Locale {
+        let identifiers = ["ko": "ko_KR", "en": "en_US", "ja": "ja_JP", "zh-Hans": "zh_Hans_CN", "zh-Hant": "zh_Hant_TW"]
+        return Locale(identifier: identifiers[language] ?? "en_US")
+    }
 
     func setMode(_ value: AppLanguageMode) {
         defaults.set(value.rawValue, forKey: AppLanguageMode.defaultsKey)
@@ -54,7 +70,7 @@ final class AppLocalization: ObservableObject {
         language = mode.resolvedLanguage()
     }
 
-    private static let bundles: [String: Bundle] = ["ko", "en"].reduce(into: [:]) { result, language in
+    private static let bundles: [String: Bundle] = AppLanguageMode.supportedLanguages.reduce(into: [:]) { result, language in
         // The shipped app copies lproj folders directly. SwiftPM keeps them in Localization.
         let root = Bundle.main.resourceURL
         let packaged = root?.appendingPathComponent("\(language).lproj")
@@ -69,7 +85,7 @@ final class AppLocalization: ObservableObject {
     }
 
     static func bundle(for language: String) -> Bundle? {
-        bundles[language == "ko" ? "ko" : "en"]
+        bundles[AppLanguageMode.supportedLanguages.contains(language) ? language : "en"]
     }
 
     static func string(_ key: String, language: String, arguments: [String] = []) -> String {

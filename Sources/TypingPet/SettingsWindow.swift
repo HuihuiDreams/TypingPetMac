@@ -511,6 +511,9 @@ private struct GeneralSettingsView: View {
                                     Text(L("System")).tag(AppLanguageMode.system)
                                     Text(L("language.korean")).tag(AppLanguageMode.korean)
                                     Text(L("language.english")).tag(AppLanguageMode.english)
+                                    Text(L("language.japanese")).tag(AppLanguageMode.japanese)
+                                    Text(L("language.simplifiedChinese")).tag(AppLanguageMode.simplifiedChinese)
+                                    Text(L("language.traditionalChinese")).tag(AppLanguageMode.traditionalChinese)
                                 }
                                 .labelsHidden()
                                 .frame(width: 200)
