@@ -117,16 +117,16 @@ private final class WorkspaceSidebarController: NSViewController, NSTableViewDat
         artwork.imageScaling = .scaleProportionallyUpOrDown
         artwork.setAccessibilityHidden(true)
         artwork.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([artwork.widthAnchor.constraint(equalToConstant: 35), artwork.heightAnchor.constraint(equalToConstant: 35)])
+        NSLayoutConstraint.activate([artwork.widthAnchor.constraint(equalToConstant: 32), artwork.heightAnchor.constraint(equalToConstant: 32)])
         brandLabel.font = .systemFont(ofSize: 14, weight: .semibold)
         subtitle.font = .systemFont(ofSize: 11)
         subtitle.textColor = .secondaryLabelColor
         let labels = NSStackView(views: [brandLabel, subtitle])
         labels.orientation = .vertical
         labels.alignment = .leading
-        labels.spacing = 3
+        labels.spacing = 2
         let brand = SidebarBrandView(views: [artwork, labels])
-        brand.spacing = 10
+        brand.spacing = 8
         brand.alignment = .centerY
         titleLabel.font = .systemFont(ofSize: 11, weight: .medium)
         titleLabel.textColor = .secondaryLabelColor
@@ -143,7 +143,7 @@ private final class WorkspaceSidebarController: NSViewController, NSTableViewDat
         table.columnAutoresizingStyle = .uniformColumnAutoresizingStyle
         table.style = .sourceList
         table.backgroundColor = .clear
-        table.intercellSpacing = NSSize(width: 0, height: 4)
+        table.intercellSpacing = NSSize(width: 0, height: 2)
         table.dataSource = self
         table.delegate = self
         table.setAccessibilityLabel(L("Set Management"))
@@ -152,21 +152,22 @@ private final class WorkspaceSidebarController: NSViewController, NSTableViewDat
         let scroll = NSScrollView()
         scroll.documentView = table
         scroll.hasVerticalScroller = true
+        scroll.autohidesScrollers = true
         scroll.drawsBackground = false
         for child in [brand, heading, scroll] {
             child.translatesAutoresizingMaskIntoConstraints = false
             view.addSubview(child)
         }
         NSLayoutConstraint.activate([
-            brand.topAnchor.constraint(equalTo: view.topAnchor, constant: 22),
-            brand.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 18),
+            brand.topAnchor.constraint(equalTo: view.topAnchor, constant: 16),
+            brand.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
             brand.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -12),
-            heading.topAnchor.constraint(equalTo: brand.bottomAnchor, constant: 24),
-            heading.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 18),
+            heading.topAnchor.constraint(equalTo: brand.bottomAnchor, constant: 18),
+            heading.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
             heading.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
-            scroll.topAnchor.constraint(equalTo: heading.bottomAnchor, constant: 8),
-            scroll.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 8),
-            scroll.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -8),
+            scroll.topAnchor.constraint(equalTo: heading.bottomAnchor, constant: 4),
+            scroll.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            scroll.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             scroll.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -12)
         ])
         editor.objectWillChange.receive(on: DispatchQueue.main).sink { [weak self] in self?.reload() }.store(in: &subscriptions)
@@ -190,10 +191,24 @@ private final class WorkspaceSidebarController: NSViewController, NSTableViewDat
         if let row = rows.firstIndex(of: desired) { table.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false) }
     }
     func numberOfRows(in tableView: NSTableView) -> Int { rows.count }
-    func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat { rows[row] == .settings ? 46 : 40 }
+    func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat { rows[row] == .settings ? 32 : 30 }
     func tableView(_ tableView: NSTableView, isGroupRow row: Int) -> Bool { rows[row] == .settings }
     func tableView(_ tableView: NSTableView, shouldSelectRow row: Int) -> Bool { rows[row] != .settings }
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
+        if rows[row] == .settings {
+            let group = NSView()
+            let label = NSTextField(labelWithString: L("Settings"))
+            label.font = .systemFont(ofSize: 11, weight: .medium)
+            label.textColor = .secondaryLabelColor
+            label.translatesAutoresizingMaskIntoConstraints = false
+            group.addSubview(label)
+            NSLayoutConstraint.activate([
+                label.leadingAnchor.constraint(equalTo: group.leadingAnchor, constant: 16),
+                label.centerYAnchor.constraint(equalTo: group.centerYAnchor),
+                label.trailingAnchor.constraint(lessThanOrEqualTo: group.trailingAnchor, constant: -16)
+            ])
+            return group
+        }
         let cell = NSTableCellView()
         let name: String
         let symbol: String
@@ -221,10 +236,10 @@ private final class WorkspaceSidebarController: NSViewController, NSTableViewDat
         check.setAccessibilityLabel(L("In Use"))
         for child in [image, label, check] { child.translatesAutoresizingMaskIntoConstraints = false; cell.addSubview(child) }
         NSLayoutConstraint.activate([
-            image.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 10), image.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
-            image.widthAnchor.constraint(equalToConstant: rows[row] == .settings ? 0 : 18), image.heightAnchor.constraint(equalToConstant: 18),
-            label.leadingAnchor.constraint(equalTo: image.trailingAnchor, constant: 8), label.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
-            check.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -10), check.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
+            image.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 0), image.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
+            image.widthAnchor.constraint(equalToConstant: rows[row] == .settings ? 0 : 16), image.heightAnchor.constraint(equalToConstant: 16),
+            label.leadingAnchor.constraint(equalTo: image.trailingAnchor, constant: rows[row] == .settings ? 0 : 8), label.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
+            check.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -4), check.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
             check.widthAnchor.constraint(equalToConstant: active ? 14 : 0), check.heightAnchor.constraint(equalToConstant: 14),
             label.trailingAnchor.constraint(lessThanOrEqualTo: check.leadingAnchor, constant: -6)
         ])

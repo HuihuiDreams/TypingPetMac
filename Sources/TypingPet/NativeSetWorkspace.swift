@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -10,7 +11,11 @@ final class PackPopoverController: NSObject, ObservableObject, NSPopoverDelegate
     @Published private(set) var target: Target?
     private let editor: PackEditorModel
     private let popover = NSPopover()
-    private let anchors = NSMapTable<NSString, NSView>.strongToWeakObjects()
+    private weak var coordinateView: NSView?
+    private var anchors: [String: CGRect] = [:]
+    private var anchorID: String?
+    private var content: NSHostingController<PackPopoverContent>?
+    private var subscription: AnyCancellable?
 
     init(editor: PackEditorModel) {
         self.editor = editor
@@ -18,34 +23,75 @@ final class PackPopoverController: NSObject, ObservableObject, NSPopoverDelegate
         popover.behavior = .transient
         popover.animates = false
         popover.delegate = self
+        subscription = editor.objectWillChange.debounce(for: .milliseconds(20), scheduler: DispatchQueue.main)
+            .sink { [weak self] in self?.resizeContent() }
     }
-    func register(_ view: NSView, id: String) { anchors.setObject(view, forKey: id as NSString) }
+    func registerCoordinateView(_ view: NSView) { coordinateView = view }
+    func register(_ rect: CGRect, id: String) {
+        anchors[id] = rect
+        if popover.isShown, anchorID == id {
+            popover.positioningRect = rect
+        }
+    }
     func toggle(_ next: Target, anchor: String) {
         if target == next, popover.isShown { close(); return }
-        guard let view = anchors.object(forKey: anchor as NSString), view.window != nil else { return }
+        guard let view = coordinateView, view.window != nil, let rect = anchors[anchor], !rect.isEmpty else { return }
         popover.close()
         target = next
-        popover.contentViewController = NSHostingController(rootView: PackPopoverContent(editor: editor, controller: self))
-        popover.show(relativeTo: view.bounds, of: view, preferredEdge: .maxY)
+        anchorID = anchor
+        let host = NSHostingController(rootView: PackPopoverContent(editor: editor, controller: self))
+        host.sizingOptions = []
+        let size = host.sizeThatFits(in: CGSize(width: 420, height: 900))
+        host.view.setFrameSize(size)
+        content = host
+        popover.contentViewController = host
+        popover.contentSize = size
+        popover.show(relativeTo: rect, of: view, preferredEdge: .maxY)
     }
     func updateModifiers() {
         if case .mapping(.key(let old)) = target {
             target = .mapping(.key(KeyStroke(keyCode: old.keyCode, modifiers: editor.modifiers)))
+            DispatchQueue.main.async { [weak self] in self?.resizeContent() }
         }
     }
-    func close() { popover.close(); popover.contentViewController = nil; target = nil }
-    func popoverDidClose(_ notification: Notification) { popover.contentViewController = nil; target = nil }
+    private func resizeContent() {
+        guard popover.isShown, let content, let view = coordinateView, let anchorID, let rect = anchors[anchorID] else { return }
+        let size = content.sizeThatFits(in: CGSize(width: 420, height: 900))
+        if popover.contentSize != size {
+            content.view.setFrameSize(size)
+            popover.contentSize = size
+            popover.show(relativeTo: rect, of: view, preferredEdge: .maxY)
+        }
+    }
+    func close() { popover.close(); popover.contentViewController = nil; content = nil; target = nil; anchorID = nil }
+    func popoverDidClose(_ notification: Notification) { popover.contentViewController = nil; content = nil; target = nil; anchorID = nil }
 }
 
-private struct PopoverAnchor: NSViewRepresentable {
+private struct PopoverAnchor: View {
     let id: String
     let controller: PackPopoverController
+    var body: some View {
+        GeometryReader { geometry in
+            Color.clear
+                .onAppear { controller.register(geometry.frame(in: .named("set-workspace")), id: id) }
+                .onChange(of: geometry.frame(in: .named("set-workspace"))) { rect in controller.register(rect, id: id) }
+        }.allowsHitTesting(false)
+    }
+}
+
+private final class PopoverCoordinateView: NSView {
+    override var isFlipped: Bool { true }
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+}
+
+private struct PopoverCoordinateRoot: NSViewRepresentable {
+    let controller: PackPopoverController
     func makeNSView(context: Context) -> NSView {
-        let view = NSView()
-        controller.register(view, id: id)
+        let view = PopoverCoordinateView()
+        controller.registerCoordinateView(view)
         return view
     }
-    func updateNSView(_ nsView: NSView, context: Context) { controller.register(nsView, id: id) }
+    func updateNSView(_ nsView: NSView, context: Context) { controller.registerCoordinateView(nsView) }
 }
 
 struct NativeSetWorkspace: View {
@@ -67,6 +113,8 @@ struct NativeSetWorkspace: View {
             .frame(maxWidth: .infinity, alignment: .topLeading)
         }
         .background(Color(nsColor: .windowBackgroundColor))
+        .background(PopoverCoordinateRoot(controller: popovers))
+        .coordinateSpace(name: "set-workspace")
         .tint(.teal)
         .environment(\.locale, localization.locale)
         .onChange(of: editor.selectedSetID) { _ in popovers.close() }
@@ -228,7 +276,10 @@ struct NativeSetWorkspace: View {
     }
     private var keyboard: some View {
         VStack(spacing: 5) {
-            ForEach(KeyboardLayoutKey.rows.indices, id: \.self) { index in keyboardRow(KeyboardLayoutKey.rows[index], function: index == 0) }
+            ForEach(KeyboardLayoutKey.rows.indices, id: \.self) { index in
+                if index == KeyboardLayoutKey.rows.count - 1 { keyboardBottomRow }
+                else { keyboardRow(KeyboardLayoutKey.rows[index], function: index == 0) }
+            }
         }
         .padding(8).frame(width: 760)
         .background(RoundedRectangle(cornerRadius: 14).fill(Color.primary.opacity(0.055)))
@@ -236,21 +287,55 @@ struct NativeSetWorkspace: View {
     private func keyboardRow(_ row: [KeyboardLayoutKey], function: Bool) -> some View {
         let unit = (744 - CGFloat(row.count - 1) * 4) / row.reduce(0) { $0 + $1.width }
         return HStack(spacing: 4) {
-            ForEach(row) { key in keyboardKey(key, function: function).frame(width: unit * key.width, height: function ? 42 : 52) }
+            ForEach(row) { key in framedKey(key, width: unit * key.width, height: function ? 42 : 52, function: function) }
         }
     }
-    private func keyboardKey(_ key: KeyboardLayoutKey, function: Bool) -> some View {
+    private var keyboardBottomRow: some View {
+        let row = KeyboardLayoutKey.rows.last ?? []
+        let regular = row.filter { ![123, 124, 125, 126].contains($0.code) }
+        let arrows = row.filter { [123, 124, 125, 126].contains($0.code) }
+        let unit = (744 - CGFloat(regular.count + 2) * 4) / (regular.reduce(0) { $0 + $1.width } + 3)
+        return HStack(alignment: .bottom, spacing: 4) {
+            ForEach(regular) { key in framedKey(key, width: unit * key.width, height: 52) }
+            if let left = arrows.first(where: { $0.code == 123 }), let up = arrows.first(where: { $0.code == 126 }),
+               let down = arrows.first(where: { $0.code == 125 }), let right = arrows.first(where: { $0.code == 124 }) {
+                framedKey(left, width: unit, height: 24, compact: true)
+                VStack(spacing: 4) {
+                    framedKey(up, width: unit, height: 24, compact: true)
+                    framedKey(down, width: unit, height: 24, compact: true)
+                }
+                framedKey(right, width: unit, height: 24, compact: true)
+            }
+        }
+    }
+    private func framedKey(_ key: KeyboardLayoutKey, width: CGFloat, height: CGFloat, function: Bool = false, compact: Bool = false) -> some View {
+        keyboardKey(key, function: function, compact: compact)
+            .frame(width: width, height: height)
+            .background(PopoverAnchor(id: "key:" + (key.code.map(String.init) ?? key.label), controller: popovers))
+    }
+    private func keyboardKey(_ key: KeyboardLayoutKey, function: Bool, compact: Bool) -> some View {
         let target = key.code.map { PackEditorTarget.key(KeyStroke(keyCode: $0, modifiers: editor.modifiers)) }
         let value = target.map(editor.selection)
         let selected = target != nil && popovers.target == target.map(PackPopoverController.Target.mapping)
         let anchor = "key:" + (key.code.map(String.init) ?? key.label)
         return Button { if let target { popovers.toggle(.mapping(target), anchor: anchor) } } label: {
-            VStack(alignment: .leading, spacing: 0) {
-                Text(key.code == nil ? key.label.replacingOccurrences(of: "L", with: "").replacingOccurrences(of: "R", with: "") : key.label)
-                    .font(.system(size: 11)).foregroundStyle(key.code == nil ? .tertiary : .secondary).lineLimit(1)
-                Spacer(minLength: 0)
-                if let id = value?.presetIDs.first { SetArtwork(image: editor.image(id: id)).frame(maxWidth: .infinity).frame(height: function ? 19 : 27) }
-                else if key.code != nil { Text("·").foregroundStyle(.tertiary).frame(maxWidth: .infinity) }
+            Group {
+                if compact {
+                    HStack(spacing: 2) {
+                        Text(key.label).font(.system(size: 11)).foregroundStyle(.secondary)
+                        Spacer(minLength: 0)
+                        if let id = value?.presetIDs.first { SetArtwork(image: editor.image(id: id)).frame(width: 17, height: 17) }
+                        else { Text("·").font(.system(size: 11)).foregroundStyle(.tertiary) }
+                    }
+                } else {
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text(key.code == nil ? key.label.replacingOccurrences(of: "L", with: "").replacingOccurrences(of: "R", with: "") : key.label)
+                            .font(.system(size: 11)).foregroundStyle(key.code == nil ? .tertiary : .secondary).lineLimit(1)
+                        Spacer(minLength: 0)
+                        if let id = value?.presetIDs.first { SetArtwork(image: editor.image(id: id)).frame(maxWidth: .infinity).frame(height: function ? 19 : 27) }
+                        else if key.code != nil { Text("·").foregroundStyle(.tertiary).frame(maxWidth: .infinity) }
+                    }
+                }
             }
             .padding(4).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .background(RoundedRectangle(cornerRadius: 6).fill(selected ? Color.teal.opacity(0.12) : Color(nsColor: .controlBackgroundColor).opacity(key.code == nil ? 0.4 : 1)))
@@ -258,7 +343,6 @@ struct NativeSetWorkspace: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain).disabled(target == nil || !editor.canEdit || editor.draft.presets.isEmpty)
-        .background(PopoverAnchor(id: anchor, controller: popovers))
         .accessibilityLabel(target?.title ?? key.label)
         .accessibilityValue(value?.presetIDs.map(editor.name).joined(separator: ", ") ?? "")
         .onDrop(of: [UTType.plainText], isTargeted: nil) { providers in
