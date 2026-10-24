@@ -60,7 +60,7 @@ The private key is unrelated to the Apple Developer ID certificate and must not 
 
 ## Release
 
-Use the [single-command release pipeline](RELEASE.md) after Developer ID setup:
+Use the [single-command release pipeline](releasing.md) after Developer ID setup:
 
 ```sh
 # Update version.json and CHANGELOG.md, commit (and push for --github), then:

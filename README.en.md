@@ -50,21 +50,21 @@ Choose `나중에` (Later) to continue using the app and resume setup from the m
 > [!IMPORTANT]
 > When moving from an older ad-hoc-signed build, you may need to grant Input Monitoring permission once more. If the pet does not react, remove the old `TypingPet` entry with `-`, add the app again, and enable its switch. Future updates signed by the same Developer ID team can retain the permission.
 
-**If you have v0.14.1 or earlier, install the latest release manually once.** The old update signing key was lost and replaced, so those builds cannot accept the new feed. Starting with v0.14.2, the app checks daily and installs an update after you approve it, on restart or quit. The [update documentation](docs/UPDATE.md) explains verification.
+**If you have v0.14.1 or earlier, install the latest release manually once.** The old update signing key was lost and replaced, so those builds cannot accept the new feed. Starting with v0.14.2, the app checks daily and installs an update after you approve it, on restart or quit. The [update documentation](developer-notes/updates.md) explains verification.
 
 ## In action
 
 An example compact list with `고양이 밥주기` (Feed the cat) and `회계사 시험 공부` (Study for the CPA exam):
 
-<img src="docs/images/todo-compact@2x.png" alt="Compact list with Feed the cat and Study for the CPA exam" width="360">
+<img src="developer-notes/images/todo-compact@2x.png" alt="Compact list with Feed the cat and Study for the CPA exam" width="360">
 
 Start the study timer while keeping both tasks in the compact list:
 
-<img src="docs/images/todo-active@2x.png" alt="Compact list with the study timer running" width="360">
+<img src="developer-notes/images/todo-active@2x.png" alt="Compact list with the study timer running" width="360">
 
 The focus bubble shows the remaining time; hover over it for pause, resume, and stop controls:
 
-<img src="docs/images/todo-focus@2x.png" alt="Focus timer for Study for the CPA exam" width="360">
+<img src="developer-notes/images/todo-focus@2x.png" alt="Focus timer for Study for the CPA exam" width="360">
 
 These screenshots use sample tasks in the isolated development app. The distributed app has the same layout.
 
@@ -83,7 +83,7 @@ These screenshots use sample tasks in the isolated development app. The distribu
 
 Move the pointer near the pet and select `할 일` (Todo). Enter a title and press Return. Each task has its own countdown or count-up setting; use the arrow to change it and the main button to start. The focus view supports pause, resume, stop, and countdown extension.
 
-Tasks and measured focus time are stored on this Mac in `~/Library/Application Support/TypingPet/todo-state.json`. Open the file from Settings > `할 일` > `기록 데이터 열기` (Reveal Record Data). Sleep and app restarts do not add offline time to a focus session. See the [Todo guide](docs/TODO.md) for details.
+Tasks and measured focus time are stored on this Mac in `~/Library/Application Support/TypingPet/todo-state.json`. Open the file from Settings > `할 일` > `기록 데이터 열기` (Reveal Record Data). Sleep and app restarts do not add offline time to a focus session. See the [Todo guide](developer-notes/todos.md) for details.
 
 ## Settings and images
 
@@ -99,7 +99,7 @@ For a folder set, name the idle image `idle.*` or `pet-idle.*`; other supported 
 
 ## Develop and build
 
-After development and manual checks, the [release pipeline](docs/RELEASE.md) runs tests, builds, signs, notarizes, and deploys a new version. Update and commit `version.json` and the changelog, push the release commit, then run `./scripts/release.sh --homebrew`. Use `--dry-run` for a read-only preflight.
+After development and manual checks, the [release pipeline](developer-notes/releasing.md) runs tests, builds, signs, notarizes, and deploys a new version. Update and commit `version.json` and the changelog, push the release commit, then run `./scripts/release.sh --homebrew`. Use `--dry-run` for a read-only preflight.
 
 Local development uses **TypingPet Dev**, with separate app identity, settings, images, and Todo records. The installed production app can remain open.
 
@@ -107,7 +107,7 @@ Local development uses **TypingPet Dev**, with separate app identity, settings, 
 ./scripts/run_dev.sh
 ```
 
-This builds and opens the debug app. Quit Dev and rerun the script after code changes. See [development setup and data separation](docs/DEVELOPMENT.md).
+This builds and opens the debug app. Quit Dev and rerun the script after code changes. See [development setup and data separation](developer-notes/development.md).
 
 Build requirements are an Apple Silicon Mac, macOS 13 or later, and Swift 6 with Xcode Command Line Tools:
 
@@ -117,7 +117,13 @@ swift test
 open "dist/TypingPet Dev.app"
 ```
 
-The build script selects a Developer ID Application, Apple Development, or ad-hoc signing identity from Keychain, in that order. Set `CODE_SIGN_IDENTITY` to choose one explicitly. Public distribution also requires an Apple Developer Program membership, a Developer ID Application certificate, and notarization credentials; see the [Developer ID guide](docs/DEVELOPER_ID.md).
+The build script selects a Developer ID Application, Apple Development, or ad-hoc signing identity from Keychain, in that order. Set `CODE_SIGN_IDENTITY` to choose one explicitly. Public distribution also requires an Apple Developer Program membership, a Developer ID Application certificate, and notarization credentials; see the [Developer ID guide](developer-notes/developer-id.md).
+
+## Developer notes
+
+[Developer Notes](developer-notes/README.md) collect implementation guides and design rationale. Guides describe existing behavior; design reviews cover unimplemented ideas whose availability, timing, and pricing remain undecided.
+
+`docs/` is a local planning and drafting workspace excluded from Git. Material intended for publication is reviewed and edited into developer notes.
 
 ## Privacy
 

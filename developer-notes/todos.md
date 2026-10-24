@@ -160,7 +160,7 @@ The production record file is:
 ```
 
 Development builds use `~/Library/Application Support/TypingPetDev/todo-state.json`.
-See [local development](DEVELOPMENT.md) for the separate app identity and runtime command.
+See [local development](development.md) for the separate app identity and runtime command.
 
 Settings > `할 일` > `기록 데이터 열기` reveals the active file in Finder.
 The file holds schema version 1, feature preferences, Todos, sessions, and extension segments.

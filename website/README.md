@@ -1,7 +1,8 @@
 # Typing Pet landing page
 
 Public Korean, English, Japanese, Simplified Chinese, and Traditional Chinese site at https://typing-pet.miel.ing, served by nginx on the Mac mini.
-React + Base UI (Tabs, Accordion, Button), with a neo-brutalist design, local fonts, and no analytics.
+React + Base UI (Tabs, Accordion, Button), with a neo-brutalist design and local fonts.
+PostHog Cloud (US) receives a small, explicit set of website events through the same-origin nginx proxy at `/relay/`.
 The ten locale/page combinations are pre-rendered to HTML; React hydrates only their interactions.
 
 ```sh
@@ -23,8 +24,8 @@ To publish on this Mac after a public GitHub release:
 ```
 
 Run that command from the repository root. It deploys a new timestamped directory, atomically switches
-the website's `current` link, writes the nginx download redirect, validates nginx, and gracefully reloads it.
-Old directories and redirect backups remain in `~/server/typing-pet-site` for recovery.
+the website's `current` link, writes the nginx site configuration and download redirect, validates nginx, and gracefully reloads it.
+Old directories, site configurations, and redirect backups remain in `~/server/typing-pet-site` for recovery.
 The shared update feed lock prevents switching the download destination during another app deployment.
 The publication command then verifies all ten live pages, Open Graph, assets, the redirect,
 the full downloaded ZIP's SHA-256, and Range requests. Its report is saved under
@@ -60,6 +61,29 @@ Locale metadata is shared in `src/locales.json`. The root follows the first brow
 recognizing Chinese scripts and regions, and remembers an explicit language choice. Language
 switching preserves the current home/changelog page, query, and anchor. `npm run build` checks
 language detection, translated content and release notes, canonical/alternate metadata, and all ten static pages.
+
+Website analytics use a pinned, locally bundled `posthog-js` SDK, loaded separately from the main UI.
+They run only on the production hostname. The public project token is intentionally client-visible;
+personal and project-secret API keys are not needed for collection.
+
+| Event | Properties specific to the event |
+| --- | --- |
+| `$pageview` | locale, page, app_version |
+| `download_clicked` | source (`github` / `direct`), placement (`hero` / `install`) |
+| `homebrew_copied` | command (`install` / `update`), sent only after a successful copy |
+| `language_changed` | to_locale, sent only when choosing a different language |
+
+All events include locale, page, and app_version. Downloads measure clicks, not completed installations.
+Autocapture, pageleave, recording, surveys, feature flags, and remote script loading are disabled.
+The event/property allowlist strips input/DOM data, person updates, URL queries and fragments, and referrer paths.
+The SDK uses a browser-local anonymous identifier in localStorage, without analytics cookies or person profiles.
+Visitors can disable collection in the footer; browser Do Not Track and Global Privacy Control also disable it.
+The Mac app and its update/download hosts do not gain an analytics SDK.
+
+The proxy only accepts event POSTs at `/relay/e[/]` (the browser SDK) or `/relay/i/v0/e[/]` (the capture API), and read-only SDK asset/config requests.
+Cookies and Authorization headers are removed before forwarding, and upstream HTTPS certificates are verified.
+Other POSTs, apart from the newsletter endpoints below, remain rejected. The proxy does not guarantee passage through every ad blocker.
+Build-time analytics policy checks require a Node release with native TypeScript support (the publisher uses Node 26).
 
 ## Newsletter requests
 

@@ -17,3 +17,6 @@ dist-dev/
 *.p8
 *.pem
 __pycache__/
+
+# Local planning and working drafts. Curated public writing lives in developer-notes/.
+/docs/

@@ -51,21 +51,21 @@ shasum -a 256 -c TypingPetMac-v0.17.0-arm64.zip.sha256
 > [!IMPORTANT]
 > 이전 임시 서명(ad-hoc) 버전에서 처음 옮겼는데 반응하지 않는다면, 입력 모니터링 목록에서 기존 `TypingPet`을 `-`로 제거한 뒤 위 순서대로 다시 추가하세요. 이 전환 때는 권한을 한 번 다시 허용해야 할 수 있습니다. 이후 같은 Developer ID 팀으로 서명된 업데이트에서는 권한이 유지됩니다.
 
-**v0.14.1 이하에서 옮길 때는 최신 버전을 한 번 직접 설치해야 합니다.** 이전 업데이트 서명 키를 잃어 새 키로 교체했기 때문에, 이전 빌드는 새 업데이트를 자동으로 설치할 수 없습니다. v0.14.2부터는 앱이 하루에 한 번 새 버전을 확인하고, 사용자가 설치를 승인하면 재시작하거나 종료할 때 적용합니다. [자동 업데이트 문서](docs/UPDATE.md)에 검증 방식이 설명돼 있습니다.
+**v0.14.1 이하에서 옮길 때는 최신 버전을 한 번 직접 설치해야 합니다.** 이전 업데이트 서명 키를 잃어 새 키로 교체했기 때문에, 이전 빌드는 새 업데이트를 자동으로 설치할 수 없습니다. v0.14.2부터는 앱이 하루에 한 번 새 버전을 확인하고, 사용자가 설치를 승인하면 재시작하거나 종료할 때 적용합니다. [자동 업데이트 문서](developer-notes/updates.md)에 검증 방식이 설명돼 있습니다.
 
 ## 사용 예시
 
 `고양이 밥주기`와 `회계사 시험 공부`를 등록한 간략 목록입니다.
 
-<img src="docs/images/todo-compact@2x.png" alt="고양이 밥주기와 회계사 시험 공부가 있는 간략 목록" width="360">
+<img src="developer-notes/images/todo-compact@2x.png" alt="고양이 밥주기와 회계사 시험 공부가 있는 간략 목록" width="360">
 
 공부 타이머를 시작해도 두 할 일을 간략 목록에서 함께 볼 수 있습니다.
 
-<img src="docs/images/todo-active@2x.png" alt="회계사 시험 공부 타이머가 실행 중인 간략 목록" width="360">
+<img src="developer-notes/images/todo-active@2x.png" alt="회계사 시험 공부 타이머가 실행 중인 간략 목록" width="360">
 
 집중 말풍선에서는 남은 시간을 확인하고, 포인터를 올려 일시정지하거나 종료할 수 있습니다.
 
-<img src="docs/images/todo-focus@2x.png" alt="회계사 시험 공부 집중 타이머" width="360">
+<img src="developer-notes/images/todo-focus@2x.png" alt="회계사 시험 공부 집중 타이머" width="360">
 
 스크린샷은 격리된 개발용 앱에 예시 데이터를 넣어 촬영했습니다. 배포 앱과 화면 구성은 같습니다.
 
@@ -91,7 +91,7 @@ shasum -a 256 -c TypingPetMac-v0.17.0-arm64.zip.sha256
 ./scripts/run_dev.sh
 ```
 
-스크립트가 디버그 앱을 빌드하고 실행합니다. 코드를 바꾼 뒤에는 Dev 앱을 종료하고 다시 실행하세요. 자세한 내용은 [개발 환경과 데이터 분리](docs/DEVELOPMENT.md)를 참고하세요.
+스크립트가 디버그 앱을 빌드하고 실행합니다. 코드를 바꾼 뒤에는 Dev 앱을 종료하고 다시 실행하세요. 자세한 내용은 [개발 환경과 데이터 분리](developer-notes/development.md)를 참고하세요.
 
 ## 할 일과 집중 타이머
 
@@ -99,7 +99,7 @@ shasum -a 256 -c TypingPetMac-v0.17.0-arm64.zip.sha256
 
 할 일과 측정된 집중 시간은 이 Mac의 `~/Library/Application Support/TypingPet/todo-state.json`에 저장됩니다. 설정 > `할 일` > `기록 데이터 열기`에서 파일을 볼 수 있습니다. 잠자기나 앱 재시작 동안의 시간은 집중 시간에 더하지 않습니다.
 
-자세한 사용법은 [할 일과 집중 타이머 문서](docs/TODO.md)를 참고하세요.
+자세한 사용법은 [할 일과 집중 타이머 문서](developer-notes/todos.md)를 참고하세요.
 
 ## 설정 창
 
@@ -142,9 +142,9 @@ open "dist/TypingPet Dev.app"
 
 빌드 스크립트는 Keychain에서 `Developer ID Application`, `Apple Development`, 임시 서명 순으로 사용합니다. 특정 인증서를 쓰려면 `CODE_SIGN_IDENTITY` 환경 변수로 지정할 수 있습니다.
 
-공개 배포용 공증에는 Apple Developer Program, `Developer ID Application` 인증서, 키체인에 저장한 공증 자격 증명이 필요합니다. 준비 방법은 [Developer ID 정식 배포 준비](docs/DEVELOPER_ID.md)를 참고하세요.
+공개 배포용 공증에는 Apple Developer Program, `Developer ID Application` 인증서, 키체인에 저장한 공증 자격 증명이 필요합니다. 준비 방법은 [Developer ID 정식 배포 준비](developer-notes/developer-id.md)를 참고하세요.
 
-개발·테스트가 끝나면 [릴리스 자동화](docs/RELEASE.md)로 테스트 → 빌드 → 서명·공증 → 새 버전 배포를 한 명령으로 실행할 수 있습니다. `version.json`과 변경 내용을 갱신·커밋한 뒤 `./scripts/release.sh --homebrew`를 사용합니다.
+개발·테스트가 끝나면 [릴리스 자동화](developer-notes/releasing.md)로 테스트 → 빌드 → 서명·공증 → 새 버전 배포를 한 명령으로 실행할 수 있습니다. `version.json`과 변경 내용을 갱신·커밋한 뒤 `./scripts/release.sh --homebrew`를 사용합니다.
 
 ```shell
 TYPINGPET_BUILD_CHANNEL=production CODE_SIGN_IDENTITY="Developer ID Application: 이름 (TEAMID)" ./scripts/build_app.sh
@@ -152,6 +152,12 @@ TYPINGPET_BUILD_CHANNEL=production CODE_SIGN_IDENTITY="Developer ID Application:
 ```
 
 처음 실행할 때의 권한 설정은 [입력 모니터링 안내](#첫-실행-입력-모니터링)를 참고하세요.
+
+## 개발 노트
+
+구현과 설계 배경은 [Developer Notes](developer-notes/README.md)에 정리합니다. 현재 동작을 설명하는 안내와 검토 중인 설계를 구분하며, 미구현 기능의 출시 여부·일정·가격은 확정되지 않았습니다.
+
+`docs/`는 Git에서 제외하는 로컬 기획·작업 공간입니다. 공개할 내용은 검토·편집한 뒤 개발 노트로 별도 관리합니다.
 
 ## 개인정보 보호
 

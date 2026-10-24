@@ -107,10 +107,10 @@ An unknown or unbundled executable cannot select production mode.
 ## Updates
 
 `./scripts/check_update.sh` checks the full update flow with two Dev builds and a local server.
-See [automatic updates](UPDATE.md).
+See [automatic updates](updates.md).
 
 ## Interface localization
 
-Korean and English strings live separately in `Sources/TypingPet/Localization/ko.lproj/Localizable.strings` and `en.lproj/Localizable.strings`. Call `L` with an English resource key; pass dynamic values as separate arguments using positional `%1$@` tokens. Keep matching keys and placeholders in both files. User-created titles and image set names are never translated.
+The five interface languages live under `Sources/TypingPet/Localization/`: `ko.lproj`, `en.lproj`, `ja.lproj`, `zh-Hans.lproj`, and `zh-Hant.lproj`, each with a `Localizable.strings` file. Call `L` with an English resource key; pass dynamic values as separate arguments using positional `%1$@` tokens. Keep matching keys and placeholders in all five files. User-created titles and image set names are never translated.
 
-Settings > General > Language defaults to System: the first preferred system language selects Korean only for `ko`, otherwise English. Explicit Korean and English choices persist and update the interface without restarting. The build script copies both language folders into the signed app. Settings uses a 490-point default width and scales its minimum width for larger preferred body text. The saved appearance choice applies to Settings and both Todo panels.
+Settings > General > Language defaults to System. The first preferred system language selects Korean for `ko`, Japanese for `ja`, or Simplified/Traditional Chinese for `zh` according to script and region; other languages fall back to English. An explicit choice persists and updates the interface without restarting. [AppLanguageMode](../Sources/TypingPet/Localization.swift) defines this selection. The build script copies all language folders into the signed app. Settings uses a 490-point default width and scales its minimum width for larger preferred body text. The saved appearance choice applies to Settings and both Todo panels.

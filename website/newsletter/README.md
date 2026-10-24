@@ -146,10 +146,9 @@ before using a group for real campaigns.
 
 ## Production integration
 
-Implementation is isolated in branch `feature/newsletter`, based on `5642ed3`. The main checkout's
-uncommitted analytics and app changes are intentionally not copied or overwritten. Merge the small
-`App.tsx` import/render addition and nginx location/CSP changes with that work before publishing;
-do not deploy this branch's older complete site configuration over newer production changes.
+Implementation was developed in the isolated `feature/newsletter` worktree and merged with the
+existing website analytics. The shared `App.tsx`, method allowlist, CSP and nginx proxies preserve
+both features. The main checkout's unrelated, uncommitted app changes are not part of this work.
 
 1. Review/merge the isolated source and run the API tests and website build.
 2. Preview the service install with `uv run --frozen python install.py`. Add `--apply` only when
@@ -157,8 +156,8 @@ do not deploy this branch's older complete site configuration over newer product
    directory, binds only `127.0.0.1:17867`, refuses an occupied port/existing agent, and preserves state.
    It does not replace the website or nginx. Future upgrades require an explicit reviewed stop/switch;
    never run a second service against a different key or delete the existing state directory.
-3. Merge the `/api/newsletter/` proxy from `../nginx/typing-pet-site.conf` into the active vhost.
-   Keep the active analytics CSP/proxy additions. Set `NEWSLETTER_TRUST_PROXY=1` only behind this
+3. Publish the combined vhost from `../nginx/typing-pet-site.conf` with the existing website
+   deployment process; it includes both the newsletter and analytics proxies. Set `NEWSLETTER_TRUST_PROXY=1` only behind this
    loopback proxy, which replaces X-Real-IP with nginx's trusted client address. Configure trusted
    Cloudflare real-IP handling in nginx if it is not already present; otherwise IP limits apply per
    Cloudflare edge address. Do not trust an arbitrary forwarded header from a public client.

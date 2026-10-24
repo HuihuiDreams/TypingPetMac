@@ -12,7 +12,7 @@ GitHub 릴리스와 ZIP·SHA-256 첨부까지 함께 게시하려면 다음을 �
 ./scripts/release.sh --github
 ```
 
-이번 버전부터 Homebrew tap도 함께 갱신하려면 다음 명령을 사용합니다. `--homebrew`는 `--github`를 포함합니다.
+Homebrew tap도 함께 갱신하려면 다음 명령을 사용합니다. `--homebrew`는 `--github`를 포함합니다.
 
 ```sh
 ./scripts/release.sh --homebrew
@@ -54,7 +54,7 @@ GitHub 릴리스와 ZIP·SHA-256 첨부까지 함께 게시하려면 다음을 �
 - GitHub 옵션에는 로그인된 `gh` CLI가 필요합니다. 비밀번호·앱 전용 암호·토큰은 스크립트 인자로 받거나 저장하지 않습니다.
 - Homebrew 옵션은 기존 공개 tap 저장소에 대한 쓰기 권한이 필요합니다. 처음 tap 저장소를 만든 뒤 사용하세요. 기존과 같은 버전의 다른 파일이나 더 낮은 버전으로 cask를 덮어쓰지 않습니다.
 
-처음 인증서를 준비하는 방법은 [Developer ID](DEVELOPER_ID.md)를 참고하세요.
+처음 인증서를 준비하는 방법은 [Developer ID](developer-id.md)를 참고하세요.
 
 ## 실행 단계와 산출물
 
