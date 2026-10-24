@@ -10,10 +10,10 @@ Windows용 [swoonqx/TypingPet](https://github.com/swoonqx/TypingPet)에서 아�
 
 ## 설치
 
-**지원 환경:** Apple Silicon Mac, macOS 13 이상. 현재 공개 버전은 `v0.14.1` 프리릴리스입니다.
+**지원 환경:** Apple Silicon Mac, macOS 13 이상. 현재 공개 버전은 `v0.14.2` 프리릴리스입니다.
 Apple이 발급한 Developer ID 인증서로 서명했고 Apple 공증도 통과했습니다. Gatekeeper 경고를 우회할 필요가 없습니다.
 
-1. [v0.14.1 릴리스](https://github.com/ynifamily3/TypingPetMac/releases/tag/v0.14.1)에서 `TypingPetMac-v0.14.1-arm64.zip`을 내려받습니다. 무결성을 확인하려면 같은 페이지의 `.sha256` 파일도 받습니다.
+1. [v0.14.2 릴리스](https://github.com/ynifamily3/TypingPetMac/releases/tag/v0.14.2)에서 `TypingPetMac-v0.14.2-arm64.zip`을 내려받습니다. 무결성을 확인하려면 같은 페이지의 `.sha256` 파일도 받습니다.
 2. ZIP을 두 번 눌러 압축을 풀고 `TypingPet.app`을 **응용 프로그램(Applications)** 폴더로 옮깁니다. 다운로드 폴더에서 바로 실행하지 마세요.
 3. 응용 프로그램 폴더의 `TypingPet.app`을 실행합니다. 메뉴 막대에 발바닥 아이콘이 나타납니다.
 
@@ -21,7 +21,7 @@ Apple이 발급한 Developer ID 인증서로 서명했고 Apple 공증도 통과
 
 ```sh
 cd ~/Downloads
-shasum -a 256 -c TypingPetMac-v0.14.1-arm64.zip.sha256
+shasum -a 256 -c TypingPetMac-v0.14.2-arm64.zip.sha256
 ```
 
 ### 첫 실행: 입력 모니터링
@@ -35,7 +35,7 @@ shasum -a 256 -c TypingPetMac-v0.14.1-arm64.zip.sha256
 > [!IMPORTANT]
 > 이전 임시 서명(ad-hoc) 버전에서 처음 옮겼는데 반응하지 않는다면, 입력 모니터링 목록에서 기존 `TypingPet`을 `-`로 제거한 뒤 위 순서대로 다시 추가하세요. 이 전환 때는 권한을 한 번 다시 허용해야 할 수 있습니다. 이후 같은 Developer ID 팀으로 서명된 업데이트에서는 권한이 유지됩니다.
 
-현재 **자동 업데이트 피드와 Homebrew 패키지는 아직 게시되지 않았습니다.** 새 버전은 [GitHub Releases](https://github.com/ynifamily3/TypingPetMac/releases)에서 직접 설치하세요. 앱의 업데이트 기능과 검증 방식은 [자동 업데이트 문서](docs/UPDATE.md)에 설명돼 있습니다.
+**v0.14.1 이하에서 옮길 때는 v0.14.2를 한 번 직접 설치해야 합니다.** 이전 업데이트 서명 키를 잃어 새 키로 교체했기 때문에, 이전 빌드는 새 업데이트를 자동으로 설치할 수 없습니다. v0.14.2부터는 앱이 하루에 한 번 새 버전을 확인하고, 사용자가 설치를 승인하면 재시작하거나 종료할 때 적용합니다. [자동 업데이트 문서](docs/UPDATE.md)에 검증 방식이 설명돼 있습니다. Homebrew 패키지는 아직 게시되지 않았습니다.
 
 ## 사용 예시
 

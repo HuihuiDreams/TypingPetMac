@@ -25,6 +25,14 @@ version="$(plist_value CFBundleShortVersionString)"
 build="$(plist_value CFBundleVersion)"
 minimum="$(plist_value LSMinimumSystemVersion)"
 executable="$(plist_value CFBundleExecutable)"
+update_key_dir="${TYPINGPET_UPDATE_KEY_DIR:-$HOME/.config/typingpet/update-keys}"
+public_key_file="$update_key_dir/$channel.pub"
+[[ -f "$public_key_file" ]] || { echo "Missing $public_key_file" >&2; exit 1; }
+[[ "$(plist_value TypingPetUpdatePublicKey)" == "$(<"$public_key_file")" ]] || {
+    echo "The app's update public key does not match $public_key_file." >&2
+    exit 1
+}
+swift "$project_dir/scripts/update_keys.swift" check "$channel" >/dev/null
 
 if [[ "$channel" == production ]] && /usr/libexec/PlistBuddy -c "Print :TypingPetTeamIdentifier" "$info" >/dev/null 2>&1; then
     spctl --assess --type execute "$app_path" || { echo "Notarize the app first: ./scripts/notarize_release.sh" >&2; exit 1; }
@@ -32,15 +40,16 @@ fi
 
 mkdir -p "$output/$channel"
 archive_name="$executable-$version-$build-arm64.zip"
-archive="$output/$channel/$archive_name"
-rm -f "$archive"
+staging="$(mktemp -d "$output/$channel/.publish.XXXXXX")"
+trap 'rm -rf "$staging"' EXIT
+archive="$staging/$archive_name"
 ditto -c -k --sequesterRsrc --keepParent "$app_path" "$archive"
 size="$(stat -f %z "$archive")"
 sha256="$(shasum -a 256 "$archive" | cut -d ' ' -f 1)"
 signature="$(swift "$project_dir/scripts/update_keys.swift" sign "$channel" "$archive")"
 notes="${UPDATE_NOTES:-$(awk -v v="## $version " 'index($0, v) == 1 { found = 1; next } /^## / && found { exit } found && NF' "$project_dir/CHANGELOG.md")}"
 
-python3 - "$output/$channel/latest.json" "$version" "$build" "$minimum" "$base_url/$channel/$archive_name" "$size" "$sha256" "$signature" "$notes" <<'PYJSON'
+python3 - "$staging/latest.json" "$version" "$build" "$minimum" "$base_url/$channel/$archive_name" "$size" "$sha256" "$signature" "$notes" <<'PYJSON'
 import json, sys
 path, version, build, minimum, url, size, sha256, signature, notes = sys.argv[1:]
 manifest = {
@@ -58,4 +67,6 @@ with open(path, "w") as file:
     json.dump(manifest, file, ensure_ascii=False, indent=2)
     file.write("\n")
 PYJSON
+mv -f "$archive" "$output/$channel/$archive_name"
+mv -f "$staging/latest.json" "$output/$channel/latest.json"
 echo "$output/$channel/latest.json"

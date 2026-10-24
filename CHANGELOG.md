@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.14.2 - 2026-10-24
+
+- Publish the production update feed and verify release archives with the app's Ed25519 key, Developer ID signature, and Apple notarization.
+- Replace the lost update signing key. Builds through 0.14.1 cannot update automatically to 0.14.2; install this release manually once. Later releases can use automatic update checks.
+- Add a single-command, guarded update deployment that publishes the archive before atomically replacing the feed.
+
 ## 0.14.1 - 2026-10-24
 
 - Release the existing 0.14.0 features with an Apple-issued Developer ID Application signature and Apple notarization.

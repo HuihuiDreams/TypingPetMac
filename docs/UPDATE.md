@@ -54,19 +54,33 @@ Keys are stored in `~/.config/typingpet/update-keys/` (`TYPINGPET_UPDATE_KEY_DIR
 Back up `production.key`. Released apps trust only its public key; losing it means users must reinstall by hand.
 Never commit a `.key` file.
 
+**Do not generate a replacement production key once a build has shipped.** Recover the original `production.key` and run
+`swift scripts/update_keys.swift check production`. The check refuses a private key that does not match `production.pub`.
+The private key is unrelated to the Apple Developer ID certificate and must not be uploaded or pasted into chat.
+
 ## Release
 
 After Developer ID setup ([Developer ID](DEVELOPER_ID.md)), raise the version and build:
 
 ```sh
-TYPINGPET_BUILD_CHANNEL=production TYPINGPET_VERSION=0.13.0 TYPINGPET_BUILD=19 ./scripts/build_app.sh
+TYPINGPET_BUILD_CHANNEL=production TYPINGPET_VERSION=0.14.2 TYPINGPET_BUILD=22 ./scripts/build_app.sh
 ./scripts/notarize_release.sh
-./scripts/publish_update.sh production dist/TypingPet.app
+./scripts/deploy_update.sh production dist/TypingPet.app
 ```
 
-Upload `dist/update-server/production/` to `https://pet.miel.ing/update/production/`.
-Upload the zip first and `latest.json` last. Serve `latest.json` with a short cache lifetime.
+`deploy_update.sh` requires the original update key, a notarized Developer ID app, and the local static server root
+`~/TypingPetUpdate` (override with `TYPINGPET_UPDATE_ROOT` or the third argument). It creates the signed zip and manifest,
+refuses a downgrade or a different archive for an already published build, copies the zip first, and atomically replaces
+`latest.json` last. It then fetches both public URLs and compares them with the deployed files.
+If public verification fails, inspect the server before retrying; the local feed may already have been updated.
+Published builds are immutable. Increase `CFBundleVersion` for the next update.
+Serve `latest.json` without caching.
 The notes come from the matching `CHANGELOG.md` section, or from `UPDATE_NOTES`.
+
+The production key was rotated for 0.14.2 after the old private key was lost. Builds through 0.14.1 embed the old public key,
+so they cannot install 0.14.2 from the feed. Install 0.14.2 manually once; builds after that can use the new feed normally.
+
+For a staged archive without deploying it, use `./scripts/publish_update.sh production dist/TypingPet.app`.
 
 ## Local check
 
@@ -75,6 +89,8 @@ Quit TypingPet Dev first, then run:
 ```sh
 ./scripts/check_update.sh
 ```
+
+The publication pipeline has a separate non-GUI check: `./scripts/check_publish_update.sh`.
 
 The script creates a development key when none exists, builds Dev 0.12.0 (18) and 0.13.0 (19), and serves the feed at `http://127.0.0.1:8787`.
 It checks that a bad signature, a wrong hash, the same build, and a remote http archive are rejected.

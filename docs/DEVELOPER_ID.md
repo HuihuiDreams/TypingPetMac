@@ -66,20 +66,21 @@ xcrun notarytool store-credentials typingpet-notary --apple-id "Apple 계정 이
 다른 값을 쓰려면 `TYPINGPET_TEAM_ID`를 지정합니다.
 프로덕션 앱은 같은 Team ID로 서명되고 공증된 업데이트만 설치합니다.
 
-업데이트 파일 서명용 프로덕션 키를 한 번 만듭니다.
+첫 프로덕션 빌드를 배포하기 전에만 업데이트 파일 서명용 키를 한 번 만듭니다.
 
 ```sh
 swift scripts/update_keys.swift generate production
 ```
 
 `~/.config/typingpet/update-keys/production.key`는 인증서 `.p12`와 함께 백업하세요. 이 키를 잃으면 이미 배포한 앱이 새 업데이트를 받지 못합니다.
+이미 배포된 빌드가 있다면 새 키를 만들지 말고 **원래 키를 복구**한 뒤 `swift scripts/update_keys.swift check production`으로 공개 키와 일치하는지 확인하세요.
 
 ## 6. 첫 정식 릴리스
 
 ```sh
 TYPINGPET_BUILD_CHANNEL=production ./scripts/build_app.sh
 ./scripts/notarize_release.sh
-./scripts/publish_update.sh production dist/TypingPet.app
+./scripts/deploy_update.sh production dist/TypingPet.app
 ```
 
 자세한 업데이트 게시 절차는 [자동 업데이트](UPDATE.md)를 봅니다.

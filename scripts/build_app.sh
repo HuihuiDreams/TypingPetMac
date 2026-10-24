@@ -5,8 +5,8 @@ project_dir="${0:A:h:h}"
 destination="${1:-$project_dir/dist}"
 configuration="${SWIFT_BUILD_CONFIGURATION:-release}"
 channel="${TYPINGPET_BUILD_CHANNEL:-development}"
-version="${TYPINGPET_VERSION:-0.14.1}"
-build_number="${TYPINGPET_BUILD:-21}"
+version="${TYPINGPET_VERSION:-0.14.2}"
+build_number="${TYPINGPET_BUILD:-22}"
 update_key_dir="${TYPINGPET_UPDATE_KEY_DIR:-$HOME/.config/typingpet/update-keys}"
 case "$channel" in
     development)
@@ -27,7 +27,7 @@ update_public_key=""
 if [[ -f "$update_key_dir/$channel.pub" ]]; then
     update_public_key="$(<"$update_key_dir/$channel.pub")"
 elif [[ "$channel" == production ]]; then
-    echo "Missing $update_key_dir/$channel.pub. Run: swift scripts/update_keys.swift generate production" >&2
+    echo "Missing $update_key_dir/$channel.pub. Restore the original update public key for released builds." >&2
     exit 1
 else
     echo "Warning: no development update key. Run: swift scripts/update_keys.swift generate development"
