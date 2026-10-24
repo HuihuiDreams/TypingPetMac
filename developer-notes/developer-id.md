@@ -77,7 +77,7 @@ swift scripts/update_keys.swift generate production
 
 ## 6. 첫 정식 릴리스
 
-설정이 끝나면 [릴리스 자동화](RELEASE.md)의 `./scripts/release.sh`로 테스트부터 공증·배포까지 실행할 수 있습니다.
+설정이 끝나면 [릴리스 자동화](releasing.md)의 `./scripts/release.sh`로 테스트부터 공증·배포까지 실행할 수 있습니다.
 아래는 각 단계를 따로 실행하는 방법입니다.
 
 ```sh
@@ -86,7 +86,7 @@ TYPINGPET_BUILD_CHANNEL=production ./scripts/build_app.sh
 ./scripts/deploy_update.sh production dist/TypingPet.app
 ```
 
-자세한 업데이트 게시 절차는 [자동 업데이트](UPDATE.md)를 봅니다.
+자세한 업데이트 게시 절차는 [자동 업데이트](updates.md)를 봅니다.
 
 0.12.0 이하에는 업데이터가 없으므로 0.13.0은 사용자가 직접 설치해야 합니다.
 ad-hoc으로 서명한 0.13.0 이후 빌드는 Ed25519 서명만 확인하고 첫 Developer ID 빌드까지 자동으로 업데이트할 수 있습니다.
