@@ -1,25 +1,57 @@
 # Typing Pet for macOS
 
+[한국어](README.md) | [English](README.en.md)
+
 키를 누를 때마다 원하는 펫 이미지 중 하나를 보여 주는 네이티브 macOS 메뉴 막대 앱입니다.
 
-![기본 키보드 고양이](Sources/TypingPet/Resources/pet-idle.png)
+<img src="Sources/TypingPet/Resources/pet-idle.png" alt="기본 키보드 고양이" width="180">
 
 Windows용 [swoonqx/TypingPet](https://github.com/swoonqx/TypingPet)에서 아이디어를 얻어 macOS용으로 새로 구현한 비공식 프로젝트입니다. 원본 프로젝트의 소스 코드와 이미지 자산은 포함하지 않습니다.
 
-## 다운로드
+## 설치
 
-GitHub Releases에서 `TypingPetMac-v0.14.1-arm64.zip`을 내려받아 압축을 풀고 `TypingPet.app`을 Applications 폴더로 옮깁니다.
+**지원 환경:** Apple Silicon Mac, macOS 13 이상. 현재 공개 버전은 `v0.14.1` 프리릴리스입니다.
+Apple이 발급한 Developer ID 인증서로 서명했고 Apple 공증도 통과했습니다. Gatekeeper 경고를 우회할 필요가 없습니다.
 
-**Apple 발급 Developer ID 인증서로 서명하고 Apple 공증까지 완료했습니다!**
-**Now signed with an Apple-issued Developer ID certificate and notarized by Apple!**
-현재 공개 빌드는 Apple Silicon 전용 프리릴리스입니다. 소스에서 직접 빌드할 수도 있습니다.
+1. [v0.14.1 릴리스](https://github.com/ynifamily3/TypingPetMac/releases/tag/v0.14.1)에서 `TypingPetMac-v0.14.1-arm64.zip`을 내려받습니다. 무결성을 확인하려면 같은 페이지의 `.sha256` 파일도 받습니다.
+2. ZIP을 두 번 눌러 압축을 풀고 `TypingPet.app`을 **응용 프로그램(Applications)** 폴더로 옮깁니다. 다운로드 폴더에서 바로 실행하지 마세요.
+3. 응용 프로그램 폴더의 `TypingPet.app`을 실행합니다. 메뉴 막대에 발바닥 아이콘이 나타납니다.
+
+두 파일을 함께 받은 경우 다운로드 폴더에서 다음 명령으로 ZIP을 확인할 수 있습니다.
+
+```sh
+cd ~/Downloads
+shasum -a 256 -c TypingPetMac-v0.14.1-arm64.zip.sha256
+```
+
+### 첫 실행: 입력 모니터링
+
+키 입력에 반응하려면 macOS의 **입력 모니터링** 권한이 필요합니다. 앱의 안내창에서 `시스템 설정 열기`를 누르고 다음 순서로 허용하세요.
+
+1. 시스템 설정 > 개인정보 보호 및 보안 > 입력 모니터링을 엽니다.
+2. 안내창의 `TypingPet.app` 아이콘을 목록으로 드래그합니다. 드래그가 안 되면 `+`를 눌러 응용 프로그램 폴더의 앱을 선택합니다.
+3. `TypingPet` 스위치를 켭니다. 앱이 권한 변경을 감지해 키 입력 감지를 다시 연결합니다. 메뉴 막대의 `키 입력 감지`에서 상태를 확인할 수 있습니다.
 
 > [!IMPORTANT]
-> 기존 임시 서명(ad-hoc) 빌드에서 이번 Developer ID 서명 빌드로 처음 옮길 때는 **입력 모니터링 권한을 한 번 다시 허용해야 할 수 있습니다.**
-> 시스템 설정 > 개인정보 보호 및 보안 > 입력 모니터링에서 기존 `TypingPet` 항목을 `-`로 지우고, 앱의 안내창에 따라 다시 추가해 스위치를 켜세요. 허용하기 전까지는 키 입력에 반응하지 않습니다.
-> 이후 같은 Developer ID 팀으로 서명된 업데이트에서는 권한이 유지됩니다.
+> 이전 임시 서명(ad-hoc) 버전에서 처음 옮겼는데 반응하지 않는다면, 입력 모니터링 목록에서 기존 `TypingPet`을 `-`로 제거한 뒤 위 순서대로 다시 추가하세요. 이 전환 때는 권한을 한 번 다시 허용해야 할 수 있습니다. 이후 같은 Developer ID 팀으로 서명된 업데이트에서는 권한이 유지됩니다.
 
-앱은 하루에 한 번 새 버전을 확인하고, 허락하면 내려받아 다시 시작합니다. 메뉴 막대의 `업데이트 확인…`이나 설정 > `일반` > `업데이트`에서 직접 확인하거나 자동 확인을 끌 수 있습니다. 자세한 동작은 [자동 업데이트](docs/UPDATE.md)를 봅니다.
+현재 **자동 업데이트 피드와 Homebrew 패키지는 아직 게시되지 않았습니다.** 새 버전은 [GitHub Releases](https://github.com/ynifamily3/TypingPetMac/releases)에서 직접 설치하세요. 앱의 업데이트 기능과 검증 방식은 [자동 업데이트 문서](docs/UPDATE.md)에 설명돼 있습니다.
+
+## 사용 예시
+
+`고양이 밥주기`와 `회계사 시험 공부`를 등록한 간략 목록입니다.
+
+<img src="docs/images/todo-compact@2x.png" alt="고양이 밥주기와 회계사 시험 공부가 있는 간략 목록" width="360">
+
+공부 타이머를 시작해도 두 할 일을 간략 목록에서 함께 볼 수 있습니다.
+
+<img src="docs/images/todo-active@2x.png" alt="회계사 시험 공부 타이머가 실행 중인 간략 목록" width="360">
+
+집중 말풍선에서는 남은 시간을 확인하고, 포인터를 올려 일시정지하거나 종료할 수 있습니다.
+
+<img src="docs/images/todo-focus@2x.png" alt="회계사 시험 공부 집중 타이머" width="360">
+
+스크린샷은 격리된 개발용 앱에 예시 데이터를 넣어 촬영했습니다. 배포 앱과 화면 구성은 같습니다.
 
 ## 동작
 
@@ -35,29 +67,23 @@ GitHub Releases에서 `TypingPetMac-v0.14.1-arm64.zip`을 내려받아 압축을
 - 0.75초 동안 입력이 없으면 idle 이미지로 돌아갑니다.
 - 일반 입력 문자는 읽거나 저장하지 않습니다. 키 반응 규칙에는 선택한 물리 키 코드와 보조 키 조합만 로컬에 저장합니다.
 
-## Local development
+## 로컬 개발
 
-Local builds use **TypingPet Dev** with separate app identity, settings, images, and Todo records.
-The installed production app can stay running.
+개발 빌드는 앱 식별자, 설정, 이미지, 할 일 기록이 분리된 **TypingPet Dev**를 사용합니다. 설치된 배포 앱을 종료하지 않아도 됩니다.
 
 ```sh
 ./scripts/run_dev.sh
 ```
 
-This builds and opens the debug app. Quit Dev and run the script again after changes.
-See [development setup and data separation](docs/DEVELOPMENT.md).
+스크립트가 디버그 앱을 빌드하고 실행합니다. 코드를 바꾼 뒤에는 Dev 앱을 종료하고 다시 실행하세요. 자세한 내용은 [개발 환경과 데이터 분리](docs/DEVELOPMENT.md)를 참고하세요.
 
-## Todo and focus timer
+## 할 일과 집중 타이머
 
-Move the pointer near the pet and select `할 일`. Enter a title and press Enter.
-Each Todo has its own countdown or count-up setting. The arrow changes the setting. The main button starts the timer.
-The focus view supports pause, resume, stop, and countdown extension.
+펫 근처로 포인터를 옮겨 `할 일`을 선택합니다. 제목을 입력하고 Enter를 누르면 추가됩니다. 각 할 일에는 별도의 카운트다운 또는 카운트업 설정이 있으며, 화살표로 시간을 바꾸고 주 버튼으로 타이머를 시작할 수 있습니다. 집중 화면에서 일시정지, 재개, 종료, 시간 연장이 가능합니다.
 
-The app saves Todos and measured session time in `~/Library/Application Support/TypingPet/todo-state.json`.
-Settings > `할 일` > `기록 데이터 열기` reveals the file.
-Sleep and app restart keep the active timer paused. Offline time does not count.
+할 일과 측정된 집중 시간은 이 Mac의 `~/Library/Application Support/TypingPet/todo-state.json`에 저장됩니다. 설정 > `할 일` > `기록 데이터 열기`에서 파일을 볼 수 있습니다. 잠자기나 앱 재시작 동안의 시간은 집중 시간에 더하지 않습니다.
 
-See [Todo use, storage, and tests](docs/TODO.md).
+자세한 사용법은 [할 일과 집중 타이머 문서](docs/TODO.md)를 참고하세요.
 
 ## 설정 창
 
@@ -100,24 +126,22 @@ open "dist/TypingPet Dev.app"
 
 빌드 스크립트는 Keychain에서 `Developer ID Application`, `Apple Development`, 임시 서명 순으로 사용합니다. 특정 인증서를 쓰려면 `CODE_SIGN_IDENTITY` 환경 변수로 지정할 수 있습니다.
 
-공개 배포용 공증에는 Apple Developer Program과 `Developer ID Application` 인증서가 필요합니다. 가입과 인증서 준비는 [Developer ID 정식 배포 준비](docs/DEVELOPER_ID.md)를 따릅니다. 인증서를 준비한 뒤 `xcrun notarytool store-credentials typingpet-notary`를 한 번 실행하고 다음 스크립트를 사용합니다.
+공개 배포용 공증에는 Apple Developer Program, `Developer ID Application` 인증서, 키체인에 저장한 공증 자격 증명이 필요합니다. 준비 방법은 [Developer ID 정식 배포 준비](docs/DEVELOPER_ID.md)를 참고하세요.
 
 ```shell
 TYPINGPET_BUILD_CHANNEL=production CODE_SIGN_IDENTITY="Developer ID Application: 이름 (TEAMID)" ./scripts/build_app.sh
 ./scripts/notarize_release.sh
 ```
 
-처음 실행하면 macOS의 입력 모니터링 권한을 허용해야 합니다. `시스템 설정 열기`를 누르면 작은 안내창이 항상 위에 표시되고, 열린 시스템 설정 창 옆을 따라갑니다. 시스템 설정을 실수로 닫았다면 안내창의 `설정 창 열기` 버튼으로 다시 열 수 있습니다. 안내창의 `TypingPet.app` 아이콘을 입력 모니터링 목록으로 드래그하고 스위치를 켜세요. 드래그가 동작하지 않으면 목록 아래의 `+` 버튼으로 앱을 직접 선택할 수 있습니다.
-
-권한을 안정적으로 유지하려면 압축을 푼 앱을 먼저 Applications 폴더로 옮긴 뒤 실행하는 것을 권장합니다. 권한이 허용되면 앱이 자동으로 키 입력 감지를 다시 연결하고 안내창을 닫습니다. 메뉴 막대의 `키 입력 감지` 항목에서 현재 상태를 확인할 수 있습니다.
+처음 실행할 때의 권한 설정은 [입력 모니터링 안내](#첫-실행-입력-모니터링)를 참고하세요.
 
 ## 개인정보 보호
 
 - 일반 입력 문자를 저장하거나 네트워크로 전송하지 않습니다.
 - 특정 키 반응에는 사용자가 등록한 물리 키 코드와 보조 키 조합만 로컬에 저장합니다.
 - 네트워크 통신은 업데이트 확인과 내려받기뿐입니다. `pet.miel.ing`에 요청할 때 사용자 정보, 기기 식별자, 입력 기록은 보내지 않습니다. 자동 확인은 설정에서 끌 수 있습니다.
-- The Todo JSON file stores titles, completion dates, timer preferences, and measured session times on this Mac.
-- Todo records have no server upload, account, or sync.
+- 할 일 JSON 파일에는 제목, 완료 날짜, 타이머 설정, 측정된 집중 시간이 이 Mac에만 저장됩니다.
+- 할 일 기록을 서버에 올리지 않으며 계정이나 동기화 기능도 없습니다.
 
 ## 라이선스
 
