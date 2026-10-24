@@ -60,3 +60,12 @@ Locale metadata is shared in `src/locales.json`. The root follows the first brow
 recognizing Chinese scripts and regions, and remembers an explicit language choice. Language
 switching preserves the current home/changelog page, query, and anchor. `npm run build` checks
 language detection, translated content and release notes, canonical/alternate metadata, and all ten static pages.
+
+## Newsletter requests
+
+The home and changelog pages include a newsletter form in all five languages. Email and explicit
+consent are required; name/nickname is optional. A separate loopback service stores requests in
+private SQLite outside the static website. It provides opt-out and owner-only review/CSV export,
+and does not send emails or modify Fastmail groups. Requests remain pending until manually reviewed.
+See [the newsletter service guide](newsletter/README.md) for tests, data retention, local development,
+production integration, backups and the manual Fastmail group synchronization requirements.
