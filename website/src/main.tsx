@@ -3,6 +3,7 @@ import '@fontsource-variable/space-grotesk';
 import App from './App';
 import './styles.css';
 import { isLocale, resolveLocale } from './localization';
+import { initWebsiteAnalytics } from './analytics';
 
 if (location.pathname === '/') {
   let saved = '';
@@ -13,5 +14,6 @@ if (location.pathname === '/') {
   const pathLocale = location.pathname.split('/')[1];
   const locale = isLocale(pathLocale) ? pathLocale : 'ko';
   const page = location.pathname.includes('/changelog') ? 'changelog' : 'home';
+  void initWebsiteAnalytics().catch(() => {});
   hydrateRoot(document.getElementById('root')!, <App locale={locale} page={page} />);
 }

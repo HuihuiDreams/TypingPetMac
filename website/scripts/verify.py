@@ -114,12 +114,21 @@ def main():
     with urllib.request.urlopen(urllib.request.Request(target, headers={'Range': 'bytes=0-31'}), timeout=20) as response:
         require(response.status == 206 and len(response.read()) == 32, 'Range downloads failed')
         result['range'] = {'status': response.status, 'content_range': response.headers['Content-Range']}
-    for path in ('/missing-page', '/.env', '/release.json'):
+    for path in ('/missing-page', '/.env', '/release.json', '/relay/admin', '/relay/flags'):
         try:
             urllib.request.urlopen(BASE + path, timeout=20)
             raise RuntimeError(f'Unexpected public file: {path}')
         except urllib.error.HTTPError as response:
             require(response.code == 404 and response.headers.get('Cache-Control') == 'no-store', f'Unexpected missing-file response: {path}')
+    result['analytics_boundaries'] = {}
+    for path, method in (('/relay/e/', 'GET'), ('/relay/i/v0/e/', 'GET'), ('/ko/', 'POST'), ('/relay/flags', 'POST')):
+        request = urllib.request.Request(BASE + path, method=method, data=b'{}' if method == 'POST' else None)
+        try:
+            urllib.request.urlopen(request, timeout=20)
+            raise RuntimeError(f'Unexpected method accepted: {method} {path}')
+        except urllib.error.HTTPError as response:
+            require(response.code == 405 and response.headers.get('Cache-Control') == 'no-store', f'Unexpected method policy: {method} {path}')
+            result['analytics_boundaries'][f'{method} {path}'] = response.code
     output = Path.home() / 'server/typing-pet-site/verification/verification.json'
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(result, ensure_ascii=False, indent=2) + '\n')
