@@ -32,6 +32,41 @@ Use the DEV menu > input monitoring settings when you want to enable global key 
 You can test the Todo UI first.
 The installed production app does not need to stop.
 
+### Input Monitoring onboarding
+
+To open the new permission onboarding in a debug build, quit Dev and run:
+
+```sh
+open "dist-dev/TypingPet Dev.app" --args --show-input-guide
+```
+
+The welcome card receives keys only while its preview area has keyboard focus.
+It animates the active pet images without requesting Input Monitoring or reading typed text.
+Tab and Shift-Tab leave the preview so the setup button remains keyboard accessible.
+Only selecting **다른 앱에서도 반응하도록 설정** requests system permission.
+The guide follows System Settings, explains turning on the app's switch first, and expands
+the existing draggable app icon under **목록에 없나요?**.
+
+Permission approval and a connected event tap leave the guide waiting for a real global key event.
+Only that event completes onboarding; the local preview cannot complete it.
+If macOS requires reopening the app, follow its prompt. Connection help offers a retry and
+explains how to quit and reopen. No Input Monitoring permission is granted by the app or its tests.
+If macOS quits the app during setup, production resumes the verification step on relaunch.
+Closing the guide with **나중에** or the close button cancels that automatic resume.
+
+For visual checks without a system permission request, debug builds also accept
+`--input-guide-preview preview`, `permission`, `verifying`, `connectionFailed`, or `complete`:
+
+```sh
+open "dist-dev/TypingPet Dev.app" --args --input-guide-preview permission
+```
+
+These screens use simulated permission/connection states and do not verify real global input.
+
+Production shows the welcome once when monitoring is unavailable. **나중에** keeps the app
+usable, and onboarding can be resumed from the menu's Input Monitoring item or Settings.
+Dev continues to avoid automatic onboarding and system prompts at launch.
+
 The menu bar has a `DEV` label. The settings title and Todo header also identify development mode.
 Quit through `TypingPet Dev 종료`. Run the script again after source changes.
 Native Swift/AppKit code needs a rebuild and restart; this script does not provide hot reload.

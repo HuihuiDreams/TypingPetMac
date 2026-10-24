@@ -5,8 +5,8 @@ project_dir="${0:A:h:h}"
 destination="${1:-$project_dir/dist}"
 configuration="${SWIFT_BUILD_CONFIGURATION:-release}"
 channel="${TYPINGPET_BUILD_CHANNEL:-development}"
-version="${TYPINGPET_VERSION:-0.14.3}"
-build_number="${TYPINGPET_BUILD:-23}"
+version="${TYPINGPET_VERSION:-$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' "$project_dir/version.json")}"
+build_number="${TYPINGPET_BUILD:-$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["build"])' "$project_dir/version.json")}"
 update_key_dir="${TYPINGPET_UPDATE_KEY_DIR:-$HOME/.config/typingpet/update-keys}"
 case "$channel" in
     development)
@@ -38,12 +38,20 @@ macos_dir="$contents_dir/MacOS"
 resources_dir="$contents_dir/Resources"
 
 cd "$project_dir"
-swift build -c "$configuration"
+build_args=(-c "$configuration")
+if [[ "$channel" == production ]]; then
+    # Distribution bundles carry their resources; exclude local source resource lookup.
+    build_args+=(-Xswiftc -D -Xswiftc TYPINGPET_DISTRIBUTION)
+fi
+swift build "${build_args[@]}"
 
-binary_path="$(swift build -c "$configuration" --show-bin-path)/TypingPet"
+binary_path="$(swift build "${build_args[@]}" --show-bin-path)/TypingPet"
 rm -rf "$app_dir"
 mkdir -p "$macos_dir" "$resources_dir"
 cp "$binary_path" "$macos_dir/$executable_name"
+if [[ "$channel" == production && "$configuration" == release ]]; then
+    xcrun strip -S "$macos_dir/$executable_name"
+fi
 cp Sources/TypingPet/Resources/*.png "$resources_dir/"
 cp Sources/TypingPet/Resources/*.icns "$resources_dir/"
 

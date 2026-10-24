@@ -10,9 +10,22 @@ This unofficial macOS app was inspired by [swoonqx/TypingPet](https://github.com
 
 ## Install
 
-**Requirements:** Apple Silicon Mac with macOS 13 or later. The current public build is the `v0.14.3` prerelease. It is signed with an Apple-issued Developer ID certificate and notarized by Apple, so you do not need to bypass Gatekeeper.
+**Requirements:** Apple Silicon Mac with macOS 13 or later. The current public build is the `v0.15.0` prerelease. It is signed with an Apple-issued Developer ID certificate and notarized by Apple, so you do not need to bypass Gatekeeper.
 
-1. Open the [v0.14.3 release](https://github.com/ynifamily3/TypingPetMac/releases/tag/v0.14.3) and download `TypingPetMac-v0.14.3-arm64.zip`. For an optional integrity check, download the `.sha256` file from the same page.
+### Install with Homebrew
+
+```sh
+brew tap ynifamily3/tap
+brew install --cask ynifamily3/tap/typing-pet
+```
+
+Open `TypingPet.app` from Applications after installation. Use `--adopt` only if an existing app is identical to the release being installed; otherwise keep the old app separately before installing.
+
+The app supports automatic updates. To update through Homebrew, quit the app, run `brew update`, then `brew upgrade --cask --greedy ynifamily3/tap/typing-pet`.
+
+### Install the ZIP manually
+
+1. Open the [v0.15.0 release](https://github.com/ynifamily3/TypingPetMac/releases/tag/v0.15.0) and download `TypingPetMac-v0.15.0-arm64.zip`. For an optional integrity check, download the `.sha256` file from the same page.
 2. Double-click the ZIP to extract it. Move `TypingPet.app` to **Applications** before launching; do not run it from Downloads.
 3. Open `TypingPet.app` from Applications. A paw icon appears in the menu bar.
 
@@ -20,21 +33,24 @@ If you downloaded both files into Downloads, verify the ZIP with:
 
 ```sh
 cd ~/Downloads
-shasum -a 256 -c TypingPetMac-v0.14.3-arm64.zip.sha256
+shasum -a 256 -c TypingPetMac-v0.15.0-arm64.zip.sha256
 ```
 
 ### First launch: Input Monitoring
 
-The app needs macOS **Input Monitoring** permission to react to global key events. The app's guide has a `시스템 설정 열기` (Open System Settings) button.
+The app needs macOS **Input Monitoring** permission to react while you use other apps. The welcome window lets you try pet reactions before requesting permission.
 
-1. Open System Settings > Privacy & Security > Input Monitoring.
-2. Drag the guide's `TypingPet.app` icon into the list. If dragging does not work, select `+` and choose the app in Applications.
-3. Turn on the `TypingPet` switch. The app reconnects automatically when permission changes. Check its status from `키 입력 감지` (Key Input Detection) in the paw menu.
+1. Click the preview area and press keys. This local preview needs no permission.
+2. Select `다른 앱에서도 반응하도록 설정` (Set up reactions in other apps), then enable TypingPet in System Settings > Privacy & Security > Input Monitoring.
+3. If it is missing, expand `목록에 없나요?` (Not in the list?) and drag the app icon into the list. Alternatively, use `+` to select the app in Applications.
+4. Return to another app and type. The guide closes after receiving the first real global key event. If macOS asks you to quit and reopen, follow its prompt; verification resumes on relaunch.
+
+Choose `나중에` (Later) to continue using the app and resume setup from the menu bar or Settings.
 
 > [!IMPORTANT]
 > When moving from an older ad-hoc-signed build, you may need to grant Input Monitoring permission once more. If the pet does not react, remove the old `TypingPet` entry with `-`, add the app again, and enable its switch. Future updates signed by the same Developer ID team can retain the permission.
 
-**If you have v0.14.1 or earlier, install the latest release manually once.** The old update signing key was lost and replaced, so those builds cannot accept the new feed. Starting with v0.14.2, the app checks daily and installs an update after you approve it, on restart or quit. The [update documentation](docs/UPDATE.md) explains verification. A Homebrew package is not published yet.
+**If you have v0.14.1 or earlier, install the latest release manually once.** The old update signing key was lost and replaced, so those builds cannot accept the new feed. Starting with v0.14.2, the app checks daily and installs an update after you approve it, on restart or quit. The [update documentation](docs/UPDATE.md) explains verification.
 
 ## In action
 
@@ -59,7 +75,7 @@ These screenshots use sample tasks in the isolated development app. The distribu
 - Drag the pet when position lock is off. A quick release glides a little before settling.
 - Hover to enlarge the pet, or grab it for a pressed-down spring effect. Set resting and hover opacity independently.
 - Optionally let a click-through, position-locked pet move away from the pointer while staying on-screen.
-- Hover controls hide or proportionally resize the pet. Restore a hidden pet from the menu bar.
+- Hover controls hide or proportionally resize the pet. A gear immediately left of the resize handle opens Settings. Restore a hidden pet from the menu bar.
 - Return to the idle image after 0.75 seconds without input.
 - Never store ordinary typed characters. Custom key rules store only the selected physical key code and modifier combination locally.
 
@@ -82,6 +98,8 @@ The Gallery can change the idle image, replace reaction images, import a folder 
 For a folder set, name the idle image `idle.*` or `pet-idle.*`; other supported images become reactions. If there is no idle-named image, the first image in sorted order is used. A one-image folder works for both idle and reaction states. PNG, APNG, JPG, JPEG, GIF, TIFF, HEIC, HEIF, and WebP are supported. Images of different proportions are fitted inside a canvas based on the idle image.
 
 ## Develop and build
+
+After development and manual checks, the [release pipeline](docs/RELEASE.md) runs tests, builds, signs, notarizes, and deploys a new version. Update and commit `version.json` and the changelog, push the release commit, then run `./scripts/release.sh --homebrew`. Use `--dry-run` for a read-only preflight.
 
 Local development uses **TypingPet Dev**, with separate app identity, settings, images, and Todo records. The installed production app can remain open.
 

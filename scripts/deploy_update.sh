@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Publish a signed update to the local static server. The manifest is replaced last.
-#   ./scripts/deploy_update.sh <development|production> <app> [server-root]
+#   ./scripts/deploy_update.sh <development|production> <app> [server-root] [prepared-root]
 project_dir="${0:A:h:h}"
 channel="${1:?Usage: deploy_update.sh <channel> <app> [server-root]}"
 app_path="${2:?Usage: deploy_update.sh <channel> <app> [server-root]}"
@@ -32,10 +32,46 @@ esac
 
 staging="$(mktemp -d "${TMPDIR:-/tmp}/typingpet-deploy.XXXXXX")"
 trap 'rm -rf "$staging"' EXIT
-"$project_dir/scripts/publish_update.sh" "$channel" "$app_path" "$staging" "$base_url" >/dev/null
+if [[ -n "${4:-}" ]]; then
+    # Reuse exactly the signed bytes saved by release.sh, including on a retry.
+    prepared_root="${4:A}"
+    cp -R "$prepared_root/$channel" "$staging/$channel"
+    python3 - "$staging/$channel/latest.json" "$base_url" "$channel" <<'PYPREPARED'
+import json, re, sys
+with open(sys.argv[1]) as file:
+    manifest = json.load(file)
+prefix = sys.argv[2] + "/" + sys.argv[3] + "/"
+url = manifest["url"]
+if not url.startswith(prefix) or not re.fullmatch(r"[A-Za-z0-9.-]+\.zip", url[len(prefix):]):
+    raise SystemExit("Prepared archive URL is outside the expected feed")
+PYPREPARED
+    archive_name="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["url"].rsplit("/",1)[1])' "$staging/$channel/latest.json")"
+    signature="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["signature"])' "$staging/$channel/latest.json")"
+    swift "$project_dir/scripts/update_keys.swift" verify "$channel" "$staging/$channel/$archive_name" "$signature" >/dev/null
+    mkdir "$staging/extracted"
+    ditto -x -k "$staging/$channel/$archive_name" "$staging/extracted"
+    diff -qr "$app_path" "$staging/extracted/${app_path:t}" >/dev/null || {
+        echo "Prepared archive differs from the validated app." >&2
+        exit 1
+    }
+    python3 - "$staging/$channel/latest.json" "$app_path/Contents/Info.plist" "$channel" <<'PYIDENTITY'
+import json, plistlib, sys
+with open(sys.argv[1]) as file:
+    manifest = json.load(file)
+with open(sys.argv[2], "rb") as file:
+    info = plistlib.load(file)
+if (info["TypingPetBuildChannel"] != sys.argv[3]
+        or info["CFBundleShortVersionString"] != manifest["version"]
+        or int(info["CFBundleVersion"]) != manifest["build"]):
+    raise SystemExit("Prepared manifest differs from the app identity")
+PYIDENTITY
+else
+    "$project_dir/scripts/publish_update.sh" "$channel" "$app_path" "$staging" "$base_url" >/dev/null
+fi
 
 python3 - "$staging/$channel" "$server_root/$channel" <<'PYDEPLOY'
 import hashlib
+import fcntl
 import json
 import os
 from pathlib import Path
@@ -65,6 +101,11 @@ if archive.stat().st_size != manifest["size"] or digest != manifest["sha256"]:
     raise SystemExit("Update archive does not match its manifest")
 
 destination.mkdir(parents=True, exist_ok=True)
+lock = (destination / ".deploy.lock").open("a")
+try:
+    fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+except BlockingIOError:
+    raise SystemExit("Another update deployment is running")
 current_path = destination / "latest.json"
 if current_path.exists():
     current = json.loads(current_path.read_text())
@@ -114,7 +155,7 @@ print(f"Deployed build {manifest['build']}: {current_path}")
 PYDEPLOY
 
 if [[ "$channel" == production ]]; then
-    curl --fail --silent --show-error --retry 2 --retry-delay 1 \
+    curl --fail --silent --show-error --retry 2 --retry-delay 1 --connect-timeout 10 --max-time 120 \
         "$base_url/$channel/latest.json" -o "$staging/public-latest.json"
     python3 - "$server_root/$channel/latest.json" "$staging/public-latest.json" <<'PYVERIFY'
 import json
@@ -124,13 +165,12 @@ with open(sys.argv[1]) as file:
     local = json.load(file)
 with open(sys.argv[2]) as file:
     remote = json.load(file)
-for field in ("build", "sha256", "signature", "url"):
-    if local[field] != remote[field]:
-        raise SystemExit(f"Public update feed differs at {field}")
+if local != remote:
+    raise SystemExit("Public update feed differs from the deployed manifest")
 print("Public update feed verified")
 PYVERIFY
     archive_url="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["url"])' "$server_root/$channel/latest.json")"
-    curl --fail --silent --show-error --retry 2 --retry-delay 1 \
+    curl --fail --silent --show-error --retry 2 --retry-delay 1 --connect-timeout 10 --max-time 120 \
         "$archive_url" -o "$staging/public-update.zip"
     archive_name="${archive_url:t}"
     cmp -s "$staging/public-update.zip" "$server_root/$channel/$archive_name" || {

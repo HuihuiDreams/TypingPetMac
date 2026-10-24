@@ -216,23 +216,27 @@ final class PetImageLibrary {
 
     private func resolvedURL(fileName: String, set: PetImageSet) -> URL? {
         if set.isBuiltIn {
-            let name = URL(fileURLWithPath: fileName).deletingPathExtension().lastPathComponent
-            if let bundled = Bundle.main.url(forResource: name, withExtension: "png") { return bundled }
-            let source = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-                .appendingPathComponent("Resources").appendingPathComponent(fileName)
-            return fileManager.fileExists(atPath: source.path) ? source : nil
+            return builtInResourceURL(fileName: fileName)
         }
         let base = set.storageFolder.map { setsDirectory.appendingPathComponent($0, isDirectory: true) } ?? imagesDirectory
         let url = base.appendingPathComponent(fileName)
         if fileManager.fileExists(atPath: url.path) { return url }
         if Self.defaultReactionNames.contains(fileName) || fileName == Self.defaultIdleName {
-            let name = URL(fileURLWithPath: fileName).deletingPathExtension().lastPathComponent
-            if let bundled = Bundle.main.url(forResource: name, withExtension: "png") { return bundled }
-            let source = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-                .appendingPathComponent("Resources").appendingPathComponent(fileName)
-            return fileManager.fileExists(atPath: source.path) ? source : nil
+            return builtInResourceURL(fileName: fileName)
         }
         return nil
+    }
+
+    private func builtInResourceURL(fileName: String) -> URL? {
+        let name = URL(fileURLWithPath: fileName).deletingPathExtension().lastPathComponent
+        if let bundled = Bundle.main.url(forResource: name, withExtension: "png") { return bundled }
+        #if TYPINGPET_DISTRIBUTION
+        return nil
+        #else
+        let source = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .appendingPathComponent("Resources").appendingPathComponent(fileName)
+        return fileManager.fileExists(atPath: source.path) ? source : nil
+        #endif
     }
 
     private func editableActiveSet(named defaultName: String) throws -> PetImageSet {

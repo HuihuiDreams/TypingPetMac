@@ -77,6 +77,9 @@ swift scripts/update_keys.swift generate production
 
 ## 6. 첫 정식 릴리스
 
+설정이 끝나면 [릴리스 자동화](RELEASE.md)의 `./scripts/release.sh`로 테스트부터 공증·배포까지 실행할 수 있습니다.
+아래는 각 단계를 따로 실행하는 방법입니다.
+
 ```sh
 TYPINGPET_BUILD_CHANNEL=production ./scripts/build_app.sh
 ./scripts/notarize_release.sh

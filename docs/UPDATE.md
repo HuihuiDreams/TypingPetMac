@@ -60,7 +60,15 @@ The private key is unrelated to the Apple Developer ID certificate and must not 
 
 ## Release
 
-After Developer ID setup ([Developer ID](DEVELOPER_ID.md)), raise the version and build:
+Use the [single-command release pipeline](RELEASE.md) after Developer ID setup:
+
+```sh
+# Update version.json and CHANGELOG.md, commit (and push for --github), then:
+./scripts/release.sh --dry-run --github
+./scripts/release.sh --github
+```
+
+For the individual steps, raise the version and build:
 
 ```sh
 TYPINGPET_BUILD_CHANNEL=production TYPINGPET_VERSION=0.14.3 TYPINGPET_BUILD=23 ./scripts/build_app.sh

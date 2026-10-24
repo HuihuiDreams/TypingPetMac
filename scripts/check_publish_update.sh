@@ -27,6 +27,19 @@ PYPLIST
 
 "$project_dir/scripts/deploy_update.sh" development "$app" "$test_root/server"
 cp "$test_root/server/development/latest.json" "$test_root/first-manifest.json"
+# Prepared releases must preserve their exact bytes across retries.
+mkdir "$test_root/prepared"
+cp -R "$test_root/server/development" "$test_root/prepared/"
+"$project_dir/scripts/deploy_update.sh" development "$app" "$test_root/server" "$test_root/prepared"
+cmp -s "$test_root/first-manifest.json" "$test_root/server/development/latest.json" || {
+    echo "Prepared retry changed the published manifest" >&2
+    exit 1
+}
+print -n 'tampered' >>"$test_root/prepared/development/TypingPetDev-0.13.0-19-arm64.zip"
+if "$project_dir/scripts/deploy_update.sh" development "$app" "$test_root/server" "$test_root/prepared" >/dev/null 2>&1; then
+    echo "Tampered prepared archive unexpectedly deployed" >&2
+    exit 1
+fi
 retry_output="$("$project_dir/scripts/deploy_update.sh" development "$app" "$test_root/server" 2>&1)" || {
     [[ "$retry_output" == *"Refusing to replace an existing build with different bytes"* ]] || {
         echo "Unexpected retry failure: $retry_output" >&2

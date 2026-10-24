@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.15.0 - 2026-10-24
+
+- Let users try pet key reactions inside the welcome window before requesting Input Monitoring permission.
+- Guide users through enabling the permission switch, with optional drag-and-drop help when the app is missing from the list.
+- Confirm a real global key event before completing setup, and resume verification after a required app relaunch.
+- Add a gear button immediately to the left of the pet's resize handle on hover to open Settings.
+- Publish the signed and notarized Apple Silicon app through the ynifamily3/tap Homebrew cask alongside GitHub and automatic updates.
+- Add guarded release automation for testing, signing, notarization, update-server deployment, and Homebrew publication.
+
 ## 0.14.3 - 2026-10-24
 
 - Add System, Light, and Dark appearance choices for the Settings window, with an immediate preview and a saved preference.

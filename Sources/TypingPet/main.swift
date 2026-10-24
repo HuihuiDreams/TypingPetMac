@@ -117,6 +117,7 @@ private final class PetResizeHandleView: NSView {
 
 private final class PetContentView: NSView {
     var onClose: (() -> Void)?
+    var onOpenSettings: (() -> Void)?
     var onResizeBegan: ((NSPoint) -> Void)?
     var onResizeDragged: ((NSPoint) -> Void)?
     var onResizeEnded: (() -> Void)?
@@ -126,6 +127,7 @@ private final class PetContentView: NSView {
     weak var petImageView: NSView?
 
     private let closeButton: NSButton
+    private let settingsButton: NSButton
     private let resizeHandle: PetResizeHandleView
     private var hoverTrackingArea: NSTrackingArea?
     private var controlsVisible = false
@@ -140,6 +142,7 @@ private final class PetContentView: NSView {
 
     override init(frame frameRect: NSRect) {
         closeButton = NSButton(frame: .zero)
+        settingsButton = NSButton(frame: .zero)
         resizeHandle = PetResizeHandleView(frame: .zero)
         super.init(frame: frameRect)
         wantsLayer = true
@@ -158,11 +161,26 @@ private final class PetContentView: NSView {
         closeButton.action = #selector(closePet)
         closeButton.setAccessibilityLabel("펫 숨기기")
 
+        settingsButton.isBordered = false
+        settingsButton.image = NSImage(
+            systemSymbolName: "gearshape",
+            accessibilityDescription: "설정 열기"
+        )?.withSymbolConfiguration(.init(pointSize: 18, weight: .semibold))
+        settingsButton.imagePosition = .imageOnly
+        settingsButton.contentTintColor = .white
+        settingsButton.wantsLayer = true
+        settingsButton.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.62).cgColor
+        settingsButton.target = self
+        settingsButton.action = #selector(openSettings)
+        settingsButton.toolTip = "설정 열기"
+        settingsButton.setAccessibilityLabel("펫 설정 열기")
+
         resizeHandle.onResizeBegan = { [weak self] in self?.onResizeBegan?($0) }
         resizeHandle.onResizeDragged = { [weak self] in self?.onResizeDragged?($0) }
         resizeHandle.onResizeEnded = { [weak self] in self?.onResizeEnded?() }
 
         addSubview(closeButton)
+        addSubview(settingsButton)
         addSubview(resizeHandle)
         setControlsVisible(false, animated: false)
     }
@@ -202,6 +220,8 @@ private final class PetContentView: NSView {
             width: controlSize,
             height: controlSize
         )
+        settingsButton.frame = resizeHandle.frame.offsetBy(dx: -controlSize - 6, dy: 0)
+        settingsButton.layer?.cornerRadius = controlSize / 2
     }
 
     override func updateTrackingAreas() {
@@ -256,6 +276,7 @@ private final class PetContentView: NSView {
 
     override func hitTest(_ point: NSPoint) -> NSView? {
         if controlsVisible, closeButton.frame.contains(point) { return closeButton }
+        if controlsVisible, settingsButton.frame.contains(point) { return settingsButton }
         if controlsVisible, resizeHandle.frame.contains(point) { return resizeHandle }
         return self
     }
@@ -272,23 +293,30 @@ private final class PetContentView: NSView {
         onClose?()
     }
 
+    @objc private func openSettings() {
+        onOpenSettings?()
+    }
+
     private func setControlsVisible(_ visible: Bool, animated: Bool = true) {
         guard controlsVisible != visible || !animated else { return }
         controlsVisible = visible
 
         if visible {
             closeButton.isHidden = false
+            settingsButton.isHidden = false
             resizeHandle.isHidden = false
             window?.invalidateCursorRects(for: resizeHandle)
         }
 
         let changes = { [weak self] in
             self?.closeButton.alphaValue = visible ? 1 : 0
+            self?.settingsButton.alphaValue = visible ? 1 : 0
             self?.resizeHandle.alphaValue = visible ? 1 : 0
         }
         let completion = { [weak self] in
             guard let self, !self.controlsVisible else { return }
             self.closeButton.isHidden = true
+            self.settingsButton.isHidden = true
             self.resizeHandle.isHidden = true
         }
 
@@ -301,6 +329,7 @@ private final class PetContentView: NSView {
             context.duration = 0.12
             context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
             closeButton.animator().alphaValue = visible ? 1 : 0
+            settingsButton.animator().alphaValue = visible ? 1 : 0
             resizeHandle.animator().alphaValue = visible ? 1 : 0
         } completionHandler: {
             completion()
@@ -383,7 +412,8 @@ private final class PetController: NSObject, NSWindowDelegate {
     init(
         library: PetImageLibrary,
         keyStore: KeyReactionStore,
-        onScaleChanged: @escaping (CGFloat) -> Void = { _ in }
+        onScaleChanged: @escaping (CGFloat) -> Void = { _ in },
+        onOpenSettings: @escaping () -> Void = {}
     ) {
         self.library = library
         self.keyStore = keyStore
@@ -411,6 +441,7 @@ private final class PetController: NSObject, NSWindowDelegate {
         contentView.petImageView = imageView
         contentView.addSubview(imageView, positioned: .below, relativeTo: nil)
         contentView.onClose = { [weak self] in self?.hidePet() }
+        contentView.onOpenSettings = onOpenSettings
         contentView.onResizeBegan = { [weak self] in self?.beginResize(at: $0) }
         contentView.onResizeDragged = { [weak self] in self?.continueResize(at: $0) }
         contentView.onResizeEnded = { [weak self] in self?.endResize() }
@@ -1029,7 +1060,8 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     private var updateItem: NSMenuItem!
     private let updater = UpdateController()
     private var permissionRetryTimer: Timer?
-    private var didShowPermissionAlert = false
+    private static let inputMonitoringWelcomeShownKey = "inputMonitoringWelcomeShown-v1"
+    private static let inputMonitoringSetupPendingKey = "inputMonitoringSetupPending-v1"
     private var settingsWindowController: SettingsWindowController?
     private var settingsModel: TypingPetSettingsModel?
     private var inputMonitoringGuideController: InputMonitoringGuideController?
@@ -1040,7 +1072,8 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         petController = PetController(
             library: imageLibrary,
             keyStore: keyReactionStore,
-            onScaleChanged: { [weak self] scale in self?.settingsModel?.syncScale(scale) }
+            onScaleChanged: { [weak self] scale in self?.settingsModel?.syncScale(scale) },
+            onOpenSettings: { [weak self] in self?.showSettings() }
         )
         todoBubble = TodoBubbleWindowController(store: todoStore, pet: petController.todoAnchorWindow)
         petController.shouldHoldPosition = { [weak self] in self?.todoBubble?.isInteracting == true }
@@ -1053,17 +1086,34 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         keyMonitor = GlobalKeyMonitor { [weak self] stroke in
             DispatchQueue.main.async {
                 self?.petController.handleKeystroke(stroke)
+                self?.inputMonitoringGuideController?.receivedGlobalKeystroke()
             }
         }
 
+        let shouldShowWelcome = !AppEnvironment.isDevelopment
+            && !AppEnvironment.defaults.bool(forKey: Self.inputMonitoringWelcomeShownKey)
+        let shouldResumeSetup = !AppEnvironment.isDevelopment
+            && AppEnvironment.defaults.bool(forKey: Self.inputMonitoringSetupPendingKey)
         #if DEBUG
-        if !ProcessInfo.processInfo.arguments.contains("--todo-preview") {
-            startMonitoringOrRequestPermission(shouldShowAlert: !AppEnvironment.isDevelopment)
+        if !ProcessInfo.processInfo.arguments.contains("--todo-preview"),
+           !ProcessInfo.processInfo.arguments.contains("--input-guide-preview") {
+            startMonitoring(showGuideIfNeeded: shouldShowWelcome)
+            if shouldResumeSetup { showInputMonitoringGuide() }
         }
         if ProcessInfo.processInfo.arguments.contains("--show-todos") { showTodos() }
         if ProcessInfo.processInfo.arguments.contains("--install-update-now") { updater.installNowForChecks() }
+        if ProcessInfo.processInfo.arguments.contains("--show-input-guide") { showInputMonitoringGuide() }
+        if let index = ProcessInfo.processInfo.arguments.firstIndex(of: "--input-guide-preview"),
+           ProcessInfo.processInfo.arguments.indices.contains(index + 1),
+           let phase = InputMonitoringGuideModel.Phase(rawValue: ProcessInfo.processInfo.arguments[index + 1]) {
+            inputMonitoringGuideController = .preview(
+                phase: phase, idleURL: imageLibrary.idleURL, reactionURLs: imageLibrary.reactionURLs
+            )
+            inputMonitoringGuideController?.show()
+        }
         #else
-        startMonitoringOrRequestPermission(shouldShowAlert: !AppEnvironment.isDevelopment)
+        startMonitoring(showGuideIfNeeded: shouldShowWelcome)
+        if shouldResumeSetup { showInputMonitoringGuide() }
         #endif
 
         if ProcessInfo.processInfo.arguments.contains("--show-settings") {
@@ -1235,7 +1285,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     }
 
     @objc private func restartMonitoring() {
-        startMonitoringOrRequestPermission(shouldShowAlert: true)
+        startMonitoring(showGuideIfNeeded: true)
     }
 
     @objc private func previewReaction() {
@@ -1278,13 +1328,30 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     }
 
     @objc private func openInputMonitoringSettings() {
-        InputMonitoringSettings.open()
-        guard !CGPreflightListenEventAccess() else { return }
+        if CGPreflightListenEventAccess(), keyMonitor.isRunning {
+            InputMonitoringSettings.open()
+        } else {
+            showInputMonitoringGuide()
+        }
+    }
 
+    private func showInputMonitoringGuide() {
+        AppEnvironment.defaults.set(true, forKey: Self.inputMonitoringWelcomeShownKey)
         if inputMonitoringGuideController == nil {
-            inputMonitoringGuideController = InputMonitoringGuideController { [weak self] in
-                self?.retryMonitoringIfAuthorized()
+            inputMonitoringGuideController = InputMonitoringGuideController(
+                idleURL: imageLibrary.idleURL,
+                reactionURLs: imageLibrary.reactionURLs,
+                resumeSetup: AppEnvironment.defaults.bool(forKey: Self.inputMonitoringSetupPendingKey),
+                onSetupStarted: {
+                    AppEnvironment.defaults.set(true, forKey: Self.inputMonitoringSetupPendingKey)
+                },
+                onDismiss: {
+                    AppEnvironment.defaults.set(false, forKey: Self.inputMonitoringSetupPendingKey)
+                }
+            ) { [weak self] restart in
+                let connected = self?.connectMonitoring(restart: restart) ?? false
                 self?.settingsModel?.refresh()
+                return connected
             }
         }
         inputMonitoringGuideController?.show()
@@ -1410,27 +1477,25 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         )
     }
 
-    private func startMonitoringOrRequestPermission(shouldShowAlert: Bool) {
-        if CGPreflightListenEventAccess(), keyMonitor.start() {
+    private func startMonitoring(showGuideIfNeeded: Bool) {
+        if connectMonitoring() { return }
+        schedulePermissionRetry()
+        if showGuideIfNeeded { showInputMonitoringGuide() }
+    }
+
+    @discardableResult
+    private func connectMonitoring(restart: Bool = false) -> Bool {
+        guard CGPreflightListenEventAccess() else { return false }
+        if restart { keyMonitor.stop() }
+        let connected = keyMonitor.isRunning || keyMonitor.start()
+        if connected {
             permissionRetryTimer?.invalidate()
             permissionRetryTimer = nil
-            return
+        } else {
+            schedulePermissionRetry()
         }
-
-        schedulePermissionRetry()
-        guard shouldShowAlert, !didShowPermissionAlert else { return }
-        didShowPermissionAlert = true
-        _ = CGRequestListenEventAccess()
-        showAlert(
-            title: "키 입력 감지 권한이 필요합니다",
-            message: "\(AppEnvironment.displayName)은 입력 내용을 읽거나 저장하지 않고, 키가 눌렸다는 사실만 감지합니다. 시스템 설정에서 \(AppEnvironment.displayName)의 입력 모니터링을 허용하면 앱이 자동으로 다시 연결합니다.",
-            primaryButton: "시스템 설정 열기",
-            secondaryButton: "나중에"
-        ) { [weak self] response in
-            if response == .alertFirstButtonReturn {
-                self?.openInputMonitoringSettings()
-            }
-        }
+        updateMonitoringStatusItem()
+        return connected
     }
 
     private func schedulePermissionRetry() {
@@ -1446,13 +1511,10 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
 
     @objc private func retryMonitoringIfAuthorized() {
         #if DEBUG
-        if ProcessInfo.processInfo.arguments.contains("--todo-preview") { return }
+        if ProcessInfo.processInfo.arguments.contains("--todo-preview")
+            || ProcessInfo.processInfo.arguments.contains("--input-guide-preview") { return }
         #endif
-        guard !keyMonitor.isRunning, CGPreflightListenEventAccess() else { return }
-        if keyMonitor.start() {
-            permissionRetryTimer?.invalidate()
-            permissionRetryTimer = nil
-        }
+        connectMonitoring()
     }
 
     private func showAlert(
