@@ -3,6 +3,8 @@
 The existing static site posts to a separate loopback API. Email is required; name/nickname
 is optional. All five website languages are supported. No SMTP connection, confirmation email,
 automatic campaign, Fastmail contact import or group creation happens in this implementation.
+New requests can notify the operator's existing private Telegram chat. This is independent of
+subscriber email delivery, and no additional notice or status is added to the signup screen.
 
 ## Storage choice
 
@@ -72,6 +74,8 @@ list, export or approval endpoints. The CLI never sends mail or changes Fastmail
 
 ```sh
 uv run --frozen python manage.py counts
+uv run --frozen python manage.py notifications
+uv run --frozen python manage.py retry-notification 1 --checked-not-delivered
 uv run --frozen python manage.py approve --verified-manually
 uv run --frozen python manage.py export --locale ko --output /private/path/active-ko.csv
 uv run --frozen python manage.py export --status pending --output /private/path/review-requests.csv
@@ -85,6 +89,49 @@ Nickname is an empty cell when omitted. A leading apostrophe protects formula-li
 spreadsheets. Exports are 0600 and refuse to overwrite existing files. Treat CSV files as private
 contact imports, not untrusted spreadsheet formulas; emails are preserved for correct delivery.
 Remove review/export files when finished, following the same retention policy.
+
+## Operator Telegram notification
+
+For a newly inserted request, the same SQLite transaction queues one notification. An existing
+email's repeated submission, rejected input and honeypot never create another notification.
+An asynchronous worker sends it after commit; Telegram delays/errors do not turn a saved request
+into a failed signup. Unsubscribed or expired requests are excluded before unsent alerts are claimed.
+The payload is plain text (no HTML/Markdown interpretation), with link previews disabled:
+
+```text
+subscriber@example.com (미엘)가 뉴스레터를 신청했습니다.
+subscriber@example.com가 뉴스레터를 신청했습니다.
+```
+
+The nickname and parentheses are omitted when not supplied. The endpoint must return `ok: true`
+with a positive `message_id` and the configured chat ID before the queue is marked sent.
+The message is an application notification, not proof of email ownership or subscription approval.
+
+The production installer enables this worker with the machine's pre-existing configuration:
+
+- `NEWSLETTER_TELEGRAM_ENABLED=1` (local runs remain disabled unless explicitly enabled).
+- `NEWSLETTER_TELEGRAM_CONFIG_FILE` points to `~/dccon/data/telegram.json`. Only its `token_ref`
+  and positive `user_id` owner chat are used. The separate sticker-channel target is never used.
+- `NEWSLETTER_OP_SERVICE_TOKEN_FILE` points to `~/.config/1password/service-account-token`.
+  Both files must be owned by this user and private (0600). `op read` retrieves the referenced
+  bot token into memory via the existing service account. No bot token is copied into the source,
+  LaunchAgent, SQLite, logs, or a new configuration file.
+- The sender verifies the target is the configured **private** chat before sending. A future change
+  to the existing owner config changes this target, so review that reference when reconfiguring it.
+
+Credentials errors, known Telegram rejections and rate limits are retried with backoff. A network
+timeout, malformed send response or interrupted in-flight send can mean Telegram already received
+the message: these are **uncertain**, not automatically resent. Telegram sendMessage does not
+provide a client idempotency key, so exactly-once delivery across network failures cannot be promised.
+Use `manage.py notifications` to inspect safe metadata and receipt IDs. Retry an uncertain job only
+after checking that the message did not arrive, using the explicit CLI flag shown above.
+
+The outbox does not duplicate plaintext email/nickname; it joins the current subscriber record.
+Finished/cancelled job metadata is removed after 30 days. The resulting message in Telegram is a
+separate operator-held copy: SQLite expiry and unsubscribe do not delete Telegram messages.
+Restrict this to the owner's private chat and manage Telegram message retention separately.
+Schema v1 is upgraded additively to v2; existing subscriber data is preserved and historical rows
+are not retroactively notified. Retain a private DB/key backup before deploying the new version.
 
 The generic unsubscribe link for a manually written group message is:
 `https://typing-pet.miel.ing/ko/?newsletter=unsubscribe#newsletter`

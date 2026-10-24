@@ -14,6 +14,10 @@ def main():
     parser.add_argument("--state-dir", default=os.environ.get("NEWSLETTER_STATE_DIR", str(Path.home() / "server/typing-pet-newsletter/state")))
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("counts", help="Show counts only; also run retention cleanup")
+    commands.add_parser("notifications", help="Show notification IDs, receipts and safe delivery status")
+    retry = commands.add_parser("retry-notification", help="Retry only after checking Telegram did not receive this message")
+    retry.add_argument("id", type=int)
+    retry.add_argument("--checked-not-delivered", action="store_true", required=True)
     approve = commands.add_parser("approve", help="Approve a request after independently checking consent/address")
     approve.add_argument("--verified-manually", action="store_true", required=True)
     export = commands.add_parser("export", help="Write a private CSV; active subscribers only by default")
@@ -25,7 +29,12 @@ def main():
     args = parser.parse_args()
     store = Store(args.state_dir)
     try:
-        if args.command == "approve":
+        if args.command == "notifications":
+            print(json.dumps(store.notifications()))
+        elif args.command == "retry-notification":
+            store.retry_notification(args.id)
+            print("Notification queued for reviewed retry.")
+        elif args.command == "approve":
             email = normalize_email(getpass.getpass("Email to approve (hidden): "))
             store.approve(email)
             print("Request approved. No email sent; no Fastmail group changed.")

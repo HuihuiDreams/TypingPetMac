@@ -13,11 +13,13 @@ from starlette.responses import JSONResponse
 from starlette.routing import Route
 
 from store import InvalidInput, RateLimited, Store, normalize_email, signup_fields
+from telegram_notify import TelegramSender, deliver_one
 
 
-def create_app(directory=None, origins=None, trust_proxy=False):
+def create_app(directory=None, origins=None, trust_proxy=False, telegram=None):
     store = Store(directory or os.environ.get("NEWSLETTER_STATE_DIR", str(Path.home() / "server/typing-pet-newsletter/state")))
     allowed = set(origins or os.environ.get("NEWSLETTER_ORIGINS", "https://typing-pet.miel.ing").split(","))
+    wake_notifications = asyncio.Event()
 
     def result(body, status=200, headers=None):
         return JSONResponse(body, status_code=status, headers={
@@ -53,7 +55,9 @@ def create_app(directory=None, origins=None, trust_proxy=False):
                 ip = str(ipaddress.ip_address(request.headers.get("x-real-ip", ip)))
             if request.url.path.endswith("/subscribe"):
                 fields = signup_fields(data)
-                await run_in_threadpool(store.subscribe, *fields, ip)
+                created = await run_in_threadpool(store.subscribe, *fields, ip)
+                if created:
+                    wake_notifications.set()
             else:
                 email = normalize_email(data.get("email"))
                 await run_in_threadpool(store.unsubscribe, email, ip)
@@ -77,13 +81,30 @@ def create_app(directory=None, origins=None, trust_proxy=False):
                     # Health reports database failures; never log private records.
                     pass
                 await asyncio.sleep(3600)
-        task = asyncio.create_task(cleanup())
+        async def notifications():
+            while True:
+                try:
+                    sent = await run_in_threadpool(deliver_one, store, telegram)
+                except Exception:
+                    sent = False
+                if sent:
+                    await asyncio.sleep(1)
+                    continue
+                wake_notifications.clear()
+                with suppress(asyncio.TimeoutError):
+                    await asyncio.wait_for(wake_notifications.wait(), timeout=30)
+
+        tasks = [asyncio.create_task(cleanup())]
+        if telegram is not None:
+            tasks.append(asyncio.create_task(notifications()))
         try:
             yield
         finally:
-            task.cancel()
-            with suppress(asyncio.CancelledError):
-                await task
+            for task in tasks:
+                task.cancel()
+            for task in tasks:
+                with suppress(asyncio.CancelledError):
+                    await task
 
     app = Starlette(lifespan=lifespan, routes=[Route("/api/newsletter/health", health, methods=["GET"]),
                             Route("/api/newsletter/subscribe", intake, methods=["POST"]),
@@ -93,4 +114,5 @@ def create_app(directory=None, origins=None, trust_proxy=False):
 
 
 def app_factory():
-    return create_app(trust_proxy=os.environ.get("NEWSLETTER_TRUST_PROXY") == "1")
+    telegram = TelegramSender() if os.environ.get("NEWSLETTER_TELEGRAM_ENABLED") == "1" else None
+    return create_app(trust_proxy=os.environ.get("NEWSLETTER_TRUST_PROXY") == "1", telegram=telegram)

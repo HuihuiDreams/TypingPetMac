@@ -22,7 +22,8 @@ def main():
     root = Path.home() / "server/typing-pet-newsletter"
     agent = Path.home() / "Library/LaunchAgents" / (LABEL + ".plist")
     print(json.dumps({"apply": args.apply, "listen": "127.0.0.1:17867", "state": str(root / "state"),
-                      "launch_agent": str(agent), "nginx_changes": False, "mail_sending": False}, indent=2))
+                      "launch_agent": str(agent), "nginx_changes": False, "mail_sending": False,
+                      "telegram_notifications": True, "telegram_target": "existing owner private chat"}, indent=2))
     if not args.apply:
         return
     if sys.platform != "darwin":
@@ -41,7 +42,7 @@ def main():
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     release = root / "releases" / stamp
     release.mkdir(parents=True, mode=0o700)
-    for name in ["server.py", "store.py", "manage.py", "pyproject.toml", "uv.lock", ".python-version"]:
+    for name in ["server.py", "store.py", "telegram_notify.py", "manage.py", "pyproject.toml", "uv.lock", ".python-version"]:
         shutil.copyfile(SOURCE / name, release / name)
     subprocess.run([uv, "sync", "--frozen", "--project", str(release)], check=True)
     logs = root / "logs"
@@ -55,6 +56,9 @@ def main():
         "WorkingDirectory": str(release),
         "EnvironmentVariables": {"NEWSLETTER_STATE_DIR": str(root / "state"),
                                  "NEWSLETTER_ORIGINS": "https://typing-pet.miel.ing", "NEWSLETTER_TRUST_PROXY": "1",
+                                 "NEWSLETTER_TELEGRAM_ENABLED": "1",
+                                 "NEWSLETTER_TELEGRAM_CONFIG_FILE": str(Path.home() / "dccon/data/telegram.json"),
+                                 "NEWSLETTER_OP_SERVICE_TOKEN_FILE": str(Path.home() / ".config/1password/service-account-token"),
                                  "PYTHONUNBUFFERED": "1"},
         "RunAtLoad": True, "KeepAlive": True, "ThrottleInterval": 10,
         "StandardOutPath": str(logs / "stdout.log"), "StandardErrorPath": str(logs / "stderr.log"),
