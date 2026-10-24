@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { content, locales, localeMetadata, resolveLocale } from '../.runtime/ssr/entry-server.js';
 
 for (const [input, expected] of [
@@ -31,6 +32,13 @@ for (const locale of locales) {
     assert.ok(html.includes(notes.find(note => note.version === release.version)[locale].title));
     if (!suffix) assert.ok(html.includes(content[locale].hero1));
     assert.ok(!html.includes('undefined'));
+    const themeScript = html.match(/<script src="(\/assets\/theme-([a-f0-9]{12})\.js)"><\/script>/);
+    assert.ok(themeScript, `${locale}/${suffix} blocking theme bootstrap`);
+    assert.ok(themeScript.index < html.indexOf('rel="stylesheet"'), 'apply saved appearance before CSS and page content');
+    const themeBytes = await readFile(`dist${themeScript[1]}`);
+    assert.equal(createHash('sha256').update(themeBytes).digest('hex').slice(0, 12), themeScript[2]);
+    assert.ok(html.includes('class="theme-picker"'));
+    assert.equal((html.match(/type="radio"/g) || []).length, 3, 'three appearance choices');
   }
 }
 const sitemap = await readFile('dist/sitemap.xml', 'utf8');

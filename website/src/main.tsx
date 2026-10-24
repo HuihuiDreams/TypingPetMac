@@ -2,6 +2,7 @@ import { hydrateRoot } from 'react-dom/client';
 import '@fontsource-variable/space-grotesk';
 import App from './App';
 import './styles.css';
+import './theme.css';
 import { isLocale, resolveLocale } from './localization';
 import { initWebsiteAnalytics } from './analytics';
 

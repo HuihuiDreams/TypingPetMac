@@ -62,6 +62,14 @@ recognizing Chinese scripts and regions, and remembers an explicit language choi
 switching preserves the current home/changelog page, query, and anchor. `npm run build` checks
 language detection, translated content and release notes, canonical/alternate metadata, and all ten static pages.
 
+The header appearance menu offers System (default), Light, and Dark in all five languages.
+The preference stays in this browser's `typingpet-theme` localStorage entry across page/language
+changes and synchronizes between tabs. System follows OS appearance changes. A blocking,
+content-hashed head script applies the palette before paint; the mounted controller handles later
+changes. If storage is unavailable, manual choices still work until the page is reloaded.
+`npm test` covers preference resolution, OS/storage changes, and blocked storage; the build also
+checks the pre-paint script and its fingerprint on every rendered page.
+
 Website analytics use a pinned, locally bundled `posthog-js` SDK, loaded separately from the main UI.
 They run only on the production hostname. The public project token is intentionally client-visible;
 personal and project-secret API keys are not needed for collection.

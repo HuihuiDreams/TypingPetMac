@@ -1,6 +1,11 @@
-import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, rename } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { render, content, locales, localeMetadata } from '../.runtime/ssr/entry-server.js';
-const template = await readFile('dist/index.html', 'utf8');
+const bootstrap = await readFile('dist/theme.js');
+const themeAsset = `/assets/theme-${createHash('sha256').update(bootstrap).digest('hex').slice(0, 12)}.js`;
+await mkdir('dist/assets', { recursive: true });
+await rename('dist/theme.js', `dist${themeAsset}`);
+const template = (await readFile('dist/index.html', 'utf8')).replace('src="/theme.js"', `src="${themeAsset}"`);
 const origin = 'https://typing-pet.miel.ing';
 const escape = s => s.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;');
 const paths = [];

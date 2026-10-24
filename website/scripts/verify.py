@@ -2,6 +2,7 @@
 """Verify the live landing pages, social metadata and the real download path."""
 import hashlib
 import json
+import re
 from pathlib import Path
 import struct
 from html.parser import HTMLParser
@@ -83,6 +84,10 @@ def main():
             require(page.meta.get('og:image:width') == '1200' and page.meta.get('og:image:height') == '630', f'Wrong declared image size: {path}')
             email_present = 'support@miel.ing' in html or 'support@miel.ing' in page.emails
             require(metadata['version'] in html and email_present and 'Jongkeun Choi' in html, f'Missing release or contact details: {path}')
+            theme_script = re.search(r'<script src="(/assets/theme-([a-f0-9]{12})\.js)"></script>', html)
+            require(theme_script is not None and 'class="theme-picker"' in html
+                    and html.count('type="radio"') == 3, f'Missing appearance controls: {path}')
+            require(theme_script.start() < html.index('rel="stylesheet"'), f'Late theme bootstrap: {path}')
             result['pages'][path] = {'status': status, 'cache_control': cache,
                                      'og_locale': page.meta['og:locale'], 'og_title': page.meta['og:title']}
             for asset in page.assets:
@@ -91,6 +96,11 @@ def main():
                 with urllib.request.urlopen(urllib.request.Request(BASE + asset, method='HEAD'), timeout=20) as response:
                     require(response.status == 200 and 'immutable' in response.headers.get('Cache-Control', ''), f'Asset or cache failed: {asset}')
                     result['assets'][asset] = {'status': response.status, 'cache_control': response.headers['Cache-Control']}
+                if asset == theme_script[1]:
+                    with urllib.request.urlopen(BASE + asset, timeout=20) as response:
+                        digest = hashlib.sha256(response.read()).hexdigest()
+                    require(digest[:12] == theme_script[2], 'Theme bootstrap fingerprint mismatch')
+                    result['assets'][asset]['sha256'] = digest
     with urllib.request.urlopen(BASE + '/assets/social-preview.png', timeout=20) as response:
         image = response.read()
         require(image[:8] == b'\x89PNG\r\n\x1a\n', 'OG image is not a PNG')
