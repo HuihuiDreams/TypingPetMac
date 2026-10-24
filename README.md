@@ -8,14 +8,16 @@ Windows용 [swoonqx/TypingPet](https://github.com/swoonqx/TypingPet)에서 아�
 
 ## 다운로드
 
-GitHub Releases에서 `TypingPet-macOS-arm64.zip`을 내려받아 압축을 풀고 `TypingPet.app`을 Applications 폴더로 옮깁니다.
+GitHub Releases에서 `TypingPetMac-v0.14.1-arm64.zip`을 내려받아 압축을 풀고 `TypingPet.app`을 Applications 폴더로 옮깁니다.
 
-현재 공개 빌드는 Apple Silicon 전용 프리릴리스입니다. Apple Developer ID 공증 전까지는 Gatekeeper가 개발자 확인 경고를 표시할 수 있습니다. 소스에서 직접 빌드할 수도 있습니다.
+**Apple 발급 Developer ID 인증서로 서명하고 Apple 공증까지 완료했습니다!**
+**Now signed with an Apple-issued Developer ID certificate and notarized by Apple!**
+현재 공개 빌드는 Apple Silicon 전용 프리릴리스입니다. 소스에서 직접 빌드할 수도 있습니다.
 
 > [!IMPORTANT]
-> 아직 Apple Developer ID로 서명하지 않은 임시 서명(ad-hoc) 빌드입니다. macOS는 빌드마다 다른 앱으로 인식하므로, **새 버전을 내려받거나 자동 업데이트한 뒤에는 입력 모니터링 권한을 다시 허용해야 합니다.**
+> 기존 임시 서명(ad-hoc) 빌드에서 이번 Developer ID 서명 빌드로 처음 옮길 때는 **입력 모니터링 권한을 한 번 다시 허용해야 할 수 있습니다.**
 > 시스템 설정 > 개인정보 보호 및 보안 > 입력 모니터링에서 기존 `TypingPet` 항목을 `-`로 지우고, 앱의 안내창에 따라 다시 추가해 스위치를 켜세요. 허용하기 전까지는 키 입력에 반응하지 않습니다.
-> Developer ID 서명 빌드부터는 업데이트 뒤에도 권한이 유지됩니다.
+> 이후 같은 Developer ID 팀으로 서명된 업데이트에서는 권한이 유지됩니다.
 
 앱은 하루에 한 번 새 버전을 확인하고, 허락하면 내려받아 다시 시작합니다. 메뉴 막대의 `업데이트 확인…`이나 설정 > `일반` > `업데이트`에서 직접 확인하거나 자동 확인을 끌 수 있습니다. 자세한 동작은 [자동 업데이트](docs/UPDATE.md)를 봅니다.
 

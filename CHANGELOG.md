@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.14.1 - 2026-10-24
+
+- Release the existing 0.14.0 features with an Apple-issued Developer ID Application signature and Apple notarization.
+- Keep the production update public key from 0.14.0 so existing installations continue to trust future updates signed with the original private key.
+- Existing ad-hoc installations may need Input Monitoring permission granted again when switching to this Developer ID-signed build.
+
 ## 0.14.0 - 2026-10-23
 
 - Add a compact view for a Todo bubble that stays open: up to three open Todos, one line each with checkboxes, and `+N개 더` to open the full view.
