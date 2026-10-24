@@ -1,5 +1,6 @@
-import { useEffect, useId, useRef, useState } from 'react';
-import { Monitor, Moon, Sun } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Menu } from '@base-ui/react/menu';
+import { Check, Monitor, Moon, Sun } from 'lucide-react';
 import type { Locale } from './localization';
 import { mountTheme, type ThemeMode } from './theme';
 
@@ -18,47 +19,33 @@ export default function ThemePicker({ locale }: { locale: Locale }) {
   // The server and first client render agree; the head script already applied the palette.
   const [mode, setMode] = useState<ThemeMode>('system');
   const controller = useRef<ReturnType<typeof mountTheme> | null>(null);
-  const menu = useRef<HTMLDetailsElement>(null);
-  const id = useId();
   const CurrentIcon = icons[mode];
   useEffect(() => {
     const theme = mountTheme(setMode);
     controller.current = theme;
-    function outside(event: PointerEvent) {
-      if (event.target instanceof Node && !menu.current?.contains(event.target) && menu.current) menu.current.open = false;
-    }
-    document.addEventListener('pointerdown', outside);
     return () => {
       theme.destroy(); controller.current = null;
-      document.removeEventListener('pointerdown', outside);
     };
   }, []);
-  function close() {
-    if (menu.current) {
-      menu.current.open = false;
-      menu.current.querySelector('summary')?.focus();
-    }
-  }
-  return <details ref={menu} className="theme-picker" onKeyDown={event => {
-    if (event.key === 'Escape') { event.preventDefault(); close(); }
-  }} onToggle={event => {
-    if (event.currentTarget.open) document.querySelector('.language-menu')?.removeAttribute('open');
-  }}>
-    <summary className="theme-toggle" aria-label={`${t.label}: ${t[mode]}`} title={`${t.label}: ${t[mode]}`}>
+  return <Menu.Root>
+    <Menu.Trigger className="theme-toggle" aria-label={`${t.label}: ${t[mode]}`} title={`${t.label}: ${t[mode]}`}>
       <CurrentIcon size={18} aria-hidden="true" />
-    </summary>
-    <fieldset className="theme-options" aria-label={t.label}>
-      <legend>{t.label}</legend>
-      {modes.map(value => {
-        const Icon = icons[value];
-        return <label key={value}>
-          <Icon size={17} aria-hidden="true" />
-          <span>{t[value]}</span>
-          <input type="radio" name={`${id}-theme`} value={value} checked={mode === value} onChange={() => {
-            controller.current?.choose(value); close();
-          }} />
-        </label>;
-      })}
-    </fieldset>
-  </details>;
+    </Menu.Trigger>
+    <Menu.Portal>
+      <Menu.Positioner className="ui-positioner" sideOffset={10} align="end" collisionPadding={12}>
+        <Menu.Popup className="ui-popup theme-options" aria-label={t.label}>
+          <Menu.RadioGroup value={mode} onValueChange={(value: ThemeMode) => controller.current?.choose(value)}>
+            <Menu.GroupLabel className="ui-group-label">{t.label}</Menu.GroupLabel>
+            {modes.map(value => {
+              const Icon = icons[value];
+              return <Menu.RadioItem className="ui-item" key={value} value={value} label={t[value]} closeOnClick>
+                <Icon size={17} aria-hidden="true" /><span>{t[value]}</span>
+                <Menu.RadioItemIndicator className="ui-indicator"><Check size={16} aria-hidden="true" /></Menu.RadioItemIndicator>
+              </Menu.RadioItem>;
+            })}
+          </Menu.RadioGroup>
+        </Menu.Popup>
+      </Menu.Positioner>
+    </Menu.Portal>
+  </Menu.Root>;
 }

@@ -3,6 +3,7 @@ set -euo pipefail
 
 # Package an already released, notarized app without rebuilding or re-signing it.
 # Usage: build_dmg.sh <TypingPet.app> <output.dmg>
+project_dir="${0:A:h:h}"
 app_path="${1:?Usage: build_dmg.sh <TypingPet.app> <output.dmg>}"
 app_path="${app_path:A}"
 output="${2:?Usage: build_dmg.sh <TypingPet.app> <output.dmg>}"
@@ -25,10 +26,13 @@ cleanup() {
     rm -rf "$work_dir"
 }
 trap cleanup EXIT
-mkdir -p "$work_dir/image" "${output:h}"
-ditto "$app_path" "$work_dir/image/TypingPet.app"
-ln -s /Applications "$work_dir/image/Applications"
-hdiutil create -volname "Typing Pet $version" -srcfolder "$work_dir/image" -format UDZO "$output"
+mkdir -p "${output:h}"
+# A 144 dpi TIFF displays at 760 × 440 points while retaining Retina detail.
+sips -z 880 1520 -s format tiff -s dpiWidth 144 -s dpiHeight 144 \
+    "$project_dir/packaging/dmg/background.png" --out "$work_dir/background.tiff" >/dev/null
+uv run --python 3.12 --with 'dmgbuild==1.6.7' dmgbuild \
+    -s "$project_dir/packaging/dmg/settings.py" -D "app=$app_path" -D "background=$work_dir/background.tiff" \
+    "Typing Pet $version" "$output"
 codesign --sign "$identity" --timestamp "$output"
 xcrun notarytool submit "$output" --keychain-profile "${NOTARY_KEYCHAIN_PROFILE:-typingpet-notary}" \
     --wait --timeout "${NOTARY_TIMEOUT:-30m}" --output-format json > "$output.notary-result.json"

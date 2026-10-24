@@ -8,7 +8,9 @@ import struct
 from html.parser import HTMLParser
 import urllib.error
 import urllib.request
+from urllib.parse import urlsplit
 from datetime import datetime, timezone
+from downloads import IMMUTABLE_CACHE, download_targets, latest_url
 
 BASE = 'https://typing-pet.miel.ing'
 
@@ -82,17 +84,21 @@ def main():
             require(note_titles[metadata['version']][language]['title'] in visible, f'Missing translated release notes: {path}')
             if not suffix:
                 require(headings[language] in visible, f'Missing translated homepage: {path}')
-                require(metadata['githubUrl'] in page.links, f'Missing ZIP download: {path}')
+                require(latest_url('github', 'zip') in page.links, f'Missing ZIP download: {path}')
                 if dmg := metadata.get('dmg'):
-                    require(dmg['githubUrl'] in page.links, f'Missing DMG download: {path}')
+                    require(latest_url('github', 'dmg') in page.links, f'Missing DMG download: {path}')
+                require(latest_url('direct', 'dmg' if metadata.get('dmg') else 'zip') in page.links,
+                        f'Missing direct download: {path}')
             require(page.meta.get('twitter:card') == 'summary_large_image', f'Missing X card: {path}')
             require(page.meta.get('og:image') == BASE + '/assets/social-preview.png', f'Missing OG image: {path}')
             require(page.meta.get('og:image:width') == '1200' and page.meta.get('og:image:height') == '630', f'Wrong declared image size: {path}')
             email_present = 'support@miel.ing' in html or 'support@miel.ing' in page.emails
             require(metadata['version'] in html and email_present and 'Jongkeun Choi' in html, f'Missing release or contact details: {path}')
             theme_script = re.search(r'<script src="(/assets/theme-([a-f0-9]{12})\.js)"></script>', html)
-            require(theme_script is not None and 'class="theme-picker"' in html
-                    and html.count('type="radio"') == 3, f'Missing appearance controls: {path}')
+            require(theme_script is not None and 'class="theme-toggle"' in html
+                    and html.count('aria-haspopup="menu"') == 2, f'Missing header menus: {path}')
+            require('role="combobox"' in html and html.count('role="checkbox"') == 2
+                    and 'role="switch"' in html, f'Missing accessible form controls: {path}')
             require(theme_script.start() < html.index('rel="stylesheet"'), f'Late theme bootstrap: {path}')
             result['pages'][path] = {'status': status, 'cache_control': cache,
                                      'og_locale': page.meta['og:locale'], 'og_title': page.meta['og:title']}
@@ -113,36 +119,93 @@ def main():
         dimensions = struct.unpack('>II', image[16:24])
         require(dimensions == (1200, 630), 'OG image is not 1200 by 630')
         result['opengraph_image'] = {'status': response.status, 'dimensions': dimensions, 'type': response.headers['Content-Type']}
-    try:
-        urllib.request.build_opener(NoRedirect).open('https://pet.miel.ing/download/latest', timeout=20)
-        raise RuntimeError('Expected a download redirect')
-    except urllib.error.HTTPError as response:
-        require(response.code == 302 and response.headers.get('Cache-Control') == 'no-store', 'Wrong redirect cache policy')
-        require(response.headers.get('Cloudflare-CDN-Cache-Control') == 'no-store', 'Missing CDN bypass')
-        target = response.headers['Location']
-        require(target == metadata['url'], 'Latest points to another build')
-        result['latest'] = {'status': response.code, 'cache_control': response.headers['Cache-Control'], 'location': target}
-    with urllib.request.urlopen('https://pet.miel.ing/download/latest', timeout=40) as response:
-        digest = hashlib.sha256(response.read()).hexdigest()
-        require(digest == metadata['sha256'], 'Downloaded ZIP differs from the GitHub-verified build')
-        require(response.headers.get('Cache-Control') == 'public, max-age=31536000, immutable', 'Wrong ZIP cache policy')
-        result['download'] = {'status': response.status, 'sha256': digest, 'cache_control': response.headers['Cache-Control']}
-    with urllib.request.urlopen(urllib.request.Request(target, headers={'Range': 'bytes=0-31'}), timeout=20) as response:
-        require(response.status == 206 and len(response.read()) == 32, 'Range downloads failed')
-        result['range'] = {'status': response.status, 'content_range': response.headers['Content-Range']}
-    if dmg := metadata.get('dmg'):
-        result['dmg'] = {}
-        for source, url in (('direct', dmg['url']), ('github', dmg['githubUrl'])):
-            with urllib.request.urlopen(url, timeout=40) as response:
+    targets = download_targets(metadata)
+    no_redirect = urllib.request.build_opener(NoRedirect)
+    no_redirect.addheaders = opener.addheaders
+
+    def redirect(url, target, method='GET'):
+        try:
+            no_redirect.open(urllib.request.Request(url, method=method), timeout=20)
+            raise RuntimeError(f'Expected a download redirect: {url}')
+        except urllib.error.HTTPError as response:
+            with response:
+                require(response.code == 302 and response.headers.get('Location') == target,
+                        f'Wrong redirect destination: {url}')
+                for header in ('Cache-Control', 'CDN-Cache-Control', 'Cloudflare-CDN-Cache-Control'):
+                    require(response.headers.get(header) == 'no-store', f'Wrong redirect {header}: {url}')
+                return {'status': response.code, 'cache_control': response.headers['Cache-Control'], 'location': target}
+
+    result['downloads'] = {}
+    for kind in ('zip', 'dmg'):
+        asset = metadata if kind == 'zip' else metadata.get('dmg')
+        if not asset:
+            continue
+        for source in ('github', 'direct'):
+            url = latest_url(source, kind)
+            target = targets[f'{source}:{kind}']
+            check = redirect(url, target)
+            redirect(url, target, 'HEAD')
+            with urllib.request.urlopen(url, timeout=60) as response:
                 data = response.read()
                 digest = hashlib.sha256(data).hexdigest()
-                require(len(data) == dmg['size'] and digest == dmg['sha256'], f'Downloaded DMG differs: {source}')
-                result['dmg'][source] = {'status': response.status, 'size': len(data), 'sha256': digest}
-        with urllib.request.urlopen(dmg['checksumUrl'], timeout=20) as response:
-            require(response.read().decode().strip() == f"{dmg['sha256']}  {dmg['url'].rsplit('/', 1)[1]}", 'DMG checksum differs')
-        with urllib.request.urlopen(urllib.request.Request(dmg['url'], headers={'Range': 'bytes=0-31'}), timeout=20) as response:
-            require(response.status == 206 and len(response.read()) == 32, 'DMG Range downloads failed')
-            result['dmg']['range'] = {'status': response.status, 'content_range': response.headers['Content-Range']}
+                require(response.status == 200 and len(data) == asset['size'] and digest == asset['sha256'],
+                        f'Download differs from the GitHub-verified build: {url}')
+                if source == 'direct':
+                    require(response.geturl() == target, f'Direct download left the fixed asset: {url}')
+                    for header in ('Cache-Control', 'CDN-Cache-Control', 'Cloudflare-CDN-Cache-Control'):
+                        require(response.headers.get(header) == IMMUTABLE_CACHE, f'Wrong fixed asset {header}: {url}')
+                    expected_type = 'application/zip' if kind == 'zip' else 'application/x-apple-diskimage'
+                    require(response.headers.get_content_type() == expected_type, f'Wrong asset MIME type: {url}')
+                    etag = response.headers['ETag']
+                else:
+                    require(urlsplit(response.geturl()).hostname in ('github.com', 'release-assets.githubusercontent.com', 'objects.githubusercontent.com'),
+                            f'GitHub download ended outside GitHub: {url}')
+                check.update({'download_status': response.status, 'size': len(data), 'sha256': digest,
+                              'final_host': urlsplit(response.geturl()).hostname,
+                              'asset_cache_control': response.headers.get('Cache-Control')})
+            result['downloads'][url] = check
+        direct = targets[f'direct:{kind}']
+        with urllib.request.urlopen(urllib.request.Request(direct, headers={'Range': 'bytes=0-31'}), timeout=20) as response:
+            require(response.status == 206 and len(response.read()) == 32, f'{kind} Range download failed')
+            require(response.headers.get('Cache-Control') == IMMUTABLE_CACHE, f'{kind} Range cache failed')
+            result['downloads'][latest_url('direct', kind)]['range_status'] = response.status
+        try:
+            urllib.request.urlopen(urllib.request.Request(direct, headers={'If-None-Match': etag}), timeout=20)
+            raise RuntimeError(f'Expected conditional response: {kind}')
+        except urllib.error.HTTPError as response:
+            with response:
+                require(response.code == 304 and response.headers.get('Cache-Control') == IMMUTABLE_CACHE,
+                        f'{kind} conditional cache failed')
+                result['downloads'][latest_url('direct', kind)]['conditional_status'] = response.code
+        with urllib.request.urlopen(asset['checksumUrl'], timeout=20) as response:
+            checksum = response.read().decode().split()[0]
+            require(checksum == asset['sha256'], f'{kind} checksum differs')
+
+    result['download_defaults'] = {}
+    for path, target in (('/latest', targets['github:auto']),
+                         ('/latest?from=direct', targets['direct:auto']),
+                         ('/latest?type=zip', targets['github:zip']),
+                         ('/download/latest', metadata['url'])):
+        result['download_defaults'][path] = redirect('https://pet.miel.ing' + path, target)
+    result['download_boundaries'] = {}
+    for path, method, expected in (
+        ('/latest?from=invalid&type=dmg', 'GET', 400),
+        ('/latest?from=github&type=exe', 'GET', 400),
+        ('/latest?from=github&from=direct&type=zip', 'GET', 400),
+        ('/latest?from=github&type=zip&extra=1', 'GET', 400),
+        ('/latest?from=github&type=dmg', 'POST', 405),
+        ('/update/production/TypingPet-0.0.0-0-arm64.zip', 'HEAD', 404),
+        ('/update/production/TypingPetMac-v0.0.0-arm64-installer.dmg', 'HEAD', 404),
+    ):
+        try:
+            no_redirect.open(urllib.request.Request('https://pet.miel.ing' + path, method=method), timeout=20)
+            raise RuntimeError(f'Unexpected download request accepted: {method} {path}')
+        except urllib.error.HTTPError as response:
+            with response:
+                require(response.code == expected, f'Wrong download boundary: {method} {path}')
+                for header in ('Cache-Control', 'CDN-Cache-Control', 'Cloudflare-CDN-Cache-Control'):
+                    require(response.headers.get(header) == 'no-store', f'Cached download error: {path}')
+                result['download_boundaries'][f'{method} {path}'] = response.code
     for path in ('/missing-page', '/.env', '/release.json', '/relay/admin', '/relay/flags'):
         try:
             urllib.request.urlopen(BASE + path, timeout=20)

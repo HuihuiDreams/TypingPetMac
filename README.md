@@ -26,7 +26,7 @@ brew install --cask ynifamily3/tap/typing-pet
 
 ### DMG로 직접 설치
 
-1. [v0.17.1 DMG](https://github.com/ynifamily3/TypingPetMac/releases/download/v0.17.1/TypingPetMac-v0.17.1-arm64.dmg)를 내려받아 두 번 눌러 엽니다.
+1. [v0.17.1 DMG](https://github.com/ynifamily3/TypingPetMac/releases/download/v0.17.1/TypingPetMac-v0.17.1-arm64-installer.dmg)를 내려받아 두 번 눌러 엽니다.
 2. `TypingPet` 앱을 옆의 `Applications` 폴더로 드래그합니다.
 3. 디스크 이미지를 추출하고 응용 프로그램 폴더에서 앱을 실행합니다.
 

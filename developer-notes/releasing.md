@@ -106,9 +106,15 @@ Homebrew까지 게시하거나 tap 게시만 재시도할 때는 `./scripts/rele
 릴리스 전에 `website/src/releases.json`에 해당 버전의 한국어·영어·일본어·중국어 간체·번체 제목과 변경 항목을 추가하세요.
 누락된 번역은 빌드·서명 전에 검사합니다. 웹사이트 기록은 v0.16.0부터 시작합니다.
 
-`pet.miel.ing/download/latest`는 프로덕션 업데이트 배포가 검증될 때마다 최신 고정 빌드 URL로
-갱신합니다. 응답은 `302`와 `Cache-Control: no-store`이며, 고정 ZIP의 1년 immutable 캐시는 유지합니다.
-GitHub 없이 업데이트 서버에만 게시해도 이 다운로드 리디렉션은 갱신됩니다.
+홈페이지 다운로드는 `https://pet.miel.ing/latest?from=github&type=dmg` 형식으로 통일합니다.
+`from`은 `github` 또는 `direct`, `type`은 `dmg` 또는 `zip`입니다. GitHub 선택은 GitHub의 고정
+릴리스 자산으로 직접 리디렉션하며, direct 선택은 업데이트 서버의 고정 자산으로 리디렉션합니다.
+네 경로는 GitHub 공개·자산 검증 후 웹사이트와 함께 갱신합니다. `/latest`는 `302`와
+브라우저·CDN `no-store`, 직접 제공하는 고정 ZIP·DMG는 1년 `immutable` 캐시를 사용합니다.
+
+기존 `pet.miel.ing/download/latest`는 ZIP 직접 다운로드 호환 경로로 유지합니다.
+이 경로는 GitHub 없이 업데이트 서버에만 게시해도 프로덕션 업데이트 배포 검증 후 갱신됩니다.
+앱 업데이트 feed와 Homebrew는 계속 검증된 버전의 고정 URL을 사용합니다.
 
 앱 게시 후 웹사이트 갱신만 실패했다면 앱을 다시 빌드하거나 게시하지 말고,
 원인을 수정한 뒤 저장소 루트에서 `./scripts/deploy_website.sh`를 실행하세요.
@@ -120,16 +126,19 @@ v0.17.1에는 이미 공개된 ZIP과 같은 앱을 DMG로도 제공합니다. �
 DMG 생성은 위의 새 버전 자동 릴리스 파이프라인과 별도입니다. 공개 ZIP의 SHA-256을 확인한 후 압축을 풀어 사용하세요.
 
 ```sh
-./scripts/build_dmg.sh /absolute/path/TypingPet.app /absolute/path/TypingPetMac-v0.17.1-arm64.dmg
+./scripts/build_dmg.sh /absolute/path/TypingPet.app /absolute/path/TypingPetMac-v0.17.1-arm64-installer.dmg
 ```
 
 이 스크립트는 앱의 서명·공증을 검사하고, 앱과 `/Applications` 바로가기를 넣어 DMG를 만듭니다.
+옅은 발바닥 배경, 크레용 화살표와 Drag & Drop 안내, 136pt 아이콘 배치를 적용합니다.
+`uv`의 격리된 Python 3.12 환경에서 고정된 `dmgbuild==1.6.7`을 사용합니다. 배경과 배치 원본은 `packaging/dmg/`에 있습니다.
 앱 자체는 다시 빌드하거나 서명하지 않습니다. DMG를 같은 Developer ID로 서명하고 기존 `typingpet-notary` 프로필로
 Apple 공증·staple·Gatekeeper 검사를 수행합니다. 읽기 전용으로 마운트해 원본 앱과 파일을 비교하고 앱의 Gatekeeper 검사도 다시 수행합니다.
 DMG 옆에 `.sha256`과 `.notary-result.json`을 남기며 기존 DMG나 체크섬은 덮어쓰지 않습니다.
 
 검증한 DMG와 `.sha256`만 해당 GitHub 릴리스와 업데이트 서버의 `production/` 폴더에 추가한 뒤
 `./scripts/deploy_website.sh`로 홈페이지를 갱신합니다. `.notary-result.json`은 로컬 증거로 보관합니다.
+홈페이지는 새 `-installer.dmg` 파일을 우선 사용하며, 이전 이름의 공개 DMG는 보존합니다.
 
 ## 자동화 자체 검증
 

@@ -7,6 +7,7 @@
     "dev": "vite --host 127.0.0.1 --port 4179",
     "sync-release": "node scripts/sync-release.mjs",
     "test": "node --test scripts/theme.test.mjs",
+    "test:downloads": "python3 -m unittest discover -s scripts -p 'test_downloads.py' -v",
     "build": "tsc --noEmit && npm test && node scripts/check-analytics.mjs && vite build && vite build --ssr src/entry-server.tsx --outDir .runtime/ssr && node scripts/prerender.mjs && node scripts/check-locales.mjs",
     "preview": "vite preview --host 127.0.0.1 --port 4179"
   },

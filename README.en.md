@@ -25,7 +25,7 @@ The app supports automatic updates. To update through Homebrew, quit the app, ru
 
 ### Install the DMG manually
 
-1. Download the [v0.17.1 DMG](https://github.com/ynifamily3/TypingPetMac/releases/download/v0.17.1/TypingPetMac-v0.17.1-arm64.dmg) and double-click to open it.
+1. Download the [v0.17.1 DMG](https://github.com/ynifamily3/TypingPetMac/releases/download/v0.17.1/TypingPetMac-v0.17.1-arm64-installer.dmg) and double-click to open it.
 2. Drag `TypingPet` into the `Applications` folder beside it.
 3. Eject the disk image and open the app from Applications.
 

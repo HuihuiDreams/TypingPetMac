@@ -1,26 +1,16 @@
 .header-controls{display:flex;align-items:center;gap:10px;flex-shrink:0}
-.theme-picker{position:relative}
-.theme-toggle{display:grid;place-items:center;width:40px;height:40px;border:var(--line);background:#fff;box-shadow:2px 2px 0 var(--ink);cursor:pointer;list-style:none}
-.theme-toggle::-webkit-details-marker{display:none}
-.theme-options{position:absolute;right:0;top:calc(100% + 10px);width:205px;margin:0;padding:9px;border:var(--line);background:#fff;box-shadow:var(--shadow);z-index:30}
-.theme-options legend{float:left;width:100%;padding:5px 9px 10px;font-size:11px;font-weight:700}
-.theme-options label{display:flex;align-items:center;gap:10px;padding:10px 9px;font-size:13px;cursor:pointer;clear:both}
-.theme-options label:hover{background:#eeebe2}
-.theme-options label:has(input:checked){background:var(--yellow);color:#20211f}
-.theme-options input{margin:0 0 0 auto;accent-color:#20211f;width:15px;height:15px}
-.theme-options label:focus-within{outline:3px solid #7145bc;outline-offset:-2px}
+.theme-toggle{display:grid;place-items:center;width:40px;height:40px;border:var(--line);background:#fff;box-shadow:2px 2px 0 var(--ink);cursor:pointer}
 
 html[data-theme=dark]{color:#f1eee8;background:#18191b;--paper:#18191b;--ink:#f1eee8;--line:2px solid #b9b8b0;--shadow:5px 5px 0 #050607}
 html[data-theme=dark] ::selection{color:#20211f}
 html[data-theme=dark] :is(button,a,input,select,summary):focus-visible{outline-color:#b79aff}
-html[data-theme=dark] .theme-options label:focus-within{outline-color:#b79aff}
 html[data-theme=dark] :is(.language-switch,.language-options,.theme-toggle,.theme-options,.hero-label,.secondary,.demo-window,.window-bar,.demo-note,.keycap,.demo-input-wrap,.tag,.install-card,.release-card){background:#25262a}
 html[data-theme=dark] :is(.primary,.brand-icon,.sticker-lime,.keycap-right,.demo-speech,.yellow,.install-tab[data-active],.skip-link){color:#20211f}
 html[data-theme=dark] .keycap-right{background:var(--lime)}
 html[data-theme=dark] .brand-icon{box-shadow:2px 2px 0 #050607}
 html[data-theme=dark] .brand-dot{color:#bb9ae9}
 html[data-theme=dark] .highlight:before{background:#655326}
-html[data-theme=dark] :is(.hero-description,.hero-meta,.signed-note,.demo-input-wrap>span,.demo-caption,.section-head>p,.section-head>div>p,.focus-copy>p,.focus-bottom,.minor-links,.permission-note p,.install-panel>p,.brew-update,.faq-panel p,.release-meta time,.release-card ul,.about-copy p,.maker-label,.site-footer,.changelog-intro,.newsletter-copy>p,.newsletter-note,.newsletter-fields label span,.newsletter-fields small,.newsletter-pending,.analytics-notice){color:#c1beb5}
+html[data-theme=dark] :is(.hero-description,.hero-meta,.signed-note,.demo-input-wrap>span,.demo-caption,.section-head>p,.section-head>div>p,.focus-copy>p,.focus-bottom,.minor-links,.permission-note p,.install-panel>p,.brew-update,.faq-panel p,.release-meta time,.release-card ul,.about-copy p,.maker-label,.site-footer,.changelog-intro,.newsletter-copy>p,.newsletter-note,.newsletter-fields label span,.newsletter-hint,.newsletter-pending,.analytics-notice){color:#c1beb5}
 html[data-theme=dark] .desktop-scene{background-color:#363044;background-image:linear-gradient(#ffffff0d 1px,transparent 1px),linear-gradient(90deg,#ffffff0d 1px,transparent 1px)}
 html[data-theme=dark] .timer-text{color:#f2b09c}
 html[data-theme=dark] .desk-line{border-color:#f1eee855}
@@ -48,14 +38,10 @@ html[data-theme=dark] .version-label.yellow{background:var(--yellow)}
 html[data-theme=dark] .release-card li::marker{color:#bda0ee}
 html[data-theme=dark] .about-section{background:#29261d}
 html[data-theme=dark] :is(.newsletter-card input:not([type=checkbox]),.newsletter-card select){background:#202124}
-html[data-theme=dark] .newsletter-privacy>div{background:#ffffff08}
-html[data-theme=dark] .newsletter-consent input{accent-color:var(--yellow)}
+html[data-theme=dark] .newsletter-privacy .disclosure-content{background:#ffffff08}
 html[data-theme=dark] .newsletter-result{background:#35412d}
 html[data-theme=dark] .newsletter-result.error{background:#512e31}
 html[data-theme=dark] :is(.newsletter-mode,.analytics-notice){border-color:#73716b}
-html[data-theme=dark] :is(.language-options a:hover,.language-options a[aria-current]){color:#20211f}
-html[data-theme=dark] .theme-options label:hover{background:#393a3f}
-html[data-theme=dark] .theme-options label:has(input:checked){background:var(--yellow);color:#20211f}
 
 @media(max-width:1050px) and (min-width:761px){.header-inner{gap:20px}.header-inner nav{gap:18px}}
 @media(max-width:760px){

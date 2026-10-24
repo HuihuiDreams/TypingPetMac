@@ -19,8 +19,9 @@ const asset = release.assets.find(a => a.name === `TypingPetMac-v${feed.version}
 const checksum = release.assets.find(a => a.name === `TypingPetMac-v${feed.version}-arm64.zip.sha256`);
 if (!asset || !checksum || asset.size !== feed.size || asset.digest !== `sha256:${feed.sha256}`) throw new Error('GitHub ZIP does not match the update feed');
 // A DMG is optional: older releases and update-only releases can keep using ZIPs.
-const dmgAsset = release.assets.find(a => a.name === `TypingPetMac-v${feed.version}-arm64.dmg`);
-const dmgChecksum = release.assets.find(a => a.name === `TypingPetMac-v${feed.version}-arm64.dmg.sha256`);
+const dmgAsset = [`TypingPetMac-v${feed.version}-arm64-installer.dmg`, `TypingPetMac-v${feed.version}-arm64.dmg`]
+  .map(name => release.assets.find(a => a.name === name)).find(Boolean);
+const dmgChecksum = dmgAsset && release.assets.find(a => a.name === `${dmgAsset.name}.sha256`);
 let dmg = null;
 if (dmgAsset) {
   const url = `https://pet.miel.ing/update/production/${dmgAsset.name}`;
