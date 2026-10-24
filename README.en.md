@@ -10,9 +10,9 @@ This unofficial macOS app was inspired by [swoonqx/TypingPet](https://github.com
 
 ## Install
 
-**Requirements:** Apple Silicon Mac with macOS 13 or later. The current public build is the `v0.14.2` prerelease. It is signed with an Apple-issued Developer ID certificate and notarized by Apple, so you do not need to bypass Gatekeeper.
+**Requirements:** Apple Silicon Mac with macOS 13 or later. The current public build is the `v0.14.3` prerelease. It is signed with an Apple-issued Developer ID certificate and notarized by Apple, so you do not need to bypass Gatekeeper.
 
-1. Open the [v0.14.2 release](https://github.com/ynifamily3/TypingPetMac/releases/tag/v0.14.2) and download `TypingPetMac-v0.14.2-arm64.zip`. For an optional integrity check, download the `.sha256` file from the same page.
+1. Open the [v0.14.3 release](https://github.com/ynifamily3/TypingPetMac/releases/tag/v0.14.3) and download `TypingPetMac-v0.14.3-arm64.zip`. For an optional integrity check, download the `.sha256` file from the same page.
 2. Double-click the ZIP to extract it. Move `TypingPet.app` to **Applications** before launching; do not run it from Downloads.
 3. Open `TypingPet.app` from Applications. A paw icon appears in the menu bar.
 
@@ -20,7 +20,7 @@ If you downloaded both files into Downloads, verify the ZIP with:
 
 ```sh
 cd ~/Downloads
-shasum -a 256 -c TypingPetMac-v0.14.2-arm64.zip.sha256
+shasum -a 256 -c TypingPetMac-v0.14.3-arm64.zip.sha256
 ```
 
 ### First launch: Input Monitoring
@@ -34,7 +34,7 @@ The app needs macOS **Input Monitoring** permission to react to global key event
 > [!IMPORTANT]
 > When moving from an older ad-hoc-signed build, you may need to grant Input Monitoring permission once more. If the pet does not react, remove the old `TypingPet` entry with `-`, add the app again, and enable its switch. Future updates signed by the same Developer ID team can retain the permission.
 
-**If you have v0.14.1 or earlier, install v0.14.2 manually once.** The old update signing key was lost and replaced, so those builds cannot accept the new feed. Starting with v0.14.2, the app checks daily and installs an update after you approve it, on restart or quit. The [update documentation](docs/UPDATE.md) explains verification. A Homebrew package is not published yet.
+**If you have v0.14.1 or earlier, install the latest release manually once.** The old update signing key was lost and replaced, so those builds cannot accept the new feed. Starting with v0.14.2, the app checks daily and installs an update after you approve it, on restart or quit. The [update documentation](docs/UPDATE.md) explains verification. A Homebrew package is not published yet.
 
 ## In action
 
@@ -73,7 +73,7 @@ Tasks and measured focus time are stored on this Mac in `~/Library/Application S
 
 Open `설정` (Settings) from the paw icon in the menu bar.
 
-- `일반` (General): pet size, opacity, bounce, always-on-top, position lock and pointer avoidance, launch at login, Input Monitoring, and updates.
+- `일반` (General): pet size, opacity, bounce, always-on-top, position lock and pointer avoidance, Settings appearance (System/Light/Dark), launch at login, Input Monitoring, and updates.
 - `갤러리` (Gallery): add, preview, select, rename, and remove image sets.
 - `키 반응` (Key Reactions): assign or remove images for keys and key combinations.
 

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.14.3 - 2026-10-24
+
+- Add System, Light, and Dark appearance choices for the Settings window, with an immediate preview and a saved preference.
+- Keep the pet and Todo bubble appearance independent of the Settings window choice.
+
 ## 0.14.2 - 2026-10-24
 
 - Publish the production update feed and verify release archives with the app's Ed25519 key, Developer ID signature, and Apple notarization.

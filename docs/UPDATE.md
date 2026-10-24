@@ -63,7 +63,7 @@ The private key is unrelated to the Apple Developer ID certificate and must not 
 After Developer ID setup ([Developer ID](DEVELOPER_ID.md)), raise the version and build:
 
 ```sh
-TYPINGPET_BUILD_CHANNEL=production TYPINGPET_VERSION=0.14.2 TYPINGPET_BUILD=22 ./scripts/build_app.sh
+TYPINGPET_BUILD_CHANNEL=production TYPINGPET_VERSION=0.14.3 TYPINGPET_BUILD=23 ./scripts/build_app.sh
 ./scripts/notarize_release.sh
 ./scripts/deploy_update.sh production dist/TypingPet.app
 ```

@@ -3,6 +3,24 @@ import ServiceManagement
 import SwiftUI
 import UniformTypeIdentifiers
 
+enum SettingsAppearanceMode: String, CaseIterable {
+    case system, light, dark
+
+    static let defaultsKey = "SettingsAppearanceMode"
+
+    static func load(from defaults: UserDefaults) -> Self {
+        Self(rawValue: defaults.string(forKey: defaultsKey) ?? "") ?? .system
+    }
+
+    var windowAppearance: NSAppearance? {
+        switch self {
+        case .system: nil
+        case .light: NSAppearance(named: .aqua)
+        case .dark: NSAppearance(named: .darkAqua)
+        }
+    }
+}
+
 @MainActor
 final class TypingPetSettingsModel: ObservableObject {
     @Published private(set) var imageSets: [PetImageSet] = []
@@ -17,10 +35,13 @@ final class TypingPetSettingsModel: ObservableObject {
     @Published private(set) var positionLocked: Bool
     @Published private(set) var avoidsPointerWhenLocked: Bool
     @Published private(set) var launchAtLogin: Bool
+    @Published private(set) var appearanceMode: SettingsAppearanceMode
     @Published var errorMessage: String?
+    var onAppearanceChanged: ((SettingsAppearanceMode) -> Void)?
 
     let library: PetImageLibrary
     let keyStore: KeyReactionStore
+    private let defaults: UserDefaults
     private let applyScale: (CGFloat) -> Void
     private let applyRestingOpacity: (CGFloat) -> Void
     private let applyHoverOpacity: (CGFloat) -> Void
@@ -49,10 +70,12 @@ final class TypingPetSettingsModel: ObservableObject {
         applyPositionLock: @escaping (Bool) -> Void,
         applyPointerAvoidance: @escaping (Bool) -> Void,
         reloadPet: @escaping () -> Void,
-        openInputMonitoringSettings: @escaping () -> Void
+        openInputMonitoringSettings: @escaping () -> Void,
+        defaults: UserDefaults = AppEnvironment.defaults
     ) {
         self.library = library
         self.keyStore = keyStore
+        self.defaults = defaults
         self.scale = Double(scale)
         self.restingOpacity = Double(restingOpacity)
         self.hoverOpacity = Double(hoverOpacity)
@@ -72,6 +95,7 @@ final class TypingPetSettingsModel: ObservableObject {
         activeSetID = library.activeSetID
         selectedSetID = library.activeSetID
         launchAtLogin = SMAppService.mainApp.status == .enabled
+        appearanceMode = SettingsAppearanceMode.load(from: defaults)
         refresh()
     }
 
@@ -130,6 +154,12 @@ final class TypingPetSettingsModel: ObservableObject {
     func setPointerAvoidance(_ value: Bool) {
         avoidsPointerWhenLocked = value
         applyPointerAvoidance(value)
+    }
+
+    func setAppearanceMode(_ value: SettingsAppearanceMode) {
+        appearanceMode = value
+        defaults.set(value.rawValue, forKey: SettingsAppearanceMode.defaultsKey)
+        onAppearanceChanged?(value)
     }
 
     func toggleLaunchAtLogin(_ value: Bool) {
@@ -225,9 +255,13 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         window.setContentSize(NSSize(width: 780, height: 600))
         window.minSize = NSSize(width: 700, height: 540)
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
+        window.appearance = model.appearanceMode.windowAppearance
         window.center()
         super.init(window: window)
         window.delegate = self
+        model.onAppearanceChanged = { [weak window] mode in
+            window?.appearance = mode.windowAppearance
+        }
         shouldCascadeWindows = false
     }
 
@@ -428,6 +462,24 @@ private struct GeneralSettingsView: View {
 
                 FlatSettingsSection("시스템") {
                     VStack(spacing: 0) {
+                        SettingsRow {
+                            HStack(spacing: SettingsMetrics.space3) {
+                                Text("설정 화면 모드")
+                                Spacer(minLength: SettingsMetrics.space3)
+                                Picker("설정 화면 모드", selection: Binding(
+                                    get: { model.appearanceMode },
+                                    set: model.setAppearanceMode
+                                )) {
+                                    Text("시스템").tag(SettingsAppearanceMode.system)
+                                    Text("라이트").tag(SettingsAppearanceMode.light)
+                                    Text("다크").tag(SettingsAppearanceMode.dark)
+                                }
+                                .pickerStyle(.segmented)
+                                .labelsHidden()
+                                .frame(width: 252)
+                            }
+                        }
+                        Divider()
                         SettingsToggleRow(
                             title: "로그인 시 자동 실행",
                             isOn: Binding(get: { model.launchAtLogin }, set: model.toggleLaunchAtLogin)
