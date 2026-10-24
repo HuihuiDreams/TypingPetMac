@@ -10,42 +10,42 @@ private enum TodoTimeText {
     }
     // Same wording as the timer button in the full view.
     static func start(_ preference: TimerPreference) -> String {
-        preference.mode == .countup ? "카운트업 시작" : "\(Int((preference.seconds ?? 1200) / 60))분 시작"
+        preference.mode == .countup ? L("Start Count Up") : L("Start %1$@ min", Int((preference.seconds ?? 1200) / 60))
     }
     static func total(_ seconds: Double) -> String {
         let minutes = Int(max(0, seconds)) / 60
-        if minutes < 60 { return "누적 \(minutes)분" }
-        return String(format: "누적 %d시간 %02d분", minutes / 60, minutes % 60)
+        if minutes < 60 { return L("Total %1$@ min", minutes) }
+        return String(format: L("Total %d hr %02d min"), minutes / 60, minutes % 60)
     }
     // Both 분 and 시간 end in a final consonant, so the topic particle is always 은.
     static func away(_ seconds: Double) -> String {
         let minutes = Int(max(0, seconds)) / 60
-        guard minutes > 0 else { return "자리를 비운 시간은 빼고 기록했어요" }
-        let length = minutes < 60 ? "\(minutes)분" : (minutes % 60 == 0 ? "\(minutes / 60)시간" : "\(minutes / 60)시간 \(minutes % 60)분")
-        return "자리를 비운 \(length)은 빼고 기록했어요"
+        guard minutes > 0 else { return L("Time away was excluded") }
+        let length = minutes < 60 ? L("%1$@ min", minutes) : (minutes % 60 == 0 ? L("%1$@ hr", minutes / 60) : L("%1$@ hr %2$@ min", minutes / 60, minutes % 60))
+        return L("Excluded %1$@ away", length)
     }
     static func awayReason(_ reason: TodoAbsence.Reason) -> String {
         switch reason {
-        case .idle: return "자리 비움"
-        case .locked: return "화면 잠김"
-        case .sleep: return "잠자기"
+        case .idle: return L("Away")
+        case .locked: return L("Screen locked")
+        case .sleep: return L("Sleep")
         }
     }
     // Pick 을/를 from the last Hangul syllable. Other scripts get both forms.
     static func objectParticle(after title: String) -> String {
-        guard let scalar = title.unicodeScalars.last, (0xAC00...0xD7A3).contains(scalar.value) else { return "을(를)" }
-        return (scalar.value - 0xAC00) % 28 == 0 ? "를" : "을"
+        guard let scalar = title.unicodeScalars.last, (0xAC00...0xD7A3).contains(scalar.value) else { return L("object.particle.unknown") }
+        return (scalar.value - 0xAC00) % 28 == 0 ? L("object.particle.vowel") : L("object.particle.consonant")
     }
     // Quotes inside sentences stay short so a long title cannot swallow the message.
     static func quoted(_ title: String, limit: Int = 24) -> String {
         title.count > limit ? String(title.prefix(limit)).trimmingCharacters(in: .whitespaces) + "…" : title
     }
-    static let day: DateFormatter = {
+    static var day: DateFormatter {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "ko_KR")
-        formatter.dateFormat = "M월 d일 EEEE"
+        formatter.locale = AppLocalization.shared.locale
+        formatter.dateFormat = L("EEEE, MMM d")
         return formatter
-    }()
+    }
 }
 
 // MARK: - Palette and zoom
@@ -106,6 +106,7 @@ private struct Z {
 // MARK: - Bubble
 
 struct TodoBubbleView: View {
+    @ObservedObject private var localization = AppLocalization.shared
     @ObservedObject var store: TodoStore
     @ObservedObject var layout: TodoBubbleLayout
     @State private var draft = ""
@@ -172,6 +173,7 @@ struct TodoBubbleView: View {
             .background(zoomShortcuts)
             .environment(\.bubbleZoom, zoom)
             .environment(\.bubblePointer, layout.pointer)
+            .environment(\.locale, localization.locale)
             .onExitCommand(perform: handleEscape)
             .onChange(of: session?.status) { status in
                 if status == .expired { resetExtension() }
@@ -350,7 +352,7 @@ struct TodoBubbleView: View {
         HStack(alignment: .center, spacing: z(2)) {
             VStack(alignment: .leading, spacing: z(1)) {
                 HStack(spacing: z(6)) {
-                    Text("오늘 할 일").font(z.font(15, .bold, .rounded)).foregroundStyle(BubbleColor.ink)
+                    Text(L("Today's Todos")).font(z.font(15, .bold, .rounded)).foregroundStyle(BubbleColor.ink)
                     if AppEnvironment.isDevelopment {
                         Text("DEV").font(z.font(8.5, .heavy, .rounded)).foregroundStyle(.white)
                             .padding(.horizontal, z(5)).padding(.vertical, z(1.5))
@@ -363,29 +365,29 @@ struct TodoBubbleView: View {
             }
             Spacer(minLength: z(4))
             if session != nil {
-                IconButton(symbol: "chevron.down", label: "집중 말풍선으로 접기") { setExpanded(false) }
+                IconButton(symbol: "chevron.down", label: L("Collapse to Focus Bubble")) { setExpanded(false) }
             }
-            IconButton(symbol: "arrow.down.right.and.arrow.up.left", label: "컴팩트 뷰로 보기") { setListStyle(.compact) }
+            IconButton(symbol: "arrow.down.right.and.arrow.up.left", label: L("Switch to Compact View")) { setListStyle(.compact) }
             zoomMenu
-            IconButton(symbol: "minus", label: "할 일 숨기기") { store.hide() }
+            IconButton(symbol: "minus", label: L("Hide Todos")) { store.hide() }
         }
     }
 
     private var zoomMenu: some View {
-        IconMenu(symbol: "textformat.size", help: "말풍선 크기 · \(store.zoomPercent)%", accessibilityLabel: "말풍선 크기") {
-            Button("크게 보기") { store.zoomIn() }.keyboardShortcut("+", modifiers: .command).disabled(!store.canZoomIn)
-            Button("작게 보기") { store.zoomOut() }.keyboardShortcut("-", modifiers: .command).disabled(!store.canZoomOut)
-            Button("실제 크기 (100%)") { store.resetZoom() }.keyboardShortcut("0", modifiers: .command).disabled(store.zoom == 1)
+        IconMenu(symbol: "textformat.size", help: L("Bubble size · %1$@%", store.zoomPercent), accessibilityLabel: L("Bubble size")) {
+            Button(L("Zoom In")) { store.zoomIn() }.keyboardShortcut("+", modifiers: .command).disabled(!store.canZoomIn)
+            Button(L("Zoom Out")) { store.zoomOut() }.keyboardShortcut("-", modifiers: .command).disabled(!store.canZoomOut)
+            Button(L("Actual Size (100%)")) { store.resetZoom() }.keyboardShortcut("0", modifiers: .command).disabled(store.zoom == 1)
             Divider()
-            Text("현재 \(store.zoomPercent)%")
+            Text(L("Current %1$@%", store.zoomPercent))
         }
         .accessibilityValue("\(store.zoomPercent)%")
     }
 
     private func subtitle(openCount: Int, completedCount: Int) -> String {
         let day = TodoTimeText.day.string(from: Date())
-        if openCount > 0 { return "\(day) · \(openCount)개 남음" }
-        return completedCount > 0 ? "\(day) · 모두 끝냈어요" : day
+        if openCount > 0 { return L("%1$@ · %2$@ remaining", day, openCount) }
+        return completedCount > 0 ? L("%1$@ · All done", day) : day
     }
 
     private var activeCard: some View {
@@ -393,7 +395,7 @@ struct TodoBubbleView: View {
             HStack(spacing: z(10)) {
                 TomatoRing(fraction: ringFraction, paused: paused, size: 34, showsRing: showsRing)
                 VStack(alignment: .leading, spacing: z(1)) {
-                    Text(expired ? "시간 종료" : store.absence.map { TodoTimeText.awayReason($0.reason) } ?? (paused ? "일시정지" : "집중 중"))
+                    Text(expired ? L("Time's up") : store.absence.map { TodoTimeText.awayReason($0.reason) } ?? (paused ? L("Paused") : L("Focusing")))
                         .font(z.font(10.5, .bold)).foregroundStyle(paused ? BubbleColor.muted : BubbleColor.tomato)
                     Text(activeTitle).font(z.font(12.5, .semibold)).foregroundStyle(BubbleColor.ink)
                         .lineLimit(1).help(activeTitle)
@@ -404,8 +406,8 @@ struct TodoBubbleView: View {
                 // The notice below has the same choices.
                 if !expired, store.absence == nil {
                     HStack(spacing: 0) {
-                        IconButton(symbol: paused ? "play.fill" : "pause.fill", label: paused ? "재개" : "일시정지", tint: BubbleColor.ink, size: 26) { togglePause() }
-                        IconButton(symbol: "stop.fill", label: "종료", tint: BubbleColor.ink, size: 26) { finish() }
+                        IconButton(symbol: paused ? "play.fill" : "pause.fill", label: paused ? L("Resume") : L("Paused"), tint: BubbleColor.ink, size: 26) { togglePause() }
+                        IconButton(symbol: "stop.fill", label: L("Stop"), tint: BubbleColor.ink, size: 26) { finish() }
                     }
                 }
             }
@@ -466,13 +468,13 @@ struct TodoBubbleView: View {
             ForEach(shown) { todo in compactRow(todo).transition(rowTransition) }
             if open.count > shown.count {
                 Button { setListStyle(.full) } label: {
-                    Text("+\(open.count - shown.count)개 더").font(z.font(11.5, .medium)).foregroundStyle(BubbleColor.muted)
+                    Text(L("+%1$@ more", open.count - shown.count)).font(z.font(11.5, .medium)).foregroundStyle(BubbleColor.muted)
                         .monospacedDigit().contentTransition(.identity)
                         .padding(.leading, z(34)).frame(maxWidth: .infinity, minHeight: z(24), alignment: .leading)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(PressStyle())
-                .help("풀 뷰에서 모두 보기")
+                .help(L("Show All in Full View"))
                 .transition(.opacity)
             }
             if open.isEmpty {
@@ -482,14 +484,14 @@ struct TodoBubbleView: View {
                 } label: {
                     HStack(spacing: z(8)) {
                         Image(systemName: allDone ? "checkmark" : "plus").font(z.font(11, .semibold)).frame(width: z(20))
-                        Text(allDone ? "오늘 할 일을 모두 끝냈어요" : "오늘 할 일 추가하기").font(z.font(12.5))
+                        Text(allDone ? L("All Todos done today") : L("Add a Todo for today")).font(z.font(12.5))
                     }
                     .foregroundStyle(BubbleColor.muted)
                     .padding(.horizontal, z(6)).frame(maxWidth: .infinity, minHeight: z(28), alignment: .leading)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(PressStyle())
-                .help("풀 뷰에서 할 일 추가하기")
+                .help(L("Add a Todo in Full View"))
                 .transition(.opacity)
             }
         }
@@ -499,9 +501,9 @@ struct TodoBubbleView: View {
             if compactHovering {
                 HStack(spacing: z(2)) {
                     if session != nil {
-                        IconButton(symbol: "chevron.down", label: "집중 말풍선으로 접기", size: 22) { setExpanded(false) }
+                        IconButton(symbol: "chevron.down", label: L("Collapse to Focus Bubble"), size: 22) { setExpanded(false) }
                     }
-                    IconButton(symbol: "arrow.up.left.and.arrow.down.right", label: "풀 뷰로 보기", size: 22) { setListStyle(.full) }
+                    IconButton(symbol: "arrow.up.left.and.arrow.down.right", label: L("Switch to Full View"), size: 22) { setListStyle(.full) }
                 }
                 // Wide enough to cover the active Todo's clock in the first row.
                 .padding(.leading, z(44)).padding(.trailing, z(8)).padding(.vertical, z(9))
@@ -517,18 +519,18 @@ struct TodoBubbleView: View {
         .overlay { if let id = pendingStart { switchConfirmation(id) } }
         .animation(.easeOut(duration: 0.15), value: compactHovering)
         .contextMenu {
-            Button("풀 뷰로 보기") { setListStyle(.full) }
-            if session != nil { Button("집중 말풍선으로 접기") { setExpanded(false) } }
-            Button("할 일 숨기기") { store.hide() }
+            Button(L("Switch to Full View")) { setListStyle(.full) }
+            if session != nil { Button(L("Collapse to Focus Bubble")) { setExpanded(false) } }
+            Button(L("Hide Todos")) { store.hide() }
         }
-        .accessibilityAction(named: "풀 뷰로 보기") { setListStyle(.full) }
+        .accessibilityAction(named: L("Switch to Full View")) { setListStyle(.full) }
     }
 
     private func compactRow(_ todo: TodoItem) -> some View {
         let checked = completing.contains(todo.id)
         let active = session?.todoId == todo.id
         return HStack(spacing: z(8)) {
-            CheckCircle(checked: checked, label: "\(todo.title) 완료") { toggle(todo, completed: false) }
+            CheckCircle(checked: checked, label: L("Complete %1$@", todo.title)) { toggle(todo, completed: false) }
             Text(todo.title).font(z.font(12.5)).foregroundStyle(checked ? BubbleColor.muted : BubbleColor.ink)
                 .lineLimit(1).truncationMode(.tail).help(todo.title)
             Spacer(minLength: z(4))
@@ -539,7 +541,7 @@ struct TodoBubbleView: View {
                         .foregroundStyle(paused ? BubbleColor.muted : BubbleColor.tomato)
                 }
                 .accessibilityElement(children: .combine)
-                .accessibilityLabel(paused ? "일시정지 \(clockText)" : "집중 중 \(clockText)")
+                .accessibilityLabel(paused ? L("Paused %1$@", clockText) : L("Focusing %1$@", clockText))
             }
         }
         .padding(.horizontal, z(6)).frame(minHeight: z(28))
@@ -552,10 +554,10 @@ struct TodoBubbleView: View {
     @ViewBuilder private func compactMenu(_ todo: TodoItem) -> some View {
         if session?.todoId == todo.id {
             if expired {
-                Button("끝내기") { finish() }
+                Button(L("Finish")) { finish() }
             } else {
-                Button(paused ? "재개" : "일시정지") { togglePause() }
-                Button("종료") { finish() }
+                Button(paused ? L("Resume") : L("Paused")) { togglePause() }
+                Button(L("Stop")) { finish() }
             }
         } else {
             let others = [TimerPreference.countup, TimerPreference(seconds: 1200)].filter { $0 != todo.timerPreference }
@@ -564,15 +566,15 @@ struct TodoBubbleView: View {
             }
         }
         Divider()
-        Button("완료") { toggle(todo, completed: false) }
-        Button("풀 뷰로 보기") { setListStyle(.full) }
+        Button(L("Complete")) { toggle(todo, completed: false) }
+        Button(L("Switch to Full View")) { setListStyle(.full) }
     }
 
     private func emptyState(hasCompleted: Bool) -> some View {
         VStack(alignment: .leading, spacing: z(3)) {
-            Text(hasCompleted ? "오늘 할 일을 모두 끝냈어요!" : "오늘은 무엇부터 해볼까요?")
+            Text(hasCompleted ? L("All Todos done today!") : L("What will you start with today?"))
                 .font(z.font(13, .semibold)).foregroundStyle(BubbleColor.ink)
-            Text(hasCompleted ? "새로 생긴 일은 위에 적어 주세요." : "제목만 적고 Enter를 누르면 추가돼요.")
+            Text(hasCompleted ? L("Add any new tasks above.") : L("Type a title and press Enter to add it."))
                 .font(z.font(11.5)).foregroundStyle(BubbleColor.muted)
         }
         .padding(.horizontal, z(10)).padding(.top, z(4)).padding(.bottom, z(6))
@@ -585,7 +587,7 @@ struct TodoBubbleView: View {
             Image(systemName: "plus").font(z.font(12, .semibold))
                 .foregroundStyle(hasDraft || addHovering ? BubbleColor.muted : BubbleColor.faint)
                 .frame(width: z(20), height: z(16))
-            TextField("할 일 추가…", text: $draft, axis: .vertical)
+            TextField(L("Add a Todo…"), text: $draft, axis: .vertical)
                 .textFieldStyle(.plain)
                 .font(z.font(13))
                 .foregroundStyle(BubbleColor.ink)
@@ -599,11 +601,11 @@ struct TodoBubbleView: View {
                     let limited = TodoTitlePolicy.limitedDraft(value)
                     if limited != value { draft = limited }
                 }
-                .accessibilityLabel("할 일 추가")
+                .accessibilityLabel(L("Add Todo"))
             if draft.count >= TodoTitlePolicy.warningLength {
                 TitleCounter(count: draft.count)
             } else if hasDraft {
-                Text("↩︎ 추가").font(z.font(10.5, .medium)).foregroundStyle(BubbleColor.faint)
+                Text(L("↩︎ Add")).font(z.font(10.5, .medium)).foregroundStyle(BubbleColor.faint)
                     .frame(height: z(16))
             }
         }
@@ -626,7 +628,7 @@ struct TodoBubbleView: View {
                 HStack(spacing: z(6)) {
                     Image(systemName: "chevron.right").font(z.font(9, .bold))
                         .rotationEffect(.degrees(completedExpanded ? 90 : 0))
-                    Text("오늘 완료").font(z.font(12, .semibold))
+                    Text(L("Completed Today")).font(z.font(12, .semibold))
                     Text("\(completed.count)").font(z.font(10.5, .bold, .rounded)).monospacedDigit()
                         .contentTransition(.identity)
                         .padding(.horizontal, z(6)).padding(.vertical, z(1))
@@ -638,8 +640,8 @@ struct TodoBubbleView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("오늘 완료 \(completed.count)개")
-            .accessibilityValue(completedExpanded ? "펼침" : "접힘")
+            .accessibilityLabel(L("Completed today: %1$@", completed.count))
+            .accessibilityValue(completedExpanded ? L("Expanded") : L("Collapsed"))
             if completedExpanded {
                 ForEach(completed) { todo in row(todo, completed: true).transition(.opacity) }
             }
@@ -651,14 +653,14 @@ struct TodoBubbleView: View {
         return ZStack {
             Rectangle().fill(BubbleColor.surface.opacity(0.7))
             VStack(alignment: .leading, spacing: z(8)) {
-                Text("타이머를 전환할까요?").font(z.font(14, .bold, .rounded)).foregroundStyle(BubbleColor.ink)
-                Text("‘\(TodoTimeText.quoted(activeTitle))’의 타이머를 종료하고 ‘\(TodoTimeText.quoted(nextTitle))’\(TodoTimeText.objectParticle(after: TodoTimeText.quoted(nextTitle))) 시작할까요?")
+                Text(L("Switch timers?")).font(z.font(14, .bold, .rounded)).foregroundStyle(BubbleColor.ink)
+                Text(L("Stop the timer for “%1$@” and start “%2$@”%3$@?", TodoTimeText.quoted(activeTitle), TodoTimeText.quoted(nextTitle), TodoTimeText.objectParticle(after: TodoTimeText.quoted(nextTitle))))
                     .font(z.font(12)).foregroundStyle(BubbleColor.muted)
                     .fixedSize(horizontal: false, vertical: true)
                 HStack(spacing: z(8)) {
                     Spacer()
-                    PillButton(title: "취소") { pendingStart = nil }
-                    PillButton(title: "전환", role: .timer) {
+                    PillButton(title: L("Cancel")) { pendingStart = nil }
+                    PillButton(title: L("Switch"), role: .timer) {
                         start(id, confirmed: true)
                         pendingStart = nil
                     }
@@ -690,7 +692,7 @@ struct TodoBubbleView: View {
                         Text(clockText).font(z.font(26, .semibold, .rounded)).monospacedDigit()
                             .foregroundStyle(paused ? BubbleColor.muted : BubbleColor.ink)
                         if paused {
-                            Text("일시정지").font(z.font(11, .semibold)).foregroundStyle(BubbleColor.muted)
+                            Text(L("Paused")).font(z.font(11, .semibold)).foregroundStyle(BubbleColor.muted)
                         }
                     }
                 }
@@ -701,15 +703,15 @@ struct TodoBubbleView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .help("\(activeTitle) · 클릭하면 목록을 펼쳐요")
-        .accessibilityLabel("\(activeTitle), 목록 펼치기")
+        .help(L("%1$@ · Click to expand the list", activeTitle))
+        .accessibilityLabel(L("%1$@, expand list", activeTitle))
         .accessibilityValue(clockText)
         .pointerHover { focusHovering = $0 }
         .overlay(alignment: .trailing) {
             if focusHovering {
                 HStack(spacing: z(2)) {
-                    IconButton(symbol: paused ? "play.fill" : "pause.fill", label: paused ? "재개" : "일시정지", tint: BubbleColor.ink, size: 28) { togglePause() }
-                    IconButton(symbol: "stop.fill", label: "종료", tint: BubbleColor.ink, size: 28) { finish() }
+                    IconButton(symbol: paused ? "play.fill" : "pause.fill", label: paused ? L("Resume") : L("Paused"), tint: BubbleColor.ink, size: 28) { togglePause() }
+                    IconButton(symbol: "stop.fill", label: L("Stop"), tint: BubbleColor.ink, size: 28) { finish() }
                 }
                 .padding(.leading, z(26)).padding(.trailing, z(8))
                 .frame(maxHeight: .infinity)
@@ -722,8 +724,8 @@ struct TodoBubbleView: View {
         }
         .animation(.easeOut(duration: 0.15), value: focusHovering)
         .contextMenu {
-            Button("목록 펼치기") { setExpanded(true) }
-            Button("할 일 숨기기") { store.hide() }
+            Button(L("Expand List")) { setExpanded(true) }
+            Button(L("Hide Todos")) { store.hide() }
         }
     }
 
@@ -737,7 +739,7 @@ struct TodoBubbleView: View {
                     HStack(alignment: .firstTextBaseline, spacing: z(8)) {
                         Text("00:00").font(z.font(26, .semibold, .rounded)).monospacedDigit()
                             .foregroundStyle(BubbleColor.ink)
-                        Text("집중 시간이 끝났어요").font(z.font(11.5, .semibold)).foregroundStyle(BubbleColor.tomato)
+                        Text(L("Focus time is up")).font(z.font(11.5, .semibold)).foregroundStyle(BubbleColor.tomato)
                     }
                 }
                 Spacer(minLength: 0)
@@ -747,8 +749,8 @@ struct TodoBubbleView: View {
         .padding(.horizontal, z(14)).padding(.vertical, z(13))
         .contextMenu {
             // The compact list cannot show an ending or an absence, so it comes back once they are answered.
-            if store.listStyle == .full { Button("목록 펼치기") { setExpanded(true) } }
-            Button("할 일 숨기기") { store.hide() }
+            if store.listStyle == .full { Button(L("Expand List")) { setExpanded(true) } }
+            Button(L("Hide Todos")) { store.hide() }
         }
     }
 
@@ -774,8 +776,8 @@ struct TodoBubbleView: View {
         .padding(.horizontal, z(14)).padding(.vertical, z(13))
         .contextMenu {
             // The compact list cannot show an ending or an absence, so it comes back once they are answered.
-            if store.listStyle == .full { Button("목록 펼치기") { setExpanded(true) } }
-            Button("할 일 숨기기") { store.hide() }
+            if store.listStyle == .full { Button(L("Expand List")) { setExpanded(true) } }
+            Button(L("Hide Todos")) { store.hide() }
         }
     }
 
@@ -787,12 +789,12 @@ struct TodoBubbleView: View {
                 .font(z.font(11.5)).foregroundStyle(BubbleColor.muted).monospacedDigit()
                 .contentTransition(.identity)
             HStack(spacing: z(8)) {
-                PillButton(title: "이어서 재기", role: .timer) { withAnimation(Self.motion) { store.change { $0.resume() } } }
-                    .help("자리를 비운 시간은 빼고 이어서 재요")
-                PillButton(title: "포함해서 재기") { withAnimation(Self.motion) { store.includeAbsence() } }
-                    .help("자리를 비운 시간도 기록에 넣고 이어서 재요")
-                PillButton(title: "끝내기") { finish() }
-                    .help("자리를 비운 시간은 빼고 이 집중을 끝내요")
+                PillButton(title: L("Resume Timing"), role: .timer) { withAnimation(Self.motion) { store.change { $0.resume() } } }
+                    .help(L("Continue without counting time away"))
+                PillButton(title: L("Include Time Away")) { withAnimation(Self.motion) { store.includeAbsence() } }
+                    .help(L("Count time away and continue timing"))
+                PillButton(title: L("Finish")) { finish() }
+                    .help(L("End this focus session without counting time away"))
                 Spacer(minLength: 0)
             }
         }
@@ -800,10 +802,10 @@ struct TodoBubbleView: View {
 
     private var extensionControls: some View {
         HStack(spacing: z(8)) {
-            TimerSplitButton(preference: extensionPreference, suffix: "연장", allowsCountup: false, prominent: true,
+            TimerSplitButton(preference: extensionPreference, suffix: L("Extend"), allowsCountup: false, prominent: true,
                 onSelect: { extensionPreference = $0 },
                 onStart: { store.change { $0.extend(minutes: Int((extensionPreference.seconds ?? 1200) / 60)) } })
-            PillButton(title: "끝내기") { finish() }
+            PillButton(title: L("Finish")) { finish() }
             Spacer(minLength: 0)
         }
     }
@@ -812,7 +814,7 @@ struct TodoBubbleView: View {
 
     private var errorBanner: some View {
         VStack(alignment: .leading, spacing: z(8)) {
-            Label(store.loadBlocked ? "할 일 기록을 읽을 수 없어요" : "할 일 기록을 저장하지 못했어요", systemImage: "exclamationmark.triangle.fill")
+            Label(store.loadBlocked ? L("Could not read Todo records") : L("Could not save Todo records"), systemImage: "exclamationmark.triangle.fill")
                 .font(z.font(13, .bold)).foregroundStyle(BubbleColor.tomato)
             ScrollView {
                 Text(store.errorMessage ?? "").font(z.font(11.5)).foregroundStyle(BubbleColor.ink)
@@ -820,8 +822,8 @@ struct TodoBubbleView: View {
             }
             .frame(maxHeight: store.loadBlocked ? z(220) : z(64))
             HStack(spacing: z(8)) {
-                if !store.loadBlocked { PillButton(title: "다시 저장", role: .primary) { store.persist() } }
-                PillButton(title: "기록 데이터 열기") { revealData() }
+                if !store.loadBlocked { PillButton(title: L("Save Again"), role: .primary) { store.persist() } }
+                PillButton(title: L("Show Record Data")) { revealData() }
             }
         }
         .padding(z(12))
@@ -969,6 +971,7 @@ private struct DockBounce: ViewModifier, Animatable {
 
 // Preferences do not cross the hosting view and scroll view reliably, so report sizes directly.
 private struct SizeReader: View {
+    @ObservedObject private var localization = AppLocalization.shared
     let onChange: (CGSize) -> Void
     var body: some View {
         GeometryReader { proxy in
@@ -1005,6 +1008,7 @@ private struct CappedHeight: Layout {
 // MARK: - Row
 
 private struct TodoRow: View {
+    @ObservedObject private var localization = AppLocalization.shared
     let todo: TodoItem
     let completed: Bool
     let checked: Bool
@@ -1038,8 +1042,8 @@ private struct TodoRow: View {
         .background(RoundedRectangle(cornerRadius: z(10), style: .continuous).fill(background))
         .pointerHover { hovering = $0 }
         .contextMenu {
-            if !completed { Button("제목 수정") { onBeginEdit() } }
-            Button("삭제…", role: .destructive) { onRequestDelete() }
+            if !completed { Button(L("Edit Title")) { onBeginEdit() } }
+            Button(L("Delete…"), role: .destructive) { onRequestDelete() }
         }
     }
 
@@ -1050,7 +1054,7 @@ private struct TodoRow: View {
 
     private var content: some View {
         HStack(alignment: .top, spacing: z(8)) {
-            CheckCircle(checked: checked, label: "\(todo.title) \(completed ? "완료 취소" : "완료")", action: onToggle)
+            CheckCircle(checked: checked, label: "\(todo.title) \(completed ? L("Mark Incomplete") : L("Complete"))", action: onToggle)
             VStack(alignment: .leading, spacing: z(2)) {
                 HStack(alignment: .top, spacing: z(4)) {
                     title.frame(maxWidth: .infinity, minHeight: z(20), alignment: .leading)
@@ -1075,18 +1079,18 @@ private struct TodoRow: View {
                 font: .systemFont(ofSize: 13 * zoom, weight: .medium),
                 color: checked ? BubbleNSColor.muted : BubbleNSColor.ink,
                 focusToken: focusToken,
-                tooltip: isEditing ? "Enter 저장 · Esc 취소" : "\(todo.title)\n클릭해서 제목 수정",
+                tooltip: isEditing ? L("Enter to save · Esc to cancel") : L("%1$@\nClick to edit title", todo.title),
                 onBegin: onTitleBegin,
                 onDraft: onTitleDraft,
                 onEnd: onTitleEnd
             )
             .textCursorRegion()
-            .accessibilityLabel("할 일 제목")
+            .accessibilityLabel(L("Todo title"))
             .accessibilityValue(todo.title)
-            .accessibilityHint("편집한 뒤 Enter로 저장하고, Esc로 취소합니다")
-            .accessibilityAction(named: "완료") { onToggle() }
-            .accessibilityAction(named: "타이머 시작") { onStart() }
-            .accessibilityAction(named: "삭제") { onRequestDelete() }
+            .accessibilityHint(L("Press Enter to save edits, or Esc to cancel"))
+            .accessibilityAction(named: L("Complete")) { onToggle() }
+            .accessibilityAction(named: L("Start Timer")) { onStart() }
+            .accessibilityAction(named: L("Delete")) { onRequestDelete() }
         }
     }
 
@@ -1102,22 +1106,22 @@ private struct TodoRow: View {
             if isActive {
                 HStack(spacing: z(4)) {
                     Circle().fill(BubbleColor.tomato).frame(width: z(5), height: z(5))
-                    Text("집중 중").font(z.font(11, .semibold))
+                    Text(L("Focusing")).font(z.font(11, .semibold))
                 }
                 .foregroundStyle(BubbleColor.tomato)
                 .padding(.horizontal, z(8)).frame(height: z(22))
                 .background(Capsule().fill(BubbleColor.tomatoWash))
             } else if !completed {
-                TimerSplitButton(preference: todo.timerPreference, suffix: "시작", allowsCountup: true, prominent: hovering,
+                TimerSplitButton(preference: todo.timerPreference, suffix: L("Start"), allowsCountup: true, prominent: hovering,
                     onSelect: onSelectPreference, onStart: onStart)
             }
         }
     }
 
     private var moreMenu: some View {
-        IconMenu(symbol: "ellipsis", help: "더 보기", accessibilityLabel: "\(todo.title) 메뉴", size: 22, hoverFill: BubbleColor.line) {
-            if !completed { Button("제목 수정") { onBeginEdit() } }
-            Button("삭제…", role: .destructive) { onRequestDelete() }
+        IconMenu(symbol: "ellipsis", help: L("More"), accessibilityLabel: L("%1$@ menu", todo.title), size: 22, hoverFill: BubbleColor.line) {
+            if !completed { Button(L("Edit Title")) { onBeginEdit() } }
+            Button(L("Delete…"), role: .destructive) { onRequestDelete() }
         }
         .opacity(hovering ? 1 : 0)
     }
@@ -1126,11 +1130,11 @@ private struct TodoRow: View {
         HStack(spacing: z(8)) {
             VStack(alignment: .leading, spacing: z(2)) {
                 Text(todo.title).font(z.font(12.5, .semibold)).foregroundStyle(BubbleColor.ink).lineLimit(1)
-                Text("삭제할까요? 집중 기록은 남아요.").font(z.font(11)).foregroundStyle(BubbleColor.muted)
+                Text(L("Delete this Todo? Focus records will be kept.")).font(z.font(11)).foregroundStyle(BubbleColor.muted)
             }
             Spacer(minLength: z(4))
-            PillButton(title: "취소", action: onCancelDelete)
-            PillButton(title: "삭제", role: .destructive, action: onConfirmDelete)
+            PillButton(title: L("Cancel"), action: onCancelDelete)
+            PillButton(title: L("Delete"), role: .destructive, action: onConfirmDelete)
         }
         .frame(minHeight: z(42))
     }
@@ -1139,6 +1143,7 @@ private struct TodoRow: View {
 // MARK: - Timer split button
 
 private struct TimerSplitButton: View {
+    @ObservedObject private var localization = AppLocalization.shared
     let preference: TimerPreference
     let suffix: String
     let allowsCountup: Bool
@@ -1150,7 +1155,7 @@ private struct TimerSplitButton: View {
 
     private var z: Z { Z(zoom: zoom) }
     private var buttonTitle: String {
-        preference.mode == .countup ? "카운트업 \(suffix)" : "\(Int((preference.seconds ?? 1200) / 60))분 \(suffix)"
+        preference.mode == .countup ? L("Count up %1$@", suffix) : L("%1$@ min %2$@", Int((preference.seconds ?? 1200) / 60), suffix)
     }
 
     var body: some View {
@@ -1171,8 +1176,8 @@ private struct TimerSplitButton: View {
                     .frame(width: z(20), height: z(24))
                     .contentShape(Rectangle())
             }
-            .accessibilityLabel("\(suffix) 타이머 설정")
-            .help("타이머 설정")
+            .accessibilityLabel(L("%1$@ timer settings", suffix))
+            .help(L("Timer Settings"))
             .popover(isPresented: $showingOptions, arrowEdge: .trailing) {
                 TimerOptions(preference: preference, allowsCountup: allowsCountup,
                     onSelect: { onSelect($0); showingOptions = false },
@@ -1190,6 +1195,7 @@ private struct TimerSplitButton: View {
 }
 
 private struct TimerOptions: View {
+    @ObservedObject private var localization = AppLocalization.shared
     let preference: TimerPreference
     let allowsCountup: Bool
     let onSelect: (TimerPreference) -> Void
@@ -1226,17 +1232,17 @@ private struct TimerOptions: View {
         let radius = max(4, popoverRadius - inset)
         return VStack(alignment: .leading, spacing: z(1)) {
             ForEach([10, 20, 30], id: \.self) { value in
-                OptionRow(title: "\(value)분", checked: preference == .countdown(minutes: value), cornerRadius: radius) {
+                OptionRow(title: L("%1$@ min", value), checked: preference == .countdown(minutes: value), cornerRadius: radius) {
                     onSelect(.countdown(minutes: value)!)
                 }
             }
-            OptionRow(title: customSelected ? "직접 설정 · \(Int((preference.seconds ?? 0) / 60))분" : "직접 설정…", checked: customSelected, cornerRadius: radius) {
+            OptionRow(title: customSelected ? L("Custom · %1$@ min", Int((preference.seconds ?? 0) / 60)) : L("Custom…"), checked: customSelected, cornerRadius: radius) {
                 minutes = String(Int((preference.seconds ?? 1200) / 60))
                 custom = true
             }
             if allowsCountup {
                 Rectangle().fill(BubbleColor.line).frame(height: 1).padding(.vertical, z(4)).padding(.horizontal, z(10))
-                OptionRow(title: "카운트업", subtitle: "00:00부터", checked: preference.mode == .countup, cornerRadius: radius) { onSelect(.countup) }
+                OptionRow(title: L("Count Up"), subtitle: L("From 00:00"), checked: preference.mode == .countup, cornerRadius: radius) { onSelect(.countup) }
             }
         }
         .padding(inset)
@@ -1244,7 +1250,7 @@ private struct TimerOptions: View {
 
     private var customForm: some View {
         VStack(alignment: .leading, spacing: z(8)) {
-            Text("직접 설정").font(z.font(12.5, .semibold))
+            Text(L("Custom")).font(z.font(12.5, .semibold))
             HStack(spacing: z(6)) {
                 TextField("20", text: $minutes)
                     .textFieldStyle(.plain)
@@ -1254,16 +1260,16 @@ private struct TimerOptions: View {
                     .background(RoundedRectangle(cornerRadius: z(6), style: .continuous).fill(BubbleColor.well))
                     .focused($fieldFocused)
                     .onSubmit(apply)
-                Text("분").font(z.font(13)).foregroundStyle(BubbleColor.muted)
+                Text(L("min")).font(z.font(13)).foregroundStyle(BubbleColor.muted)
             }
-            Text(customValue == nil ? "1~999 사이의 정수를 입력하세요." : "1분부터 999분까지 설정할 수 있어요.")
+            Text(customValue == nil ? L("Enter a whole number from 1 to 999.") : L("Choose from 1 to 999 minutes."))
                 .font(z.font(10.5))
                 .foregroundStyle(customValue == nil ? BubbleColor.tomato : BubbleColor.muted)
                 .fixedSize(horizontal: false, vertical: true)
             HStack {
-                Button("취소", action: onCancel)
+                Button(L("Cancel"), action: onCancel)
                 Spacer()
-                Button("적용", action: apply).keyboardShortcut(.defaultAction).disabled(customValue == nil)
+                Button(L("Apply"), action: apply).keyboardShortcut(.defaultAction).disabled(customValue == nil)
             }
         }
         .padding(z(12))
@@ -1278,6 +1284,7 @@ private struct TimerOptions: View {
 }
 
 private struct TitleCounter: View {
+    @ObservedObject private var localization = AppLocalization.shared
     let count: Int
     @Environment(\.bubbleZoom) private var zoom
 
@@ -1287,11 +1294,12 @@ private struct TitleCounter: View {
             .font(z.font(10.5, .medium)).monospacedDigit()
             .foregroundStyle(count >= TodoTitlePolicy.maxLength ? BubbleColor.tomato : BubbleColor.faint)
             .frame(height: z(16))
-            .accessibilityLabel("\(TodoTitlePolicy.maxLength)자 중 \(count)자")
+            .accessibilityLabel(L("%2$@ of %1$@ characters", TodoTitlePolicy.maxLength, count))
     }
 }
 
 private struct OptionRow: View {
+    @ObservedObject private var localization = AppLocalization.shared
     let title: String
     var subtitle: String?
     let checked: Bool
@@ -1331,6 +1339,7 @@ private struct PressStyle: ButtonStyle {
 }
 
 private struct IconButton: View {
+    @ObservedObject private var localization = AppLocalization.shared
     let symbol: String
     let label: String
     var tint: Color = BubbleColor.muted
@@ -1358,6 +1367,7 @@ private struct IconButton: View {
 
 // A menu that looks and reacts like IconButton: a round wash and a darker glyph on hover.
 private struct IconMenu<Items: View>: View {
+    @ObservedObject private var localization = AppLocalization.shared
     let symbol: String
     let help: String
     let accessibilityLabel: String
@@ -1388,6 +1398,7 @@ private struct IconMenu<Items: View>: View {
 }
 
 private struct PillButton: View {
+    @ObservedObject private var localization = AppLocalization.shared
     enum Role { case secondary, primary, timer, destructive }
     let title: String
     var role: Role = .secondary
@@ -1428,6 +1439,7 @@ private struct PillButton: View {
 }
 
 private struct CheckCircle: View {
+    @ObservedObject private var localization = AppLocalization.shared
     let checked: Bool
     let label: String
     let action: () -> Void
@@ -1457,6 +1469,7 @@ private struct CheckCircle: View {
 
 // The pet controls use the same dark translucent capsule.
 struct TodoEntryButton: View {
+    @ObservedObject private var localization = AppLocalization.shared
     let action: () -> Void
     @State private var hovering = false
 
@@ -1464,7 +1477,7 @@ struct TodoEntryButton: View {
         Button(action: action) {
             HStack(spacing: 5) {
                 Image(systemName: "checklist").font(.system(size: 11, weight: .bold))
-                Text("할 일").font(.system(size: 12, weight: .bold, design: .rounded))
+                Text(L("Todos")).font(.system(size: 12, weight: .bold, design: .rounded))
             }
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -1472,8 +1485,8 @@ struct TodoEntryButton: View {
             .contentShape(Capsule())
         }
         .buttonStyle(PressStyle())
-        .help("할 일")
-        .accessibilityLabel("할 일")
+        .help(L("Todos"))
+        .accessibilityLabel(L("Todos"))
         .trackingHover { hovering = $0 }
     }
 }
@@ -1481,6 +1494,7 @@ struct TodoEntryButton: View {
 // MARK: - Tomato
 
 private struct TomatoRing: View {
+    @ObservedObject private var localization = AppLocalization.shared
     let fraction: Double
     var paused = false
     let size: CGFloat
@@ -1517,6 +1531,7 @@ private struct TomatoRing: View {
 }
 
 private struct TomatoIcon: View {
+    @ObservedObject private var localization = AppLocalization.shared
     var body: some View {
         GeometryReader { proxy in
             let s = min(proxy.size.width, proxy.size.height)

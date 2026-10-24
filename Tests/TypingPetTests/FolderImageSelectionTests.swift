@@ -132,7 +132,7 @@ final class FolderImageSelectionTests: XCTestCase {
 
         let library = PetImageLibrary(fileManager: fileManager, defaults: defaults, imagesDirectory: root)
         XCTAssertEqual(library.imageSets.count, 2)
-        XCTAssertEqual(library.activeSet.name, "기존 사용자 세트")
+        XCTAssertEqual(library.activeSet.name, L("Existing Custom Set"))
         XCTAssertEqual(library.idleURL?.path, legacyImage.path)
 
         try library.replaceIdle(with: resource)

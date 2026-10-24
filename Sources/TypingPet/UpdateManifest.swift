@@ -45,11 +45,11 @@ struct UpdateConfiguration {
               let bundleIdentifier = info["CFBundleIdentifier"] as? String,
               let version = info["CFBundleShortVersionString"] as? String,
               let build = (info["CFBundleVersion"] as? String).flatMap(Int.init)
-        else { return .failure(.unavailable("앱 번들로 실행할 때만 업데이트할 수 있어요.")) }
+        else { return .failure(.unavailable(L("Updates are only available when running an app bundle."))) }
         guard let encodedKey = info["TypingPetUpdatePublicKey"] as? String,
               let keyData = Data(base64Encoded: encodedKey),
               let publicKey = try? Curve25519.Signing.PublicKey(rawRepresentation: keyData)
-        else { return .failure(.unavailable("이 빌드에는 업데이트 서명 키가 없어요.")) }
+        else { return .failure(.unavailable(L("This build has no update signing key."))) }
         let teamIdentifier = (info["TypingPetTeamIdentifier"] as? String).flatMap { $0.isEmpty ? nil : $0 }
         let feedURL: URL
         switch profile {
@@ -57,11 +57,11 @@ struct UpdateConfiguration {
             feedURL = productionFeedURL
         case .development:
             guard let override = feedOverride.flatMap(URL.init(string:)) else {
-                return .failure(.unavailable("Dev 빌드는 \(feedOverrideKey) 설정이 있을 때만 업데이트를 확인해요."))
+                return .failure(.unavailable(L("Dev builds only check for updates when %1$@ is configured.", feedOverrideKey)))
             }
             feedURL = override
         }
-        guard isAllowed(feedURL, profile: profile) else { return .failure(.unavailable("업데이트 주소가 안전하지 않아요.")) }
+        guard isAllowed(feedURL, profile: profile) else { return .failure(.unavailable(L("The update URL is not secure."))) }
         return .success(UpdateConfiguration(
             profile: profile,
             bundleIdentifier: bundleIdentifier,
@@ -108,50 +108,50 @@ enum UpdateError: LocalizedError, Equatable {
 enum UpdateVerifier {
     static func validate(_ manifest: UpdateManifest, configuration: UpdateConfiguration) throws {
         guard UpdateConfiguration.isAllowed(manifest.url, profile: configuration.profile) else {
-            throw UpdateError.invalidFeed("업데이트 파일 주소가 안전하지 않아요.")
+            throw UpdateError.invalidFeed(L("The update file URL is not secure."))
         }
         guard manifest.size > 0, manifest.sha256.count == 64, Data(base64Encoded: manifest.signature)?.count == 64 else {
-            throw UpdateError.invalidFeed("업데이트 정보가 올바르지 않아요.")
+            throw UpdateError.invalidFeed(L("The update information is invalid."))
         }
     }
 
     static func verifyArchive(_ data: Data, manifest: UpdateManifest, publicKey: Curve25519.Signing.PublicKey) throws {
-        guard data.count == manifest.size else { throw UpdateError.rejected("내려받은 파일 크기가 달라요.") }
+        guard data.count == manifest.size else { throw UpdateError.rejected(L("The downloaded file size does not match.")) }
         let digest = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
-        guard digest == manifest.sha256.lowercased() else { throw UpdateError.rejected("내려받은 파일의 해시가 달라요.") }
+        guard digest == manifest.sha256.lowercased() else { throw UpdateError.rejected(L("The downloaded file hash does not match.")) }
         guard let signature = Data(base64Encoded: manifest.signature),
               publicKey.isValidSignature(signature, for: data)
-        else { throw UpdateError.rejected("업데이트 서명이 올바르지 않아요.") }
+        else { throw UpdateError.rejected(L("The update signature is invalid.")) }
     }
 
     // The staged app must be this app, newer than this build, and signed like this app.
     static func verifyApp(at url: URL, manifest: UpdateManifest, configuration: UpdateConfiguration) throws {
         guard let info = NSDictionary(contentsOf: url.appendingPathComponent("Contents/Info.plist")) as? [String: Any] else {
-            throw UpdateError.rejected("업데이트 앱 정보를 읽지 못했어요.")
+            throw UpdateError.rejected(L("Could not read the update app's information."))
         }
         guard info["CFBundleIdentifier"] as? String == configuration.bundleIdentifier,
               info["TypingPetBuildChannel"] as? String == configuration.profile.rawValue
-        else { throw UpdateError.rejected("다른 앱의 업데이트예요.") }
+        else { throw UpdateError.rejected(L("This update belongs to a different app.")) }
         guard let build = (info["CFBundleVersion"] as? String).flatMap(Int.init), build == manifest.build,
               build > configuration.build
-        else { throw UpdateError.rejected("업데이트 빌드 번호가 맞지 않아요.") }
+        else { throw UpdateError.rejected(L("The update build number does not match.")) }
         try verifyCodeSignature(at: url, requirement: configuration.codeRequirement)
     }
 
     static func verifyCodeSignature(at url: URL, requirement: String?) throws {
         var code: SecStaticCode?
         guard SecStaticCodeCreateWithPath(url as CFURL, [], &code) == errSecSuccess, let code else {
-            throw UpdateError.rejected("업데이트 앱의 서명을 읽지 못했어요.")
+            throw UpdateError.rejected(L("Could not read the update app's signature."))
         }
         var secRequirement: SecRequirement?
         if let requirement {
             guard SecRequirementCreateWithString(requirement as CFString, [], &secRequirement) == errSecSuccess else {
-                throw UpdateError.rejected("서명 요구 사항을 만들지 못했어요.")
+                throw UpdateError.rejected(L("Could not create the signature requirement."))
             }
         }
         let flags = SecCSFlags(rawValue: kSecCSCheckAllArchitectures | kSecCSStrictValidate | kSecCSCheckNestedCode)
         guard SecStaticCodeCheckValidity(code, flags, secRequirement) == errSecSuccess else {
-            throw UpdateError.rejected(requirement == nil ? "업데이트 앱의 서명이 손상됐어요." : "업데이트 앱이 같은 개발자 서명이 아니에요.")
+            throw UpdateError.rejected(requirement == nil ? L("The update app's signature is damaged.") : L("The update app is not signed by the same developer."))
         }
     }
 }

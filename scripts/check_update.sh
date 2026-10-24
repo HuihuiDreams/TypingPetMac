@@ -58,26 +58,26 @@ build_of() { /usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$app/Contents/
 rewrite() { python3 -c "import json,sys; m=json.load(open(sys.argv[1])); $2; json.dump(m, open(sys.argv[1], 'w'))" "$manifest" }
 expect_rejected() {
     local name="$1" pattern="$2" output code=0
-    output="$(perl -e 'alarm 60; exec @ARGV' "$binary" --install-update-now 2>&1)" || code=$?
+    output="$(perl -e 'alarm 60; exec @ARGV' "$binary" -AppLanguageMode english --install-update-now 2>&1)" || code=$?
     [[ $code -ne 0 && "$output" == *"UPDATE CHECK FAILED"*"$pattern"* ]] || fail "$name: $output"
     [[ "$(build_of)" == "$old_build" ]] || fail "$name changed the installed app"
     pass "$name"
 }
 
 rewrite "$manifest" "s = m['signature']; m['signature'] = s[:10] + ('B' if s[10] == 'A' else 'A') + s[11:]"
-expect_rejected "Bad signature is rejected" "서명"
+expect_rejected "Bad signature is rejected" "signature"
 cp "$work/latest.good.json" "$manifest"
 rewrite "$manifest" "m['sha256'] = '0' * 64"
-expect_rejected "Hash mismatch is rejected" "해시"
+expect_rejected "Hash mismatch is rejected" "hash"
 cp "$work/latest.good.json" "$manifest"
 rewrite "$manifest" "m['build'] = $old_build"
-expect_rejected "Same build is not offered" "최신"
+expect_rejected "Same build is not offered" "up to date"
 cp "$work/latest.good.json" "$manifest"
 rewrite "$manifest" "m['url'] = 'http://example.com/update.zip'"
-expect_rejected "Remote http archive is refused" "안전"
+expect_rejected "Remote http archive is refused" "secure"
 cp "$work/latest.good.json" "$manifest"
 
-"$binary" --install-update-now >"$work/old-app.log" 2>&1 &
+"$binary" -AppLanguageMode english --install-update-now >"$work/old-app.log" 2>&1 &
 for _ in {1..300}; do
     [[ "$(build_of)" == "$new_build" ]] && pgrep -f "$binary" >/dev/null && break
     sleep 0.1

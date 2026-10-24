@@ -25,11 +25,11 @@ enum UpdateInstaller {
     static func fetchManifest(configuration: UpdateConfiguration, session: URLSession) async throws -> UpdateManifest {
         let (data, response) = try await session.data(from: configuration.feedURL)
         guard (response as? HTTPURLResponse)?.statusCode == 200 else {
-            throw UpdateError.invalidFeed("업데이트 서버가 응답하지 않아요.")
+            throw UpdateError.invalidFeed(L("The update server did not respond."))
         }
         let manifest: UpdateManifest
         do { manifest = try JSONDecoder().decode(UpdateManifest.self, from: data) } catch {
-            throw UpdateError.invalidFeed("업데이트 정보를 읽지 못했어요.")
+            throw UpdateError.invalidFeed(L("Could not read update information."))
         }
         try UpdateVerifier.validate(manifest, configuration: configuration)
         return manifest
@@ -42,7 +42,7 @@ enum UpdateInstaller {
         do {
             let (download, response) = try await session.download(from: manifest.url)
             guard (response as? HTTPURLResponse)?.statusCode == 200 else {
-                throw UpdateError.installFailed("업데이트 파일을 내려받지 못했어요.")
+                throw UpdateError.installFailed(L("Could not download the update file."))
             }
             let archive = folder.appendingPathComponent("update.zip")
             try FileManager.default.moveItem(at: download, to: archive)
@@ -52,13 +52,13 @@ enum UpdateInstaller {
                 publicKey: configuration.publicKey
             )
             let extracted = folder.appendingPathComponent("extracted", isDirectory: true)
-            try run("/usr/bin/ditto", ["-x", "-k", archive.path, extracted.path], failure: "업데이트 압축을 풀지 못했어요.")
+            try run("/usr/bin/ditto", ["-x", "-k", archive.path, extracted.path], failure: L("Could not extract the update archive."))
             let apps = try FileManager.default.contentsOfDirectory(at: extracted, includingPropertiesForKeys: nil)
                 .filter { $0.pathExtension == "app" }
-            guard apps.count == 1, let app = apps.first else { throw UpdateError.rejected("업데이트 안에 앱이 하나여야 해요.") }
+            guard apps.count == 1, let app = apps.first else { throw UpdateError.rejected(L("The update must contain exactly one app.")) }
             try UpdateVerifier.verifyApp(at: app, manifest: manifest, configuration: configuration)
             if configuration.profile == .production, configuration.teamIdentifier != nil {
-                try run("/usr/sbin/spctl", ["--assess", "--type", "execute", app.path], failure: "업데이트 앱이 공증되지 않았어요.")
+                try run("/usr/sbin/spctl", ["--assess", "--type", "execute", app.path], failure: L("The update app is not notarized."))
             }
             return StagedUpdate(manifest: manifest, app: app, folder: folder)
         } catch {
@@ -69,11 +69,11 @@ enum UpdateInstaller {
 
     static func installTarget(for bundleURL: URL) throws -> URL {
         if bundleURL.path.contains("/AppTranslocation/") {
-            throw UpdateError.unavailable("앱을 응용 프로그램 폴더로 옮긴 뒤 다시 실행하면 업데이트할 수 있어요.")
+            throw UpdateError.unavailable(L("Move the app into Applications and reopen it to enable updates."))
         }
         let parent = bundleURL.deletingLastPathComponent().path
         guard FileManager.default.isWritableFile(atPath: parent), FileManager.default.isWritableFile(atPath: bundleURL.path) else {
-            throw UpdateError.unavailable("앱이 있는 폴더에 쓸 권한이 없어요.")
+            throw UpdateError.unavailable(L("You do not have permission to write to the app's folder."))
         }
         return bundleURL
     }

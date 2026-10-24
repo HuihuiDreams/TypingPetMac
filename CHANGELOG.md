@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.16.0 - 2026-10-24
+
+- Keep Settings at a compact 490-point default width, with room to grow for larger accessibility text and manual resizing.
+- Add System, Korean, and English language choices in Settings. Follow the first system language by default, using English for languages other than Korean.
+- Maintain Korean and English interface strings in separate localization files, including Settings, menus, Todo bubbles, Input Monitoring guidance, and update messages.
+- Apply the saved System, Light, or Dark appearance to both Settings and Todo bubbles, including the collapsed entry button.
+
 ## 0.15.0 - 2026-10-24
 
 - Let users try pet key reactions inside the welcome window before requesting Input Monitoring permission.

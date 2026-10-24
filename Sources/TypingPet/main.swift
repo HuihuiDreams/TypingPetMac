@@ -3,6 +3,7 @@ import CoreGraphics
 import QuartzCore
 import ServiceManagement
 import UniformTypeIdentifiers
+import Combine
 
 private enum PetConstants {
     static let fallbackBaseSize = NSSize(width: 453, height: 354)
@@ -15,6 +16,12 @@ private final class PetPanel: NSPanel {
 }
 
 private final class PetResizeHandleView: NSView {
+    func refreshLocalizedInterface() {
+        toolTip = L("Drag to resize")
+        setAccessibilityLabel(L("Resize pet"))
+        setAccessibilityHelp(L("Drag to resize your pet."))
+    }
+
     var onResizeBegan: ((NSPoint) -> Void)?
     var onResizeDragged: ((NSPoint) -> Void)?
     var onResizeEnded: (() -> Void)?
@@ -42,14 +49,14 @@ private final class PetResizeHandleView: NSView {
         let configuration = NSImage.SymbolConfiguration(pointSize: 16, weight: .semibold)
         imageView.image = NSImage(
             systemSymbolName: "arrow.up.left.and.arrow.down.right",
-            accessibilityDescription: "크기 조절"
+            accessibilityDescription: L("Resize")
         )?.withSymbolConfiguration(configuration)
         imageView.contentTintColor = .white
         imageView.imageScaling = .scaleProportionallyDown
         addSubview(imageView)
-        toolTip = "드래그하여 크기 조절"
-        setAccessibilityLabel("펫 크기 조절")
-        setAccessibilityHelp("드래그하여 펫 크기를 조절합니다.")
+        toolTip = L("Drag to resize")
+        setAccessibilityLabel(L("Resize pet"))
+        setAccessibilityHelp(L("Drag to resize your pet."))
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -116,6 +123,13 @@ private final class PetResizeHandleView: NSView {
 }
 
 private final class PetContentView: NSView {
+    func refreshLocalizedInterface() {
+        closeButton.setAccessibilityLabel(L("Hide Pet"))
+        settingsButton.toolTip = L("Open Settings")
+        settingsButton.setAccessibilityLabel(L("Open Pet Settings"))
+        resizeHandle.refreshLocalizedInterface()
+    }
+
     var onClose: (() -> Void)?
     var onOpenSettings: (() -> Void)?
     var onResizeBegan: ((NSPoint) -> Void)?
@@ -151,7 +165,7 @@ private final class PetContentView: NSView {
         closeButton.isBordered = false
         closeButton.image = NSImage(
             systemSymbolName: "xmark",
-            accessibilityDescription: "펫 숨기기"
+            accessibilityDescription: L("Hide Pet")
         )?.withSymbolConfiguration(.init(pointSize: 18, weight: .semibold))
         closeButton.imagePosition = .imageOnly
         closeButton.contentTintColor = .white
@@ -159,12 +173,12 @@ private final class PetContentView: NSView {
         closeButton.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.62).cgColor
         closeButton.target = self
         closeButton.action = #selector(closePet)
-        closeButton.setAccessibilityLabel("펫 숨기기")
+        closeButton.setAccessibilityLabel(L("Hide Pet"))
 
         settingsButton.isBordered = false
         settingsButton.image = NSImage(
             systemSymbolName: "gearshape",
-            accessibilityDescription: "설정 열기"
+            accessibilityDescription: L("Open Settings")
         )?.withSymbolConfiguration(.init(pointSize: 18, weight: .semibold))
         settingsButton.imagePosition = .imageOnly
         settingsButton.contentTintColor = .white
@@ -172,8 +186,8 @@ private final class PetContentView: NSView {
         settingsButton.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.62).cgColor
         settingsButton.target = self
         settingsButton.action = #selector(openSettings)
-        settingsButton.toolTip = "설정 열기"
-        settingsButton.setAccessibilityLabel("펫 설정 열기")
+        settingsButton.toolTip = L("Open Settings")
+        settingsButton.setAccessibilityLabel(L("Open Pet Settings"))
 
         resizeHandle.onResizeBegan = { [weak self] in self?.onResizeBegan?($0) }
         resizeHandle.onResizeDragged = { [weak self] in self?.onResizeDragged?($0) }
@@ -384,6 +398,11 @@ private final class PetController: NSObject, NSWindowDelegate {
     private let keyStore: KeyReactionStore
     private let panel: PetPanel
     var todoAnchorWindow: NSWindow { panel }
+
+    func refreshLocalizedInterface() {
+        panel.title = AppEnvironment.displayName + L(" · Pet")
+        contentView.refreshLocalizedInterface()
+    }
     var shouldHoldPosition: (() -> Bool)?
     var onPresentationChanged: (() -> Void)?
     private let contentView: PetContentView
@@ -449,7 +468,7 @@ private final class PetController: NSObject, NSWindowDelegate {
         contentView.onMoveDragged = { [weak self] in self?.continueMove(with: $0) }
         contentView.onMoveEnded = { [weak self] in self?.endMove(with: $0) }
 
-        panel.title = AppEnvironment.displayName + " · 펫"
+        panel.title = AppEnvironment.displayName + L(" · Pet")
         panel.contentView = contentView
         panel.delegate = self
         panel.isOpaque = false
@@ -1065,6 +1084,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     private var settingsWindowController: SettingsWindowController?
     private var settingsModel: TypingPetSettingsModel?
     private var inputMonitoringGuideController: InputMonitoringGuideController?
+    private var languageSubscription: AnyCancellable?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         TextEditingShortcuts.installEditMenu(appName: AppEnvironment.displayName)
@@ -1079,6 +1099,15 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         petController.shouldHoldPosition = { [weak self] in self?.todoBubble?.isInteracting == true }
         petController.onPresentationChanged = { [weak self] in self?.todoBubble?.synchronize() }
         configureStatusItem()
+        languageSubscription = AppLocalization.shared.$language.dropFirst().sink { [weak self] _ in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.configureStatusItem()
+                TextEditingShortcuts.installEditMenu(appName: AppEnvironment.displayName)
+                self.petController.refreshLocalizedInterface()
+                self.todoBubble?.refreshLocalizedInterface()
+            }
+        }
         updater.isTimerRunning = { [weak self] in self?.todoStore.engine.activeSession?.status == .running }
         updater.onChange = { [weak self] in self?.updateUpdateItem() }
         updater.start()
@@ -1125,11 +1154,11 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         todoStore.pauseForSleepOrTermination()
         guard let error = todoStore.errorMessage, !todoStore.loadBlocked else { return .terminateNow }
         let alert = NSAlert()
-        alert.messageText = "할 일 기록을 저장하지 못했어요"
+        alert.messageText = L("Could not save Todo records")
         alert.informativeText = error
-        alert.addButton(withTitle: "다시 저장")
-        alert.addButton(withTitle: "취소")
-        alert.addButton(withTitle: "저장하지 않고 종료")
+        alert.addButton(withTitle: L("Save Again"))
+        alert.addButton(withTitle: L("Cancel"))
+        alert.addButton(withTitle: L("Quit Without Saving"))
         switch alert.runModal() {
         case .alertFirstButtonReturn:
             todoStore.persist()
@@ -1161,7 +1190,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     }
 
     func menuWillOpen(_ menu: NSMenu) {
-        petVisibilityItem.title = petController.isPetVisible ? "펫 숨기기" : "펫 다시 표시"
+        petVisibilityItem.title = petController.isPetVisible ? L("Hide Pet") : L("Show Pet Again")
         positionLockedItem.state = petController.isPositionLocked ? .on : .off
         loginItem.state = SMAppService.mainApp.status == .enabled ? .on : .off
         updateMonitoringStatusItem()
@@ -1202,8 +1231,8 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
 
     @objc private func changeIdleImage() {
         guard let url = chooseImageFiles(
-            title: "대기 이미지 선택",
-            message: "키 입력이 없을 때 표시할 이미지를 선택하세요.",
+            title: L("Choose Idle Image"),
+            message: L("Choose the image shown when you are not typing."),
             allowsMultipleSelection: false
         )?.first else { return }
 
@@ -1217,8 +1246,8 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
 
     @objc private func replaceReactionImages() {
         guard let urls = chooseImageFiles(
-            title: "반응 이미지 선택",
-            message: "키를 누를 때 무작위로 표시할 이미지를 한 장 이상 선택하세요.",
+            title: L("Choose Reaction Images"),
+            message: L("Select one or more images to show randomly when you press a key."),
             allowsMultipleSelection: true
         ), !urls.isEmpty else { return }
 
@@ -1233,9 +1262,9 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     @objc private func importImageFolder() {
         NSRunningApplication.current.activate(options: [.activateIgnoringOtherApps])
         let panel = NSOpenPanel()
-        panel.title = "이미지 폴더 가져오기"
-        panel.message = "idle.* 또는 pet-idle.*는 대기 이미지로, 나머지는 키 입력용 이미지로 가져옵니다."
-        panel.prompt = "가져오기"
+        panel.title = L("Import Image Folder")
+        panel.message = L("idle.* or pet-idle.* is the idle image. Other files are imported as key reaction images.")
+        panel.prompt = L("Import")
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
@@ -1248,15 +1277,15 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
 
             var parts: [String] = []
             if result.changedIdle {
-                parts.append("대기 이미지 1장")
+                parts.append(L("1 idle image"))
             }
             if let reactionCount = result.reactionCount {
-                parts.append("반응 이미지 \(reactionCount)장")
+                parts.append(L("%1$@ reaction images", reactionCount))
             }
             showAlert(
-                title: "이미지를 가져왔습니다",
-                message: parts.joined(separator: ", ") + "을 적용했습니다.",
-                primaryButton: "확인"
+                title: L("Images Imported"),
+                message: parts.joined(separator: ", ") + L(" were applied."),
+                primaryButton: L("OK")
             )
         } catch {
             showImageError(error)
@@ -1265,18 +1294,18 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
 
     @objc private func showImageFolderRules() {
         showAlert(
-            title: "이미지 세트 폴더 규칙",
-            message: "파일명은 자유롭게 사용할 수 있습니다. idle.* 또는 pet-idle.* 파일이 있으면 대기 이미지로 인식하며, 나머지는 키 입력용 이미지가 됩니다. 대기 이미지가 없으면 정렬상 첫 이미지를 대기 이미지로 사용합니다. 이미지가 한 장뿐이면 대기/반응에 함께 사용합니다. PNG, APNG, JPG, GIF, TIFF, HEIC, WebP를 지원합니다.",
-            primaryButton: "확인"
+            title: L("Image Set Folder Rules"),
+            message: L("File names are flexible. idle.* or pet-idle.* is used as the idle image; other files become key reaction images. Without an idle image, the first sorted image is used. A single image is used for both idle and reactions. PNG, APNG, JPG, GIF, TIFF, HEIC, and WebP are supported."),
+            primaryButton: L("OK")
         )
     }
 
     @objc private func resetImages() {
         showAlert(
-            title: "기본 이미지로 복원할까요?",
-            message: "현재 선택한 대기 이미지와 반응 이미지 설정을 기본값으로 되돌립니다. 원본 이미지 파일은 변경하지 않습니다.",
-            primaryButton: "복원",
-            secondaryButton: "취소"
+            title: L("Restore default images?"),
+            message: L("Reset your idle and reaction image selections to the defaults. Original image files will not be changed."),
+            primaryButton: L("Restore"),
+            secondaryButton: L("Cancel")
         ) { [weak self] response in
             guard response == .alertFirstButtonReturn else { return }
             self?.imageLibrary.resetToDefaults()
@@ -1322,6 +1351,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         }
         settingsModel?.refresh()
         if settingsWindowController == nil, let settingsModel {
+            settingsModel.onAppearanceChanged = { [weak self] in self?.todoBubble?.setAppearanceMode($0) }
             settingsWindowController = SettingsWindowController(model: settingsModel, todoStore: todoStore, updater: updater)
         }
         settingsWindowController?.show()
@@ -1366,9 +1396,9 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
             }
         } catch {
             showAlert(
-                title: "자동 실행 설정 실패",
+                title: L("Could not change launch at login"),
                 message: error.localizedDescription,
-                primaryButton: "확인"
+                primaryButton: L("OK")
             )
         }
     }
@@ -1382,7 +1412,9 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     }
 
     private func configureStatusItem() {
-        statusItem = NSStatusBar.system.statusItem(withLength: AppEnvironment.isDevelopment ? NSStatusItem.variableLength : NSStatusItem.squareLength)
+        if statusItem == nil {
+            statusItem = NSStatusBar.system.statusItem(withLength: AppEnvironment.isDevelopment ? NSStatusItem.variableLength : NSStatusItem.squareLength)
+        }
         if let button = statusItem.button {
             let image = NSImage(systemSymbolName: AppEnvironment.isDevelopment ? "flask.fill" : "pawprint.fill", accessibilityDescription: AppEnvironment.displayName)
             image?.isTemplate = true
@@ -1398,35 +1430,35 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         menu.delegate = self
         menu.autoenablesItems = false
 
-        menu.addItem(makeMenuItem("할 일 표시", action: #selector(showTodos)))
-        menu.addItem(makeMenuItem("설정", action: #selector(showSettings), keyEquivalent: ","))
-        petVisibilityItem = makeMenuItem("펫 숨기기", action: #selector(togglePetVisibility))
+        menu.addItem(makeMenuItem(L("Show Todos"), action: #selector(showTodos)))
+        menu.addItem(makeMenuItem(L("Settings"), action: #selector(showSettings), keyEquivalent: ","))
+        petVisibilityItem = makeMenuItem(L("Hide Pet"), action: #selector(togglePetVisibility))
         menu.addItem(petVisibilityItem)
         menu.addItem(.separator())
 
-        positionLockedItem = makeMenuItem("위치 잠금 (클릭 통과)", action: #selector(togglePositionLock))
+        positionLockedItem = makeMenuItem(L("Lock position (click through)"), action: #selector(togglePositionLock))
         menu.addItem(positionLockedItem)
-        menu.addItem(makeMenuItem("위치 초기화", action: #selector(resetPosition)))
+        menu.addItem(makeMenuItem(L("Reset Position"), action: #selector(resetPosition)))
         menu.addItem(.separator())
-        monitoringStatusItem = NSMenuItem(title: "키 입력 감지 (확인 중)", action: nil, keyEquivalent: "")
+        monitoringStatusItem = NSMenuItem(title: L("Key detection (checking)"), action: nil, keyEquivalent: "")
         monitoringStatusItem.isEnabled = true
         menu.addItem(monitoringStatusItem)
         updateMonitoringStatusItem()
-        menu.addItem(makeMenuItem("입력 모니터링 설정", action: #selector(openInputMonitoringSettings)))
+        menu.addItem(makeMenuItem(L("Input Monitoring Settings"), action: #selector(openInputMonitoringSettings)))
         menu.addItem(.separator())
 
-        loginItem = makeMenuItem("로그인 시 자동 실행", action: #selector(toggleLaunchAtLogin))
+        loginItem = makeMenuItem(L("Launch at login"), action: #selector(toggleLaunchAtLogin))
         menu.addItem(loginItem)
-        updateItem = makeMenuItem("업데이트 확인…", action: #selector(performUpdateAction))
+        updateItem = makeMenuItem(L("Check for Updates…"), action: #selector(performUpdateAction))
         menu.addItem(updateItem)
         updateUpdateItem()
-        menu.addItem(makeMenuItem("\(AppEnvironment.displayName) 종료", action: #selector(quit), keyEquivalent: "q"))
+        menu.addItem(makeMenuItem(L("Quit %1$@", AppEnvironment.displayName), action: #selector(quit), keyEquivalent: "q"))
         statusItem.menu = menu
     }
 
     private func updateMonitoringStatusItem() {
         let isAvailable = keyMonitor?.isRunning == true
-        let title = isAvailable ? "키 입력 감지 (가능)" : "키 입력 감지 (불가능)"
+        let title = isAvailable ? L("Key detection (available)") : L("Key detection (unavailable)")
         monitoringStatusItem.attributedTitle = NSAttributedString(
             string: title,
             attributes: [
@@ -1461,7 +1493,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         let panel = NSOpenPanel()
         panel.title = title
         panel.message = message
-        panel.prompt = "선택"
+        panel.prompt = L("Choose")
         panel.canChooseDirectories = false
         panel.canChooseFiles = true
         panel.allowsMultipleSelection = allowsMultipleSelection
@@ -1471,9 +1503,9 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
 
     private func showImageError(_ error: Error) {
         showAlert(
-            title: "이미지를 적용하지 못했습니다",
+            title: L("Could not apply images"),
             message: error.localizedDescription,
-            primaryButton: "확인"
+            primaryButton: L("OK")
         )
     }
 
@@ -1545,14 +1577,14 @@ MainActor.assumeIsolated {
         do {
             guard try runLock.acquire(at: AppEnvironment.supportDirectory.appendingPathComponent(".runtime.lock")) else {
                 let alert = NSAlert()
-                alert.messageText = "TypingPet Dev가 이미 실행 중입니다"
-                alert.informativeText = "메뉴 막대의 DEV 앱을 사용하세요. 다시 실행하려면 기존 Dev 앱을 종료하세요."
+                alert.messageText = L("TypingPet Dev is already running")
+                alert.informativeText = L("Use the DEV app in the menu bar. Quit the existing Dev app before launching again.")
                 alert.runModal()
                 exit(0)
             }
         } catch {
             let alert = NSAlert()
-            alert.messageText = "TypingPet Dev를 시작할 수 없습니다"
+            alert.messageText = L("Could not start TypingPet Dev")
             alert.informativeText = error.localizedDescription
             alert.runModal()
             exit(1)

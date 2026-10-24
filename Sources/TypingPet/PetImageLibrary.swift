@@ -47,12 +47,12 @@ enum PetImageLibraryError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .unsupportedFormat(let name): "지원하지 않는 이미지 형식입니다: \(name)"
-        case .unreadableImage(let name): "이미지를 읽을 수 없습니다: \(name)"
-        case .noImagesInFolder: "선택한 폴더에서 지원되는 이미지를 찾지 못했습니다."
-        case .noReactionImages: "키 입력용 이미지를 한 장 이상 선택해 주세요."
-        case .imageSetNotFound: "이미지 세트를 찾지 못했습니다."
-        case .cannotDeleteBuiltInSet: "기본 이미지 세트는 삭제할 수 없습니다."
+        case .unsupportedFormat(let name): L("Unsupported image format: %1$@", name)
+        case .unreadableImage(let name): L("Cannot read image: %1$@", name)
+        case .noImagesInFolder: L("No supported images were found in the selected folder.")
+        case .noReactionImages: L("Select at least one reaction image.")
+        case .imageSetNotFound: L("Image set not found.")
+        case .cannotDeleteBuiltInSet: L("The built-in image set cannot be removed.")
         }
     }
 }
@@ -179,7 +179,7 @@ final class PetImageLibrary {
     }
 
     func replaceIdle(with sourceURL: URL) throws {
-        var set = try editableActiveSet(named: "사용자 이미지")
+        var set = try editableActiveSet(named: L("Custom Images"))
         if set.storageFolder == nil { set.storageFolder = set.id.uuidString }
         let directory = try storageDirectory(for: set)
         set.idleFileName = try copyImage(from: sourceURL, to: directory)
@@ -188,7 +188,7 @@ final class PetImageLibrary {
 
     func replaceReactions(with sourceURLs: [URL]) throws {
         guard !sourceURLs.isEmpty else { throw PetImageLibraryError.noReactionImages }
-        var set = try editableActiveSet(named: "사용자 이미지")
+        var set = try editableActiveSet(named: L("Custom Images"))
         if set.storageFolder == nil { set.storageFolder = set.id.uuidString }
         let directory = try storageDirectory(for: set)
         set.reactionFileNames = try sourceURLs.map { try copyImage(from: $0, to: directory) }
@@ -206,7 +206,7 @@ final class PetImageLibrary {
     private static var builtInSet: PetImageSet {
         PetImageSet(
             id: builtInID,
-            name: "기본 세트",
+            name: L("Default Set"),
             storageFolder: nil,
             idleFileName: defaultIdleName,
             reactionFileNames: defaultReactionNames,
@@ -298,7 +298,7 @@ final class PetImageLibrary {
         let reactions = defaults.stringArray(forKey: Keys.legacyReactionFiles) ?? []
         guard idle != nil || !reactions.isEmpty else { return }
         let set = PetImageSet(
-            id: UUID(), name: "기존 사용자 세트", storageFolder: nil,
+            id: UUID(), name: L("Existing Custom Set"), storageFolder: nil,
             idleFileName: idle ?? Self.defaultIdleName,
             reactionFileNames: reactions.isEmpty ? Self.defaultReactionNames : reactions,
             isBuiltIn: false

@@ -108,3 +108,9 @@ An unknown or unbundled executable cannot select production mode.
 
 `./scripts/check_update.sh` checks the full update flow with two Dev builds and a local server.
 See [automatic updates](UPDATE.md).
+
+## Interface localization
+
+Korean and English strings live separately in `Sources/TypingPet/Localization/ko.lproj/Localizable.strings` and `en.lproj/Localizable.strings`. Call `L` with an English resource key; pass dynamic values as separate arguments using positional `%1$@` tokens. Keep matching keys and placeholders in both files. User-created titles and image set names are never translated.
+
+Settings > General > Language defaults to System: the first preferred system language selects Korean only for `ko`, otherwise English. Explicit Korean and English choices persist and update the interface without restarting. The build script copies both language folders into the signed app. Settings uses a 490-point default width and scales its minimum width for larger preferred body text. The saved appearance choice applies to Settings and both Todo panels.

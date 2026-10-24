@@ -233,7 +233,7 @@ final class InputMonitoringGuideController: NSObject, NSWindowDelegate {
         let panel = InputMonitoringGuidePanel(contentViewController: hostingController)
         panel.setContentSize(NSSize(width: 440, height: panelHeight))
         panel.styleMask = [.titled, .closable, .utilityWindow, .fullSizeContentView]
-        panel.title = AppEnvironment.displayName + " 입력 모니터링 안내"
+        panel.title = AppEnvironment.displayName + L(" Input Monitoring Guide")
         panel.titleVisibility = .hidden
         panel.titlebarAppearsTransparent = true
         panel.isOpaque = false
@@ -372,6 +372,7 @@ private final class InputMonitoringGuidePanel: NSPanel {
 }
 
 private struct InputMonitoringGuideView: View {
+    @ObservedObject private var localization = AppLocalization.shared
     @ObservedObject var model: InputMonitoringGuideModel
     let appURL: URL
     let location: TypingPetAppLocation
@@ -382,11 +383,11 @@ private struct InputMonitoringGuideView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             HStack(spacing: 8) {
-                step("1 체험", active: model.phase == .preview)
+                step(L("1 Try it"), active: model.phase == .preview)
                 Image(systemName: "chevron.right").font(.caption2)
-                step("2 설정", active: model.phase == .permission || model.phase == .connectionFailed)
+                step(L("2 Set up"), active: model.phase == .permission || model.phase == .connectionFailed)
                 Image(systemName: "chevron.right").font(.caption2)
-                step("3 확인", active: model.phase == .verifying || model.phase == .complete)
+                step(L("3 Verify"), active: model.phase == .verifying || model.phase == .complete)
             }
             .foregroundStyle(.secondary)
             .accessibilityElement(children: .combine)
@@ -402,23 +403,23 @@ private struct InputMonitoringGuideView: View {
             switch model.phase {
             case .preview:
                 preview
-                Text("다른 앱에서도 반응하려면 입력 모니터링 권한이 필요해요. 키 누름과 지정한 키 조합을 감지하며, 입력한 문장은 저장하거나 전송하지 않아요.")
+                Text(L("Input Monitoring lets your pet react while you use other apps. Only key presses and assigned shortcuts are detected. Typed text is never stored or sent."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             case .permission:
                 permissionInstructions
             case .verifying:
-                Label("키 입력을 기다리고 있어요", systemImage: "keyboard")
+                Label(L("Waiting for a key press"), systemImage: "keyboard")
                     .font(.headline)
                     .padding(.vertical, 8)
-                DisclosureGroup("반응이 없나요?", isExpanded: $model.showsConnectionHelp) {
+                DisclosureGroup(L("No reaction?"), isExpanded: $model.showsConnectionHelp) {
                     connectionHelp
                 }
             case .connectionFailed:
                 connectionHelp
             case .complete:
-                Label("실제 키 입력을 확인했어요", systemImage: "checkmark.circle.fill")
+                Label(L("A real key press was detected"), systemImage: "checkmark.circle.fill")
                     .font(.headline)
                     .foregroundStyle(.green)
                     .padding(.vertical, 12)
@@ -438,7 +439,7 @@ private struct InputMonitoringGuideView: View {
             } else {
                 HStack {
                     if model.phase != .complete {
-                        Button("나중에", action: close)
+                        Button(L("Later"), action: close)
                             .buttonStyle(.plain)
                             .foregroundStyle(.secondary)
                         Spacer()
@@ -446,14 +447,14 @@ private struct InputMonitoringGuideView: View {
                     switch model.phase {
                     case .preview: EmptyView()
                     case .permission:
-                        Button("설정 창 열기", action: model.showSettings)
+                        Button(L("Open Settings"), action: model.showSettings)
                             .buttonStyle(.borderedProminent)
                     case .verifying, .connectionFailed:
-                        Button("다시 연결") { model.refresh(restart: true) }
+                        Button(L("Reconnect")) { model.refresh(restart: true) }
                             .buttonStyle(.borderedProminent)
                     case .complete:
                         Spacer()
-                        Button("시작하기", action: close).buttonStyle(.borderedProminent)
+                        Button(L("Get Started"), action: close).buttonStyle(.borderedProminent)
                     }
                 }
                 .controlSize(.large)
@@ -487,9 +488,9 @@ private struct InputMonitoringGuideView: View {
                     .frame(height: 130)
                     .accessibilityHidden(true)
             }
-            Text(previewIsFocused ? "이제 키를 눌러보세요" : "여기를 클릭하고 키를 눌러보세요")
+            Text(previewIsFocused ? L("Press a key now") : L("Click here, then press a key"))
                 .font(.callout.weight(.medium))
-            Text(model.hasTriedPreview ? "이렇게 타이핑할 때마다 함께 반응해요" : "이 체험에는 권한이 필요하지 않아요")
+            Text(model.hasTriedPreview ? L("Your pet reacts whenever you type") : L("No permission is needed for this preview"))
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -507,17 +508,17 @@ private struct InputMonitoringGuideView: View {
 
     private var permissionInstructions: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Label("목록에서 \(appURL.deletingPathExtension().lastPathComponent) 항목의 스위치를 켜세요.", systemImage: "switch.2")
+            Label(L("Turn on the switch for %1$@ in the list.", appURL.deletingPathExtension().lastPathComponent), systemImage: "switch.2")
                 .font(.callout.weight(.medium))
                 .fixedSize(horizontal: false, vertical: true)
-            DisclosureGroup("목록에 없나요?", isExpanded: $model.showsMissingAppHelp) {
+            DisclosureGroup(L("Not in the list?"), isExpanded: $model.showsMissingAppHelp) {
                 VStack(alignment: .leading, spacing: 10) {
                     HStack(spacing: 14) {
                         DraggableAppIcon(appURL: appURL).frame(width: 52, height: 52)
-                        Text("이 아이콘을 입력 모니터링 목록으로 드래그한 뒤 스위치를 켜세요.")
+                        Text(L("Drag this icon into the Input Monitoring list, then turn on its switch."))
                             .font(.callout)
                     }
-                    Text("드래그가 안 되면 목록 아래의 + 버튼에서 \(appURL.lastPathComponent)을 선택하세요.")
+                    Text(L("If dragging does not work, click + below the list and select %1$@.", appURL.lastPathComponent))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -528,8 +529,8 @@ private struct InputMonitoringGuideView: View {
 
     private var connectionHelp: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("설정 창을 닫고 다른 앱에서 평소처럼 타이핑해 보세요. macOS가 종료 후 다시 열기를 요청하면 그 안내를 따라 주세요.")
-            Text("계속 반응하지 않으면 다시 연결하거나, 메뉴에서 앱을 종료한 뒤 다시 실행해 주세요.")
+            Text(L("Close Settings and type in another app. If macOS asks you to quit and reopen, follow that prompt."))
+            Text(L("If there is still no reaction, reconnect or quit the app from its menu and open it again."))
         }
         .font(.caption)
         .foregroundStyle(.secondary)
@@ -539,29 +540,29 @@ private struct InputMonitoringGuideView: View {
 
     private var title: String {
         switch model.phase {
-        case .preview: return "키를 누르면, 펫이 반응해요"
-        case .permission: return "입력 모니터링을 켜주세요"
-        case .verifying: return "연결됐어요. 타이핑해 보세요"
-        case .connectionFailed: return "권한은 확인했지만 연결이 필요해요"
-        case .complete: return "준비됐어요!"
+        case .preview: return L("Press a key. Meet your pet.")
+        case .permission: return L("Turn on Input Monitoring")
+        case .verifying: return L("Connected. Try typing.")
+        case .connectionFailed: return L("Permission granted. Reconnect to continue.")
+        case .complete: return L("You are ready!")
         }
     }
 
     private var message: String {
         switch model.phase {
-        case .preview: return "먼저 이 창에서 키 반응을 체험해 보세요."
-        case .permission: return "시스템 설정 → 개인정보 보호 및 보안 → 입력 모니터링"
-        case .verifying: return "다른 앱으로 돌아가 키를 누르면 펫이 반응해요. 첫 반응을 확인하면 안내가 자동으로 닫혀요."
-        case .connectionFailed: return "키 입력 감지를 다시 연결해 주세요. 실제 입력을 확인한 뒤 설정을 마칠게요."
-        case .complete: return "이제 평소처럼 타이핑하면 펫이 함께 반응해요."
+        case .preview: return L("Try the key reactions in this window first.")
+        case .permission: return L("System Settings → Privacy & Security → Input Monitoring")
+        case .verifying: return L("Type in another app to see your pet react. This guide closes after the first reaction.")
+        case .connectionFailed: return L("Reconnect key detection. Setup finishes after a real key press is detected.")
+        case .complete: return L("Your pet will now react as you type.")
         }
     }
 
     private var locationWarning: String {
         switch location {
         case .applications: return ""
-        case .outsideApplications: return "앱이 응용 프로그램 폴더 밖에 있어요. 먼저 응용 프로그램으로 옮겨 다시 실행하면 같은 앱에 권한을 줄 수 있어요."
-        case .translocated: return "임시 보안 위치에서 실행 중이에요. 응용 프로그램 폴더로 옮겨 다시 실행한 뒤 권한을 설정해 주세요."
+        case .outsideApplications: return L("This app is outside Applications. Move it into Applications and reopen it before granting permission.")
+        case .translocated: return L("This app is running from a temporary security location. Move it into Applications, reopen it, then grant permission.")
         }
     }
 }
@@ -582,8 +583,8 @@ private final class InputMonitoringPreviewFooterView: NSView {
     let setupButton: InputMonitoringPreviewButton
 
     init(onLater: @escaping () -> Void, onSetup: @escaping () -> Void) {
-        laterButton = InputMonitoringPreviewButton(title: "나중에", onPress: onLater)
-        setupButton = InputMonitoringPreviewButton(title: "다른 앱에서도 반응하도록 설정", onPress: onSetup)
+        laterButton = InputMonitoringPreviewButton(title: L("Later"), onPress: onLater)
+        setupButton = InputMonitoringPreviewButton(title: L("Set Up Reactions in Other Apps"), onPress: onSetup)
         super.init(frame: .zero)
         laterButton.isBordered = false
         setupButton.bezelColor = .controlAccentColor
@@ -662,8 +663,8 @@ private final class PreviewKeyCaptureView: NSView {
         super.init(frame: .zero)
         setAccessibilityElement(true)
         setAccessibilityRole(.button)
-        setAccessibilityLabel("키 반응 체험 영역")
-        setAccessibilityHelp("클릭하거나 활성화한 뒤 키를 누르면 펫이 반응합니다. 입력한 문장은 저장하지 않습니다.")
+        setAccessibilityLabel(L("Key reaction preview"))
+        setAccessibilityHelp(L("Click or activate this area and press a key to see your pet react. Typed text is not stored."))
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -732,11 +733,11 @@ private final class AppBundleDragView: NSView, NSDraggingSource {
         iconView.image = icon
         iconView.imageScaling = .scaleProportionallyUpOrDown
         addSubview(iconView)
-        toolTip = "\(appURL.lastPathComponent)을 입력 모니터링 목록으로 드래그"
+        toolTip = L("Drag %1$@ into the Input Monitoring list", appURL.lastPathComponent)
         setAccessibilityElement(true)
         setAccessibilityRole(.image)
-        setAccessibilityLabel("드래그 가능한 \(appURL.lastPathComponent)")
-        setAccessibilityHelp("입력 모니터링 목록으로 드래그하여 앱을 추가합니다.")
+        setAccessibilityLabel(L("Draggable %1$@", appURL.lastPathComponent))
+        setAccessibilityHelp(L("Drag into the Input Monitoring list to add the app."))
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }

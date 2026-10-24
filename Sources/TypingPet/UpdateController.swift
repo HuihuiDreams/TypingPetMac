@@ -26,7 +26,14 @@ final class UpdateController: ObservableObject {
     @Published var automaticChecks: Bool {
         didSet { defaults.set(automaticChecks, forKey: Self.automaticKey) }
     }
-    let configuration: Result<UpdateConfiguration, UpdateError>
+    private let bundle: Bundle
+    var configuration: Result<UpdateConfiguration, UpdateError> {
+        UpdateConfiguration.resolve(
+            profile: AppEnvironment.profile,
+            info: bundle.infoDictionary,
+            feedOverride: defaults.string(forKey: UpdateConfiguration.feedOverrideKey)
+        )
+    }
     var onChange: (() -> Void)?
     var isTimerRunning: () -> Bool = { false }
 
@@ -37,18 +44,14 @@ final class UpdateController: ObservableObject {
 
     init(defaults: UserDefaults = AppEnvironment.defaults, bundle: Bundle = .main) {
         self.defaults = defaults
-        configuration = UpdateConfiguration.resolve(
-            profile: AppEnvironment.profile,
-            info: bundle.infoDictionary,
-            feedOverride: defaults.string(forKey: UpdateConfiguration.feedOverrideKey)
-        )
+        self.bundle = bundle
         automaticChecks = defaults.object(forKey: Self.automaticKey) as? Bool ?? true
         lastChecked = defaults.object(forKey: Self.lastCheckKey) as? Date
     }
 
     var currentVersionText: String {
         let info = Bundle.main.infoDictionary
-        let version = info?["CFBundleShortVersionString"] as? String ?? "개발 실행"
+        let version = info?["CFBundleShortVersionString"] as? String ?? L("Development build")
         return (info?["CFBundleVersion"] as? String).map { "\(version) (\($0))" } ?? version
     }
 
@@ -68,28 +71,30 @@ final class UpdateController: ObservableObject {
         if let unavailableReason { return unavailableReason }
         switch phase {
         case .idle: return completedMessage ?? lastCheckedText
-        case .checking: return "업데이트를 확인하는 중이에요…"
-        case .upToDate: return "최신 버전이에요. \(lastCheckedText)"
-        case .available(let manifest): return "새 버전 \(manifest.version)이 있어요."
-        case .downloading(let manifest): return "\(manifest.version)을 내려받고 확인하는 중이에요…"
-        case .ready(let staged): return "\(staged.manifest.version) 설치 준비가 끝났어요. 다시 시작하거나 종료할 때 설치돼요."
+        case .checking: return L("Checking for updates…")
+        case .upToDate: return L("You are up to date. %1$@", lastCheckedText)
+        case .available(let manifest): return L("Version %1$@ is available.", manifest.version)
+        case .downloading(let manifest): return L("Downloading and verifying %1$@…", manifest.version)
+        case .ready(let staged): return L("%1$@ is ready. It will be installed when you restart or quit.", staged.manifest.version)
         case .failed(let message): return message
         }
     }
 
     var menuTitle: String {
         switch phase {
-        case .checking: return "업데이트 확인 중…"
-        case .available(let manifest): return "업데이트 설치 (\(manifest.version))"
-        case .downloading: return "업데이트 내려받는 중…"
-        case .ready(let staged): return "다시 시작해 업데이트 (\(staged.manifest.version))"
-        default: return "업데이트 확인…"
+        case .checking: return L("Checking for Updates…")
+        case .available(let manifest): return L("Install Update (%1$@)", manifest.version)
+        case .downloading: return L("Downloading Update…")
+        case .ready(let staged): return L("Restart to Update (%1$@)", staged.manifest.version)
+        default: return L("Check for Updates…")
         }
     }
 
     private var lastCheckedText: String {
-        guard let lastChecked else { return "아직 확인하지 않았어요." }
-        return "마지막 확인: \(lastChecked.formatted(date: .abbreviated, time: .shortened))"
+        guard let lastChecked else { return L("No checks yet.") }
+        return L("Last checked: %1$@", lastChecked.formatted(
+            Date.FormatStyle(date: .abbreviated, time: .shortened).locale(AppLocalization.shared.locale)
+        ))
     }
 
     func start() {
@@ -119,7 +124,7 @@ final class UpdateController: ObservableObject {
 
     func check(userInitiated: Bool) async {
         guard case .success(let configuration) = configuration, !isBusy else {
-            if userInitiated, let unavailableReason { alert("업데이트를 확인할 수 없어요", unavailableReason) }
+            if userInitiated, let unavailableReason { alert(L("Cannot check for updates"), unavailableReason) }
             return
         }
         if case .ready = phase { return }
@@ -130,11 +135,11 @@ final class UpdateController: ObservableObject {
             defaults.set(lastChecked, forKey: Self.lastCheckKey)
             guard manifest.isNewer(than: configuration.build) else {
                 setPhase(.upToDate)
-                if userInitiated { alert("최신 버전이에요", "\(AppEnvironment.displayName) \(configuration.version)을 사용하고 있어요.") }
+                if userInitiated { alert(L("You are up to date"), L("You are using %1$@ %2$@.", AppEnvironment.displayName, configuration.version)) }
                 return
             }
             guard manifest.supports(ProcessInfo.processInfo.operatingSystemVersion) else {
-                setPhase(.failed("\(manifest.version)은 macOS \(manifest.minimumSystemVersion) 이상이 필요해요."))
+                setPhase(.failed(L("%1$@ requires macOS %2$@ or later.", manifest.version, manifest.minimumSystemVersion)))
                 return
             }
             setPhase(.available(manifest))
@@ -145,7 +150,7 @@ final class UpdateController: ObservableObject {
             }
         } catch {
             setPhase(.failed(error.localizedDescription))
-            if userInitiated { alert("업데이트를 확인하지 못했어요", error.localizedDescription) }
+            if userInitiated { alert(L("Could not check for updates"), error.localizedDescription) }
         }
     }
 
@@ -155,7 +160,7 @@ final class UpdateController: ObservableObject {
             _ = try UpdateInstaller.installTarget(for: Bundle.main.bundleURL)
         } catch {
             setPhase(.failed(error.localizedDescription))
-            alert("업데이트를 설치할 수 없어요", error.localizedDescription)
+            alert(L("Cannot install update"), error.localizedDescription)
             return
         }
         setPhase(.downloading(manifest))
@@ -165,7 +170,7 @@ final class UpdateController: ObservableObject {
             confirmRestart()
         } catch {
             setPhase(.failed(error.localizedDescription))
-            alert("업데이트를 설치하지 못했어요", error.localizedDescription)
+            alert(L("Could not install update"), error.localizedDescription)
         }
     }
 
@@ -200,32 +205,32 @@ final class UpdateController: ObservableObject {
         let pending = defaults.integer(forKey: Self.pendingBuildKey)
         guard pending > 0, case .success(let configuration) = configuration else { return }
         if configuration.build >= pending {
-            completedMessage = "\(configuration.version)으로 업데이트했어요."
+            completedMessage = L("Updated to %1$@.", configuration.version)
         } else {
             let log = defaults.string(forKey: Self.pendingFolderKey)
                 .flatMap { try? String(contentsOf: UpdateInstaller.logURL(in: URL(fileURLWithPath: $0)), encoding: .utf8) }
-            let reason = log?.split(separator: "\n").last { $0.hasPrefix("FAILED") }.map(String.init) ?? "설치 기록이 없어요."
-            setPhase(.failed("지난 업데이트를 설치하지 못했어요. \(reason)"))
+            let reason = log?.split(separator: "\n").last { $0.hasPrefix("FAILED") }.map(String.init) ?? L("No installation record.")
+            setPhase(.failed(L("The previous update could not be installed. %1$@", reason)))
         }
     }
 
     private func offerInstall(_ manifest: UpdateManifest) -> Bool {
         let notes = manifest.notes.map { "\n\n\($0)" } ?? ""
         let response = alert(
-            "\(AppEnvironment.displayName) \(manifest.version)이 나왔어요",
-            "지금 사용하는 버전은 \(currentVersionText)이에요.\(notes)",
-            buttons: ["설치", "나중에"]
+            L("%1$@ %2$@ is available", AppEnvironment.displayName, manifest.version),
+            L("You are currently using %1$@.%2$@", currentVersionText, notes),
+            buttons: [L("Install"), L("Later")]
         )
         return response == .alertFirstButtonReturn
     }
 
     private func confirmRestart() {
         guard case .ready(let staged) = phase else { return }
-        let timerNote = isTimerRunning() ? "\n\n실행 중인 타이머는 일시정지되고, 다시 열면 이어서 할 수 있어요." : ""
+        let timerNote = isTimerRunning() ? L("\n\nThe running timer will pause. You can resume it after reopening.") : ""
         let response = alert(
-            "다시 시작해서 \(staged.manifest.version)으로 업데이트할까요?",
-            "나중에를 고르면 앱을 종료할 때 설치돼요.\(timerNote)",
-            buttons: ["다시 시작", "나중에"]
+            L("Restart to update to %1$@?", staged.manifest.version),
+            L("Choose Later to install when you quit the app.%1$@", timerNote),
+            buttons: [L("Restart"), L("Later")]
         )
         if response == .alertFirstButtonReturn { restartToUpdate() }
     }
@@ -237,7 +242,7 @@ final class UpdateController: ObservableObject {
     }
 
     @discardableResult
-    private func alert(_ title: String, _ message: String, buttons: [String] = ["확인"]) -> NSApplication.ModalResponse {
+    private func alert(_ title: String, _ message: String, buttons: [String] = [L("OK")]) -> NSApplication.ModalResponse {
         #if DEBUG
         if let automated = automatedResponse { return automated }
         #endif

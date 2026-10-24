@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import ServiceManagement
 import SwiftUI
 import UniformTypeIdentifiers
@@ -183,9 +184,9 @@ final class TypingPetSettingsModel: ObservableObject {
 
     func importImageSet() {
         let panel = NSOpenPanel()
-        panel.title = "이미지 세트 폴더 추가"
-        panel.message = "idle.* 또는 pet-idle.*는 대기 이미지로, 나머지는 반응 이미지로 가져옵니다."
-        panel.prompt = "갤러리에 추가"
+        panel.title = L("Add Image Set Folder")
+        panel.message = L("idle.* or pet-idle.* is the idle image. Other files are imported as reaction images.")
+        panel.prompt = L("Add to Gallery")
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         guard panel.runModal() == .OK, let url = panel.url else { return }
@@ -200,10 +201,10 @@ final class TypingPetSettingsModel: ObservableObject {
     func deleteSelectedSet() {
         guard let set = selectedSet, !set.isBuiltIn else { return }
         let alert = NSAlert()
-        alert.messageText = "‘\(set.name)’ 세트를 목록에서 제거할까요?"
-        alert.informativeText = "원본 이미지에는 영향을 주지 않습니다."
-        alert.addButton(withTitle: "제거")
-        alert.addButton(withTitle: "취소")
+        alert.messageText = L("Remove “%1$@” from the list?", set.name)
+        alert.informativeText = L("Original images will not be changed.")
+        alert.addButton(withTitle: L("Remove"))
+        alert.addButton(withTitle: L("Cancel"))
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         do {
             try library.deleteSet(id: set.id)
@@ -218,10 +219,10 @@ final class TypingPetSettingsModel: ObservableObject {
         let field = NSTextField(string: set.name)
         field.frame = NSRect(x: 0, y: 0, width: 280, height: 24)
         let alert = NSAlert()
-        alert.messageText = "이미지 세트 이름 변경"
+        alert.messageText = L("Rename Image Set")
         alert.accessoryView = field
-        alert.addButton(withTitle: "변경")
-        alert.addButton(withTitle: "취소")
+        alert.addButton(withTitle: L("Rename"))
+        alert.addButton(withTitle: L("Cancel"))
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         do {
             try library.renameSet(id: set.id, to: field.stringValue)
@@ -248,19 +249,30 @@ final class TypingPetSettingsModel: ObservableObject {
 
 @MainActor
 final class SettingsWindowController: NSWindowController, NSWindowDelegate {
+    private var languageSubscription: AnyCancellable?
+
     init(model: TypingPetSettingsModel, todoStore: TodoStore, updater: UpdateController) {
         let root = SettingsRootView(model: model, todoStore: todoStore, updater: updater)
         let window = NSWindow(contentViewController: NSHostingController(rootView: root))
-        window.title = AppEnvironment.displayName + " 설정"
-        window.setContentSize(NSSize(width: 780, height: 600))
-        window.minSize = NSSize(width: 700, height: 540)
+        window.title = AppEnvironment.displayName + L(" Settings")
+        window.setContentSize(SettingsWindowSizing.contentSize())
+        window.contentMinSize = SettingsWindowSizing.minimumSize()
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
         window.appearance = model.appearanceMode.windowAppearance
         window.center()
         super.init(window: window)
         window.delegate = self
+        let applyAppearance = model.onAppearanceChanged
         model.onAppearanceChanged = { [weak window] mode in
+            applyAppearance?(mode)
             window?.appearance = mode.windowAppearance
+        }
+        languageSubscription = AppLocalization.shared.$language.sink { [weak window, weak model] _ in
+            // Published values are delivered before storage changes.
+            DispatchQueue.main.async {
+                window?.title = AppEnvironment.displayName + L(" Settings")
+                model?.refresh()
+            }
         }
         shouldCascadeWindows = false
     }
@@ -268,6 +280,11 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
     func show() {
+        if let window {
+            window.contentMinSize = SettingsWindowSizing.minimumSize()
+            let size = window.contentLayoutRect.size
+            window.setContentSize(NSSize(width: max(size.width, window.contentMinSize.width), height: max(size.height, window.contentMinSize.height)))
+        }
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
         window?.makeKeyAndOrderFront(nil)
@@ -278,7 +295,21 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     }
 }
 
+enum SettingsWindowSizing {
+    // The reference is about 490 points wide on a Retina display. Allow larger text to grow it.
+    static func contentSize(fontSize: CGFloat = NSFont.preferredFont(forTextStyle: .body).pointSize) -> NSSize {
+        let scale = max(1, fontSize / 13)
+        return NSSize(width: 490 * scale, height: 600 * scale)
+    }
+
+    static func minimumSize(fontSize: CGFloat = NSFont.preferredFont(forTextStyle: .body).pointSize) -> NSSize {
+        let size = contentSize(fontSize: fontSize)
+        return NSSize(width: size.width, height: size.height * 0.9)
+    }
+}
+
 private struct SettingsRootView: View {
+    @ObservedObject private var localization = AppLocalization.shared
     @ObservedObject var model: TypingPetSettingsModel
     @ObservedObject var todoStore: TodoStore
     let updater: UpdateController
@@ -286,19 +317,20 @@ private struct SettingsRootView: View {
     var body: some View {
         TabView {
             GeneralSettingsView(model: model, updater: updater)
-                .tabItem { Label("일반", systemImage: "gearshape") }
+                .tabItem { Label(L("General"), systemImage: "gearshape") }
             TodoSettingsView(store: todoStore)
-                .tabItem { Label("할 일", systemImage: "checklist") }
+                .tabItem { Label(L("Todos"), systemImage: "checklist") }
             GallerySettingsView(model: model)
-                .tabItem { Label("갤러리", systemImage: "photo.on.rectangle.angled") }
+                .tabItem { Label(L("Gallery"), systemImage: "photo.on.rectangle.angled") }
             KeyReactionSettingsView(model: model)
-                .tabItem { Label("키 반응", systemImage: "keyboard") }
+                .tabItem { Label(L("Key Reactions"), systemImage: "keyboard") }
         }
         .padding(SettingsMetrics.space4)
-        .alert("오류", isPresented: Binding(
+        .environment(\.locale, localization.locale)
+        .alert(L("Error"), isPresented: Binding(
             get: { model.errorMessage != nil },
             set: { if !$0 { model.errorMessage = nil } }
-        )) { Button("확인") { model.errorMessage = nil } } message: {
+        )) { Button(L("OK")) { model.errorMessage = nil } } message: {
             Text(model.errorMessage ?? "")
         }
     }
@@ -315,6 +347,7 @@ private enum SettingsMetrics {
 }
 
 private struct FlatSettingsSection<Content: View>: View {
+    @ObservedObject private var localization = AppLocalization.shared
     let title: String
     let content: Content
 
@@ -333,6 +366,7 @@ private struct FlatSettingsSection<Content: View>: View {
 }
 
 private struct SettingsRow<Content: View>: View {
+    @ObservedObject private var localization = AppLocalization.shared
     let content: Content
 
     init(@ViewBuilder content: () -> Content) {
@@ -346,6 +380,7 @@ private struct SettingsRow<Content: View>: View {
 }
 
 private struct SettingsSliderRow: View {
+    @ObservedObject private var localization = AppLocalization.shared
     let title: String
     @Binding var value: Double
     let range: ClosedRange<Double>
@@ -365,6 +400,7 @@ private struct SettingsSliderRow: View {
 }
 
 private struct SettingsToggleRow: View {
+    @ObservedObject private var localization = AppLocalization.shared
     let title: String
     @Binding var isOn: Bool
     var isEnabled = true
@@ -383,6 +419,7 @@ private struct SettingsToggleRow: View {
 }
 
 private struct SettingsNote: View {
+    @ObservedObject private var localization = AppLocalization.shared
     let text: String
 
     var body: some View {
@@ -395,44 +432,45 @@ private struct SettingsNote: View {
 }
 
 private struct GeneralSettingsView: View {
+    @ObservedObject private var localization = AppLocalization.shared
     @ObservedObject var model: TypingPetSettingsModel
     @ObservedObject var updater: UpdateController
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: SettingsMetrics.space6) {
-                FlatSettingsSection("펫") {
+                FlatSettingsSection(L("Pet")) {
                     VStack(spacing: 0) {
                         SettingsSliderRow(
-                            title: "크기",
+                            title: L("Size"),
                             value: Binding(get: { model.scale }, set: model.setScale),
                             range: 0.35...1.25
                         )
                         Divider()
                         SettingsSliderRow(
-                            title: "상시 투명도",
+                            title: L("Resting opacity"),
                             value: Binding(get: { model.restingOpacity }, set: model.setRestingOpacity),
                             range: 0...1
                         )
                         Divider()
                         SettingsSliderRow(
-                            title: "호버 시 투명도",
+                            title: L("Hover opacity"),
                             value: Binding(get: { model.hoverOpacity }, set: model.setHoverOpacity),
                             range: 0...1
                         )
                         Divider()
-                        SettingsNote(text: "100%는 선명하게, 0%는 완전히 투명하게 표시됩니다.")
+                        SettingsNote(text: L("100% is fully visible. 0% is completely transparent."))
                             .frame(maxWidth: .infinity, alignment: .leading)
                         Divider()
                         SettingsRow {
                             HStack(spacing: SettingsMetrics.space3) {
-                                Text("통통 튀는 정도")
+                                Text(L("Bounce strength"))
                                 Spacer(minLength: SettingsMetrics.space3)
                                 Picker("", selection: Binding(get: { model.shakeLevel }, set: model.setShakeLevel)) {
-                                    Text("끔").tag(0)
-                                    Text("약하게").tag(1)
-                                    Text("보통").tag(2)
-                                    Text("강하게").tag(3)
+                                    Text(L("Off")).tag(0)
+                                    Text(L("Gentle")).tag(1)
+                                    Text(L("Medium")).tag(2)
+                                    Text(L("Strong")).tag(3)
                                 }
                                 .labelsHidden()
                                 .frame(width: 112)
@@ -440,39 +478,56 @@ private struct GeneralSettingsView: View {
                         }
                         Divider()
                         SettingsToggleRow(
-                            title: "항상 다른 창 위에 표시",
+                            title: L("Always on top"),
                             isOn: Binding(get: { model.alwaysOnTop }, set: model.setAlwaysOnTop)
                         )
                         Divider()
                         SettingsToggleRow(
-                            title: "위치 잠금 (클릭 통과)",
+                            title: L("Lock position (click through)"),
                             isOn: Binding(get: { model.positionLocked }, set: model.setPositionLocked)
                         )
                         Divider()
                         SettingsToggleRow(
-                            title: "위치 잠금 중 마우스 피하기",
+                            title: L("Avoid pointer while locked"),
                             isOn: Binding(get: { model.avoidsPointerWhenLocked }, set: model.setPointerAvoidance),
                             isEnabled: model.positionLocked
                         )
                         Divider()
-                        SettingsNote(text: "커서가 가까워지면 펫이 화면 안에서 부드럽게 자리를 비킵니다.")
+                        SettingsNote(text: L("Your pet smoothly moves aside when the pointer gets close, staying on screen."))
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
 
-                FlatSettingsSection("시스템") {
+                FlatSettingsSection(L("System")) {
                     VStack(spacing: 0) {
                         SettingsRow {
                             HStack(spacing: SettingsMetrics.space3) {
-                                Text("설정 화면 모드")
+                                Text(L("Language"))
                                 Spacer(minLength: SettingsMetrics.space3)
-                                Picker("설정 화면 모드", selection: Binding(
+                                Picker(L("Language"), selection: Binding(
+                                    get: { localization.mode },
+                                    set: localization.setMode
+                                )) {
+                                    Text(L("System")).tag(AppLanguageMode.system)
+                                    Text(L("language.korean")).tag(AppLanguageMode.korean)
+                                    Text(L("language.english")).tag(AppLanguageMode.english)
+                                }
+                                .labelsHidden()
+                                .frame(width: 200)
+                            }
+                        }
+                        Divider()
+                        SettingsRow {
+                            HStack(spacing: SettingsMetrics.space3) {
+                                Text(L("Appearance"))
+                                Spacer(minLength: SettingsMetrics.space3)
+                                Picker(L("Appearance"), selection: Binding(
                                     get: { model.appearanceMode },
                                     set: model.setAppearanceMode
                                 )) {
-                                    Text("시스템").tag(SettingsAppearanceMode.system)
-                                    Text("라이트").tag(SettingsAppearanceMode.light)
-                                    Text("다크").tag(SettingsAppearanceMode.dark)
+                                    Text(L("System")).tag(SettingsAppearanceMode.system)
+                                    Text(L("Light")).tag(SettingsAppearanceMode.light)
+                                    Text(L("Dark")).tag(SettingsAppearanceMode.dark)
                                 }
                                 .pickerStyle(.segmented)
                                 .labelsHidden()
@@ -481,33 +536,33 @@ private struct GeneralSettingsView: View {
                         }
                         Divider()
                         SettingsToggleRow(
-                            title: "로그인 시 자동 실행",
+                            title: L("Launch at login"),
                             isOn: Binding(get: { model.launchAtLogin }, set: model.toggleLaunchAtLogin)
                         )
                         Divider()
                         SettingsRow {
                             HStack(spacing: SettingsMetrics.space3) {
                                 Label(
-                                    model.inputMonitoringGranted ? "입력 모니터링 권한 허용됨" : "입력 모니터링 권한 필요",
+                                    model.inputMonitoringGranted ? L("Input Monitoring allowed") : L("Input Monitoring required"),
                                     systemImage: model.inputMonitoringGranted ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"
                                 )
                                 .foregroundStyle(model.inputMonitoringGranted ? .green : .orange)
                                 Spacer(minLength: SettingsMetrics.space3)
-                                Button("시스템 설정 열기") { model.openInputMonitoringSettings() }
+                                Button(L("Open System Settings")) { model.openInputMonitoringSettings() }
                             }
                         }
                         Divider()
-                        SettingsNote(text: "키 조합 판별에는 물리 키 코드와 보조 키만 사용하며, 입력 문자는 저장하거나 전송하지 않습니다.")
+                        SettingsNote(text: L("Only physical key codes and modifier keys are used to recognize shortcuts. Typed text is never stored or sent."))
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
 
-                FlatSettingsSection("업데이트") {
+                FlatSettingsSection(L("Updates")) {
                     VStack(spacing: 0) {
                         SettingsRow {
                             HStack(spacing: SettingsMetrics.space3) {
                                 VStack(alignment: .leading, spacing: SettingsMetrics.space1) {
-                                    Text("현재 버전 \(updater.currentVersionText)")
+                                    Text(L("Current version %1$@", updater.currentVersionText))
                                     Text(updater.statusText)
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
@@ -522,12 +577,12 @@ private struct GeneralSettingsView: View {
                         }
                         Divider()
                         SettingsToggleRow(
-                            title: "자동으로 업데이트 확인",
+                            title: L("Check for updates automatically"),
                             isOn: $updater.automaticChecks,
                             isEnabled: updater.unavailableReason == nil
                         )
                         Divider()
-                        SettingsNote(text: "하루에 한 번 pet.miel.ing에서 새 버전을 확인합니다. 앱 버전 외의 정보는 보내지 않으며, 서명을 확인한 업데이트만 설치합니다.")
+                        SettingsNote(text: L("Checks pet.miel.ing once a day. Only the app version is sent, and only updates with a verified signature are installed."))
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
@@ -538,6 +593,7 @@ private struct GeneralSettingsView: View {
 }
 
 private struct TodoSettingsView: View {
+    @ObservedObject private var localization = AppLocalization.shared
     @ObservedObject var store: TodoStore
 
     private var enabled: Bool { store.engine.state.featurePreferences.enabled }
@@ -545,10 +601,10 @@ private struct TodoSettingsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: SettingsMetrics.space6) {
-                FlatSettingsSection("할 일과 집중 타이머") {
+                FlatSettingsSection(L("Todos and Focus Timer")) {
                     VStack(spacing: 0) {
                         SettingsToggleRow(
-                            title: "할 일 기능 사용",
+                            title: L("Enable Todos"),
                             isOn: Binding(get: { enabled }, set: { value in
                                 store.expanded = true
                                 store.change { $0.setFeature(enabled: value, hidden: false) }
@@ -557,7 +613,7 @@ private struct TodoSettingsView: View {
                         )
                         Divider()
                         SettingsToggleRow(
-                            title: "말풍선 표시",
+                            title: L("Show bubble"),
                             isOn: Binding(
                                 get: { !store.engine.state.featurePreferences.bubbleHidden },
                                 set: { value in if value { store.show() } else { store.hide() } }
@@ -567,11 +623,11 @@ private struct TodoSettingsView: View {
                         Divider()
                         SettingsRow {
                             HStack(spacing: SettingsMetrics.space3) {
-                                Text("자리 비움 감지")
+                                Text(L("Detect absence"))
                                 Spacer(minLength: SettingsMetrics.space3)
                                 Picker("", selection: Binding(get: { store.idleMinutes }, set: store.setIdleMinutes)) {
                                     ForEach(TodoStore.idleMinuteChoices, id: \.self) { minutes in
-                                        Text(minutes == 0 ? "끔" : (minutes < 60 ? "\(minutes)분 후" : "\(minutes / 60)시간 후")).tag(minutes)
+                                        Text(minutes == 0 ? L("Off") : (minutes < 60 ? L("After %1$@ min", minutes) : L("After %1$@ hr", minutes / 60))).tag(minutes)
                                     }
                                 }
                                 .labelsHidden()
@@ -581,58 +637,58 @@ private struct TodoSettingsView: View {
                         .disabled(!enabled || store.loadBlocked)
                         Divider()
                         SettingsNote(text: store.idleMinutes == 0
-                            ? "말풍선을 숨겨도 실행 중인 타이머는 유지합니다. 잠자기와 앱 종료 시에는 일시정지합니다."
-                            : "타이머가 도는 동안 \(store.idleMinutes < 60 ? "\(store.idleMinutes)분" : "\(store.idleMinutes / 60)시간") 넘게 키보드와 마우스 입력이 없거나, 화면을 잠그거나, Mac이 잠자기에 들어가면 일시정지하고 마지막 입력 이후의 시간은 기록에서 뺍니다. 돌아오면 말풍선에서 그 시간을 포함할지 고를 수 있어요. 말풍선을 숨겨도 타이머는 유지됩니다.")
+                            ? L("Hiding the bubble keeps the timer running. Sleep and quitting the app pause it.")
+                            : L("While a timer is running, %1$@ without keyboard or mouse input, locking the screen, or sleep pauses it and excludes time since the last input. On return, choose whether to include that time. Hiding the bubble keeps the timer running.", store.idleMinutes < 60 ? L("%1$@ min", store.idleMinutes) : L("%1$@ hr", store.idleMinutes / 60)))
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
 
-                FlatSettingsSection("말풍선") {
+                FlatSettingsSection(L("Bubble")) {
                     VStack(spacing: 0) {
                         SettingsRow {
                             HStack(spacing: SettingsMetrics.space3) {
-                                Text("크기")
+                                Text(L("Size"))
                                     .frame(width: SettingsMetrics.labelWidth, alignment: .leading)
                                 Spacer(minLength: SettingsMetrics.space3)
                                 HStack(spacing: SettingsMetrics.space1) {
-                                    ZoomStepButton(symbol: "minus", label: "작게 보기", enabled: store.canZoomOut) { store.zoomOut() }
+                                    ZoomStepButton(symbol: "minus", label: L("Zoom Out"), enabled: store.canZoomOut) { store.zoomOut() }
                                     Text("\(store.zoomPercent)%")
                                         .monospacedDigit()
                                         .frame(width: 52)
-                                        .accessibilityLabel("말풍선 크기 \(store.zoomPercent)%")
-                                    ZoomStepButton(symbol: "plus", label: "크게 보기", enabled: store.canZoomIn) { store.zoomIn() }
+                                        .accessibilityLabel(L("Bubble size %1$@%", store.zoomPercent))
+                                    ZoomStepButton(symbol: "plus", label: L("Zoom In"), enabled: store.canZoomIn) { store.zoomIn() }
                                 }
-                                Button("100%로") { store.resetZoom() }
+                                Button(L("Reset to 100%")) { store.resetZoom() }
                                     .disabled(store.zoom == 1)
                             }
                         }
                         Divider()
-                        SettingsNote(text: "브라우저처럼 80%부터 200%까지 단계별로 바뀝니다. 말풍선에 입력하는 중에는 ⌘+, ⌘−, ⌘0으로도 조절할 수 있어요.")
+                        SettingsNote(text: L("Zoom in steps from 80% to 200%, like a browser. While typing in the bubble, use ⌘+, ⌘−, or ⌘0."))
                             .frame(maxWidth: .infinity, alignment: .leading)
                         Divider()
                         SettingsRow {
                             HStack(spacing: SettingsMetrics.space3) {
-                                Text("목록 보기")
+                                Text(L("List view"))
                                 Spacer(minLength: SettingsMetrics.space3)
                                 Picker("", selection: Binding(get: { store.listStyle }, set: store.setListStyle)) {
-                                    Text("풀 뷰").tag(TodoListStyle.full)
-                                    Text("컴팩트 뷰").tag(TodoListStyle.compact)
+                                    Text(L("Full")).tag(TodoListStyle.full)
+                                    Text(L("Compact")).tag(TodoListStyle.compact)
                                 }
                                 .labelsHidden()
                                 .frame(width: 168)
                             }
                         }
                         Divider()
-                        SettingsNote(text: "컴팩트 뷰는 할 일을 3개까지 한 줄씩만 보여 줘서 자리를 덜 차지해요. 체크는 바로 하고, 타이머는 할 일을 우클릭해서 시작하거나 멈춰요. 추가나 수정은 말풍선에 마우스를 올리면 나오는 ⤢ 버튼으로 풀 뷰를 열어서 해요.")
+                        SettingsNote(text: L("Compact view shows up to three Todos on single lines. Check them off directly, or right-click to control timers. To add or edit, hover over the bubble and click ⤢ for the full view."))
                             .frame(maxWidth: .infinity, alignment: .leading)
                         Divider()
                         SettingsRow {
                             HStack(spacing: SettingsMetrics.space3) {
-                                Text("표시 방식")
+                                Text(L("Visibility"))
                                 Spacer(minLength: SettingsMetrics.space3)
                                 Picker("", selection: Binding(get: { store.bubbleVisibility }, set: store.setBubbleVisibility)) {
-                                    Text("항상 표시").tag(TodoBubbleVisibility.always)
-                                    Text("마우스를 올렸을 때").tag(TodoBubbleVisibility.hover)
+                                    Text(L("Always")).tag(TodoBubbleVisibility.always)
+                                    Text(L("On hover")).tag(TodoBubbleVisibility.hover)
                                 }
                                 .labelsHidden()
                                 .frame(width: 168)
@@ -640,32 +696,32 @@ private struct TodoSettingsView: View {
                         }
                         Divider()
                         SettingsSliderRow(
-                            title: "상시 투명도",
+                            title: L("Resting opacity"),
                             value: Binding(get: { store.bubbleRestingOpacity }, set: store.setBubbleRestingOpacity),
                             range: 0...1
                         )
                         .disabled(store.bubbleVisibility == .hover)
                         Divider()
                         SettingsSliderRow(
-                            title: "호버 시 투명도",
+                            title: L("Hover opacity"),
                             value: Binding(get: { store.bubbleHoverOpacity }, set: store.setBubbleHoverOpacity),
                             range: 0...1
                         )
                         Divider()
                         SettingsNote(text: store.bubbleVisibility == .always
-                            ? "100%는 선명하게, 0%는 완전히 투명하게 표시됩니다. 펫이나 말풍선에 마우스를 올리면 호버 시 투명도를 씁니다. 입력 중이거나 집중 시간이 끝났을 때는 항상 선명하게 보여요."
-                            : "펫에 마우스를 올리면 말풍선이 호버 시 투명도로 나타나고, 말풍선 위에 있는 동안 유지됩니다. 입력 중이거나 집중 시간이 끝났을 때는 항상 선명하게 보여요.")
+                            ? L("100% is fully visible. 0% is completely transparent. Hovering over the pet or bubble uses the hover opacity. While editing or when a timer finishes, the bubble stays fully visible.")
+                            : L("Hover over the pet to reveal the bubble at its hover opacity. It stays visible while the pointer is over it. While editing or when a timer finishes, it stays fully visible."))
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
 
-                FlatSettingsSection("기록") {
+                FlatSettingsSection(L("Records")) {
                     VStack(spacing: 0) {
                         SettingsRow {
                             HStack(spacing: SettingsMetrics.space3) {
-                                Text("기록 파일")
+                                Text(L("Record file"))
                                 Spacer(minLength: SettingsMetrics.space3)
-                                Button("기록 데이터 열기") { NSWorkspace.shared.activateFileViewerSelecting([store.storage.url]) }
+                                Button(L("Show Record Data")) { NSWorkspace.shared.activateFileViewerSelecting([store.storage.url]) }
                             }
                         }
                         Divider()
@@ -675,7 +731,7 @@ private struct TodoSettingsView: View {
                             .textSelection(.enabled)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.vertical, SettingsMetrics.space2)
-                        SettingsNote(text: "할 일 제목, 완료 날짜, 타이머 설정과 실제 집중 시간을 이 Mac의 JSON 파일에 저장합니다.")
+                        SettingsNote(text: L("Todo titles, completion dates, timer preferences, and measured focus time are stored in a JSON file on this Mac."))
                             .frame(maxWidth: .infinity, alignment: .leading)
                         if let error = store.errorMessage {
                             Text(error)
@@ -694,6 +750,7 @@ private struct TodoSettingsView: View {
 
 // Both steps share one frame, so the minus and plus buttons render at the same size.
 private struct ZoomStepButton: View {
+    @ObservedObject private var localization = AppLocalization.shared
     let symbol: String
     let label: String
     let enabled: Bool
@@ -712,15 +769,16 @@ private struct ZoomStepButton: View {
 }
 
 private struct GallerySettingsView: View {
+    @ObservedObject private var localization = AppLocalization.shared
     @ObservedObject var model: TypingPetSettingsModel
     private let columns = [GridItem(.adaptive(minimum: 152, maximum: 192), spacing: SettingsMetrics.space4)]
 
     var body: some View {
         VStack(alignment: .leading, spacing: SettingsMetrics.space4) {
             HStack(spacing: SettingsMetrics.space3) {
-                Text("이미지 세트").font(.title2).bold()
+                Text(L("Image Sets")).font(.title2).bold()
                 Spacer()
-                Button { model.importImageSet() } label: { Label("폴더 추가", systemImage: "plus") }
+                Button { model.importImageSet() } label: { Label(L("Add Folder"), systemImage: "plus") }
             }
             ScrollView {
                 LazyVGrid(columns: columns, spacing: SettingsMetrics.space4) {
@@ -732,15 +790,17 @@ private struct GallerySettingsView: View {
                 .padding(SettingsMetrics.space1)
             }
             Divider()
-            HStack(spacing: SettingsMetrics.space2) {
+            VStack(alignment: .leading, spacing: SettingsMetrics.space2) {
                 if let set = model.selectedSet {
-                    Text("\(set.name) · 반응 이미지 \(model.library.reactionURLs(for: set).count)장")
+                    Text(L("%1$@ · %2$@ reaction images", set.name, model.library.reactionURLs(for: set).count))
                         .foregroundStyle(.secondary)
                 }
-                Spacer()
-                Button("이름 변경") { model.renameSelectedSet() }.disabled(model.selectedSet?.isBuiltIn != false)
-                Button("제거") { model.deleteSelectedSet() }.disabled(model.selectedSet?.isBuiltIn != false)
-                Button("적용") { model.activateSelectedSet() }.buttonStyle(.borderedProminent).disabled(model.selectedSetID == model.activeSetID)
+                HStack(spacing: SettingsMetrics.space2) {
+                    Spacer()
+                    Button(L("Rename")) { model.renameSelectedSet() }.disabled(model.selectedSet?.isBuiltIn != false)
+                    Button(L("Remove")) { model.deleteSelectedSet() }.disabled(model.selectedSet?.isBuiltIn != false)
+                    Button(L("Apply")) { model.activateSelectedSet() }.buttonStyle(.borderedProminent).disabled(model.selectedSetID == model.activeSetID)
+                }
             }
         }
         .padding(SettingsMetrics.space4)
@@ -748,6 +808,7 @@ private struct GallerySettingsView: View {
 }
 
 private struct GalleryCard: View {
+    @ObservedObject private var localization = AppLocalization.shared
     let set: PetImageSet
     let image: NSImage?
     let active: Bool
@@ -781,6 +842,7 @@ private struct GalleryCard: View {
 }
 
 private struct KeyReactionSettingsView: View {
+    @ObservedObject private var localization = AppLocalization.shared
     @ObservedObject var model: TypingPetSettingsModel
     @State private var pendingImageURL: URL?
     @State private var isCapturing = false
@@ -789,17 +851,17 @@ private struct KeyReactionSettingsView: View {
         VStack(alignment: .leading, spacing: SettingsMetrics.space4) {
             HStack(spacing: SettingsMetrics.space3) {
                 VStack(alignment: .leading, spacing: SettingsMetrics.space1) {
-                    Text("특정 키 반응").font(.title2).bold()
-                    Text("등록한 키 또는 키 조합에는 지정한 이미지가 우선 표시됩니다.").foregroundStyle(.secondary)
+                    Text(L("Custom Key Reactions")).font(.title2).bold()
+                    Text(L("Assigned images take priority for the keys and shortcuts you register.")).foregroundStyle(.secondary)
                 }
                 Spacer()
-                Button { chooseImage() } label: { Label("규칙 추가", systemImage: "plus") }
+                Button { chooseImage() } label: { Label(L("Add Rule"), systemImage: "plus") }
             }
             if model.rules.isEmpty {
                 VStack(spacing: SettingsMetrics.space2) {
                     Image(systemName: "keyboard").font(.system(size: 40)).foregroundStyle(.secondary)
-                    Text("등록된 키 반응이 없습니다").font(.headline)
-                    Text("규칙 추가를 눌러 이미지와 키 조합을 지정하세요.").foregroundStyle(.secondary)
+                    Text(L("No key reactions yet")).font(.headline)
+                    Text(L("Click Add Rule to choose an image and a shortcut.")).foregroundStyle(.secondary)
                 }.frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 List(model.rules) { rule in
@@ -839,7 +901,7 @@ private struct KeyReactionSettingsView: View {
 
     private func chooseImage() {
         let panel = NSOpenPanel()
-        panel.title = "키 반응 이미지 선택"
+        panel.title = L("Choose Key Reaction Image")
         panel.canChooseDirectories = false
         panel.canChooseFiles = true
         panel.allowedContentTypes = [.image]
@@ -850,6 +912,7 @@ private struct KeyReactionSettingsView: View {
 }
 
 private struct KeyCaptureSheet: View {
+    @ObservedObject private var localization = AppLocalization.shared
     let onCapture: (KeyStroke) -> Void
     let onCancel: () -> Void
     @State private var captured: KeyStroke?
@@ -857,13 +920,13 @@ private struct KeyCaptureSheet: View {
     var body: some View {
         VStack(spacing: 20) {
             Image(systemName: "keyboard.badge.ellipsis").font(.system(size: 42)).foregroundStyle(.tint)
-            Text("사용할 키 또는 키 조합을 누르세요").font(.title3).bold()
-            Text(captured?.displayName ?? "예: K, ⌘K, ⌃⌥Space")
+            Text(L("Press a key or shortcut to use")).font(.title3).bold()
+            Text(captured?.displayName ?? L("Example: K, ⌘K, ⌃⌥Space"))
                 .font(.system(size: 22, weight: .semibold, design: .rounded)).frame(minHeight: 32)
             KeyCaptureView { captured = $0 }.frame(width: 1, height: 1)
             HStack {
-                Button("취소", action: onCancel)
-                Button("등록") { if let captured { onCapture(captured) } }
+                Button(L("Cancel"), action: onCancel)
+                Button(L("Add")) { if let captured { onCapture(captured) } }
                     .buttonStyle(.borderedProminent).disabled(captured == nil)
             }
         }.padding(32).frame(width: 420, height: 260)

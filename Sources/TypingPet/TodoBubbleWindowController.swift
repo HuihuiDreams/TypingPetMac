@@ -104,6 +104,7 @@ final class TodoBubbleWindowController {
         self.pet = pet
         panel = Self.makePanel(size: NSSize(width: 320, height: 240))
         entry = Self.makePanel(size: TodoBubbleGeometry.entrySize)
+        setAppearanceMode(SettingsAppearanceMode.load(from: AppEnvironment.defaults))
         panel.contentView = NSHostingView(rootView: TodoBubbleView(store: store, layout: layout))
         entry.contentView = NSHostingView(rootView: TodoEntryButton { [weak self] in self?.show() })
         layout.window = panel
@@ -164,9 +165,19 @@ final class TodoBubbleWindowController {
         synchronize()
     }
 
+    func refreshLocalizedInterface() {
+        panel.title = AppEnvironment.displayName + L(" · Todos")
+        entry.title = panel.title
+    }
+
+    func setAppearanceMode(_ mode: SettingsAppearanceMode) {
+        panel.appearance = mode.windowAppearance
+        entry.appearance = mode.windowAppearance
+    }
+
     private static func makePanel(size: NSSize) -> TodoPanel {
         let panel = TodoPanel(contentRect: NSRect(origin: .zero, size: size), styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
-        panel.title = AppEnvironment.displayName + " · 할 일"
+        panel.title = AppEnvironment.displayName + L(" · Todos")
         panel.isOpaque = false
         panel.backgroundColor = .clear
         // The bubble draws its own shadow, which stays the same when the panel becomes key.

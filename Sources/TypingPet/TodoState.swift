@@ -151,8 +151,8 @@ enum TodoDataError: LocalizedError {
     case unsupportedSchema, invalidState
     var errorDescription: String? {
         switch self {
-        case .unsupportedSchema: return "지원하지 않는 기록 버전이에요. 원본 파일은 그대로 두었어요."
-        case .invalidState: return "기록에 잘못된 데이터가 있어요. 원본 파일은 그대로 두었어요."
+        case .unsupportedSchema: return L("This record version is not supported. The original file was preserved.")
+        case .invalidState: return L("The records contain invalid data. The original file was preserved.")
         }
     }
 }

@@ -54,6 +54,7 @@ if [[ "$channel" == production && "$configuration" == release ]]; then
 fi
 cp Sources/TypingPet/Resources/*.png "$resources_dir/"
 cp Sources/TypingPet/Resources/*.icns "$resources_dir/"
+cp -R Sources/TypingPet/Localization/*.lproj "$resources_dir/"
 
 signing_identity="${CODE_SIGN_IDENTITY:-}"
 if [[ -z "$signing_identity" ]]; then
@@ -84,7 +85,8 @@ python3 - "$contents_dir/Info.plist" "$app_name" "$executable_name" "$bundle_id"
 import plistlib, sys
 path, name, executable, bundle_id, display, channel, version, build, team_id, public_key = sys.argv[1:]
 info = {
-    "CFBundleDevelopmentRegion": "ko",
+    "CFBundleDevelopmentRegion": "en",
+    "CFBundleLocalizations": ["en", "ko"],
     "CFBundleDisplayName": display,
     "CFBundleExecutable": executable,
     "CFBundleIdentifier": bundle_id,

@@ -110,7 +110,7 @@ final class TodoStore: ObservableObject {
         } catch {
             engine = FocusTimerEngine(monotonicNow: monotonicNow, wallNow: wallNow)
             loadBlocked = true
-            errorMessage = "할 일 기록을 읽지 못했어요. 원본 파일은 그대로 두었어요. \(error.localizedDescription)"
+            errorMessage = L("Could not read Todo records. The original file was preserved. %1$@", error.localizedDescription)
         }
         // The compact list shows the active Todo with its timer, so it stays open; the full list folds into the focus bubble.
         if engine.activeSession != nil { expanded = listStyle == .compact }
@@ -251,7 +251,7 @@ final class TodoStore: ObservableObject {
             lastCheckpoint = monotonicNow()
             errorMessage = nil
         } catch {
-            errorMessage = "할 일 기록을 저장하지 못했어요. 최근 변경 사항이 사라질 수 있어요. \(error.localizedDescription)"
+            errorMessage = L("Could not save Todo records. Recent changes may be lost. %1$@", error.localizedDescription)
         }
     }
 }

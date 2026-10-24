@@ -131,7 +131,7 @@ final class UpdateTests: XCTestCase {
         let otherKey = Curve25519.Signing.PrivateKey().publicKey
         XCTAssertEqual(
             error { try UpdateVerifier.verifyArchive(data, manifest: signed, publicKey: otherKey) },
-            .rejected("업데이트 서명이 올바르지 않아요.")
+            .rejected(L("The update signature is invalid."))
         )
     }
 
@@ -185,7 +185,7 @@ final class UpdateTests: XCTestCase {
         XCTAssertNoThrow(try UpdateVerifier.verifyApp(at: try makeApp(), manifest: try manifest(for: data), configuration: configuration))
         XCTAssertEqual(
             error { try UpdateVerifier.verifyApp(at: try self.makeApp(bundle: "com.example.other"), manifest: try self.manifest(for: data), configuration: configuration) },
-            .rejected("다른 앱의 업데이트예요.")
+            .rejected(L("This update belongs to a different app."))
         )
         XCTAssertNotNil(error { try UpdateVerifier.verifyApp(at: try self.makeApp(channel: "production"), manifest: try self.manifest(for: data), configuration: configuration) })
         XCTAssertNotNil(error { try UpdateVerifier.verifyApp(at: try self.makeApp(build: "20"), manifest: try self.manifest(for: data), configuration: configuration) })
@@ -204,7 +204,7 @@ final class UpdateTests: XCTestCase {
         let requirement = try XCTUnwrap(try configuration(.production, team: "ABCDE12345").codeRequirement)
         XCTAssertEqual(
             error { try UpdateVerifier.verifyCodeSignature(at: app, requirement: requirement) },
-            .rejected("업데이트 앱이 같은 개발자 서명이 아니에요.")
+            .rejected(L("The update app is not signed by the same developer."))
         )
     }
 
