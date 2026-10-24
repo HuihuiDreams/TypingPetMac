@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.17.1 - 2026-10-24
+
+- Clarify app and website copy in Korean, English, Japanese, Simplified Chinese, and Traditional Chinese.
+- Use consistent names for Todo views and reaction images, clarify opacity settings, and split long setup descriptions.
+- Distinguish the Pause action from the Paused status and use consistent timer-ending labels.
+
 ## 0.17.0 - 2026-10-24
 
 - Add Japanese, Simplified Chinese, and Traditional Chinese throughout the app, alongside Korean and English.

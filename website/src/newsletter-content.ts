@@ -3,8 +3,8 @@ import type { Locale } from './localization';
 export const consentVersion = '2026-10-24-v1';
 export const newsletterContent = {
   ko: {
-    eyebrow: 'LET’S KEEP IN TOUCH', title: '작은 친구의\n다음 소식을 받아보세요.',
-    description: 'Typing Pet의 새 버전과 개발자가 전하는 이야기를 이메일로 보내드려요.',
+    eyebrow: "뉴스레터", title: "Typing Pet 소식 받기",
+    description: "새 버전을 출시하거나 전할 소식이 있을 때 이메일로 알려드려요.",
     email: '이메일 주소', nickname: '이름 / 닉네임', optional: '선택', nicknameHint: '비워 두셔도 괜찮아요.',
     language: '수신 언어', collect: '이메일과 선택 입력 정보의 수집·이용에 동의합니다.',
     receive: 'Typing Pet 업데이트와 개발자 소식을 이메일로 받겠습니다.',
@@ -22,8 +22,8 @@ export const newsletterContent = {
     pending: '신청 정보는 검토 후 구독자 목록에 반영됩니다.', honeypot: '이 칸은 비워 두세요',
   },
   en: {
-    eyebrow: 'LET’S KEEP IN TOUCH', title: 'A little friend.\nA little news.',
-    description: 'Get new Typing Pet releases and stories from the developer in your inbox.',
+    eyebrow: "NEWSLETTER", title: "Typing Pet news",
+    description: "Get an email when a new version is released or the developer has news to share.",
     email: 'Email address', nickname: 'Name / nickname', optional: 'Optional', nicknameHint: 'You can leave this blank.',
     language: 'Email language', collect: 'I agree to the collection and use of my email and optional details.',
     receive: 'I want to receive Typing Pet updates and developer news by email.',
@@ -41,8 +41,8 @@ export const newsletterContent = {
     pending: 'Requests are reviewed before being added to the subscriber list.', honeypot: 'Leave this field empty',
   },
   ja: {
-    eyebrow: 'LET’S KEEP IN TOUCH', title: '小さな仲間の\n次のお知らせを。',
-    description: 'Typing Petの新しいバージョンと開発者からのお知らせをメールでお届けします。',
+    eyebrow: "ニュースレター", title: "Typing Petのお知らせ",
+    description: "新しいバージョンの公開や開発者からのお知らせを、メールでお届けします。",
     email: 'メールアドレス', nickname: '名前 / ニックネーム', optional: '任意', nicknameHint: '空欄でも構いません。',
     language: '受信言語', collect: 'メールアドレスと任意情報の収集・利用に同意します。',
     receive: 'Typing Petのアップデートと開発者のお知らせをメールで受け取ります。',
@@ -60,8 +60,8 @@ export const newsletterContent = {
     pending: '申請は確認後に購読者リストへ反映されます。', honeypot: 'この欄は空欄にしてください',
   },
   'zh-Hans': {
-    eyebrow: 'LET’S KEEP IN TOUCH', title: '小小伙伴的\n新消息。',
-    description: '通过邮件接收 Typing Pet 新版本和开发者的消息。',
+    eyebrow: "邮件订阅", title: "订阅 Typing Pet 消息",
+    description: "有新版本或开发者消息时，我们会通过邮件通知你。",
     email: '电子邮箱', nickname: '姓名 / 昵称', optional: '选填', nicknameHint: '可以留空。',
     language: '邮件语言', collect: '我同意收集和使用邮箱及选填信息。',
     receive: '我愿意通过邮件接收 Typing Pet 更新与开发者消息。',
@@ -79,8 +79,8 @@ export const newsletterContent = {
     pending: '申请将在审核后加入订阅名单。', honeypot: '请将此项留空',
   },
   'zh-Hant': {
-    eyebrow: 'LET’S KEEP IN TOUCH', title: '小小夥伴的\n新消息。',
-    description: '透過郵件接收 Typing Pet 新版本和開發者的消息。',
+    eyebrow: "電子報", title: "訂閱 Typing Pet 消息",
+    description: "有新版本或開發者消息時，我們會透過電子郵件通知你。",
     email: '電子郵件', nickname: '姓名 / 暱稱', optional: '選填', nicknameHint: '可以留空。',
     language: '郵件語言', collect: '我同意收集和使用電子郵件及選填資訊。',
     receive: '我願意透過郵件接收 Typing Pet 更新與開發者消息。',

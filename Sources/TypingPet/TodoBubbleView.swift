@@ -406,7 +406,7 @@ struct TodoBubbleView: View {
                 // The notice below has the same choices.
                 if !expired, store.absence == nil {
                     HStack(spacing: 0) {
-                        IconButton(symbol: paused ? "play.fill" : "pause.fill", label: paused ? L("Resume") : L("Paused"), tint: BubbleColor.ink, size: 26) { togglePause() }
+                        IconButton(symbol: paused ? "play.fill" : "pause.fill", label: paused ? L("Resume") : L("Pause"), tint: BubbleColor.ink, size: 26) { togglePause() }
                         IconButton(symbol: "stop.fill", label: L("Stop"), tint: BubbleColor.ink, size: 26) { finish() }
                     }
                 }
@@ -556,7 +556,7 @@ struct TodoBubbleView: View {
             if expired {
                 Button(L("Finish")) { finish() }
             } else {
-                Button(paused ? L("Resume") : L("Paused")) { togglePause() }
+                Button(paused ? L("Resume") : L("Pause")) { togglePause() }
                 Button(L("Stop")) { finish() }
             }
         } else {
@@ -710,7 +710,7 @@ struct TodoBubbleView: View {
         .overlay(alignment: .trailing) {
             if focusHovering {
                 HStack(spacing: z(2)) {
-                    IconButton(symbol: paused ? "play.fill" : "pause.fill", label: paused ? L("Resume") : L("Paused"), tint: BubbleColor.ink, size: 28) { togglePause() }
+                    IconButton(symbol: paused ? "play.fill" : "pause.fill", label: paused ? L("Resume") : L("Pause"), tint: BubbleColor.ink, size: 28) { togglePause() }
                     IconButton(symbol: "stop.fill", label: L("Stop"), tint: BubbleColor.ink, size: 28) { finish() }
                 }
                 .padding(.leading, z(26)).padding(.trailing, z(8))

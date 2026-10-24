@@ -10,7 +10,7 @@ Windows용 [swoonqx/TypingPet](https://github.com/swoonqx/TypingPet)에서 아�
 
 ## 설치
 
-**지원 환경:** Apple Silicon Mac, macOS 13 이상. 현재 공개 버전은 `v0.17.0` 프리릴리스입니다.
+**지원 환경:** Apple Silicon Mac, macOS 13 이상. 현재 공개 버전은 `v0.17.1` 프리릴리스입니다.
 Apple이 발급한 Developer ID 인증서로 서명했고 Apple 공증도 통과했습니다. Gatekeeper 경고를 우회할 필요가 없습니다.
 
 ### Homebrew로 설치
@@ -26,7 +26,7 @@ brew install --cask ynifamily3/tap/typing-pet
 
 ### ZIP으로 직접 설치
 
-1. [v0.17.0 릴리스](https://github.com/ynifamily3/TypingPetMac/releases/tag/v0.17.0)에서 `TypingPetMac-v0.17.0-arm64.zip`을 내려받습니다. 무결성을 확인하려면 같은 페이지의 `.sha256` 파일도 받습니다.
+1. [v0.17.1 릴리스](https://github.com/ynifamily3/TypingPetMac/releases/tag/v0.17.1)에서 `TypingPetMac-v0.17.1-arm64.zip`을 내려받습니다. 무결성을 확인하려면 같은 페이지의 `.sha256` 파일도 받습니다.
 2. ZIP을 두 번 눌러 압축을 풀고 `TypingPet.app`을 **응용 프로그램(Applications)** 폴더로 옮깁니다. 다운로드 폴더에서 바로 실행하지 마세요.
 3. 응용 프로그램 폴더의 `TypingPet.app`을 실행합니다. 메뉴 막대에 발바닥 아이콘이 나타납니다.
 
@@ -34,7 +34,7 @@ brew install --cask ynifamily3/tap/typing-pet
 
 ```sh
 cd ~/Downloads
-shasum -a 256 -c TypingPetMac-v0.17.0-arm64.zip.sha256
+shasum -a 256 -c TypingPetMac-v0.17.1-arm64.zip.sha256
 ```
 
 ### 첫 실행: 입력 모니터링

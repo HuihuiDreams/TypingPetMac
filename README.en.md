@@ -10,7 +10,7 @@ This unofficial macOS app was inspired by [swoonqx/TypingPet](https://github.com
 
 ## Install
 
-**Requirements:** Apple Silicon Mac with macOS 13 or later. The current public build is the `v0.17.0` prerelease. It is signed with an Apple-issued Developer ID certificate and notarized by Apple, so you do not need to bypass Gatekeeper.
+**Requirements:** Apple Silicon Mac with macOS 13 or later. The current public build is the `v0.17.1` prerelease. It is signed with an Apple-issued Developer ID certificate and notarized by Apple, so you do not need to bypass Gatekeeper.
 
 ### Install with Homebrew
 
@@ -25,7 +25,7 @@ The app supports automatic updates. To update through Homebrew, quit the app, ru
 
 ### Install the ZIP manually
 
-1. Open the [v0.17.0 release](https://github.com/ynifamily3/TypingPetMac/releases/tag/v0.17.0) and download `TypingPetMac-v0.17.0-arm64.zip`. For an optional integrity check, download the `.sha256` file from the same page.
+1. Open the [v0.17.1 release](https://github.com/ynifamily3/TypingPetMac/releases/tag/v0.17.1) and download `TypingPetMac-v0.17.1-arm64.zip`. For an optional integrity check, download the `.sha256` file from the same page.
 2. Double-click the ZIP to extract it. Move `TypingPet.app` to **Applications** before launching; do not run it from Downloads.
 3. Open `TypingPet.app` from Applications. A paw icon appears in the menu bar.
 
@@ -33,7 +33,7 @@ If you downloaded both files into Downloads, verify the ZIP with:
 
 ```sh
 cd ~/Downloads
-shasum -a 256 -c TypingPetMac-v0.17.0-arm64.zip.sha256
+shasum -a 256 -c TypingPetMac-v0.17.1-arm64.zip.sha256
 ```
 
 ### First launch: Input Monitoring
