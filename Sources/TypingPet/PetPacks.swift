@@ -33,24 +33,30 @@ struct PetPackConfiguration: Codable, Equatable {
     var idle: PresetSelection
     var mappings: [PresetKeyMapping] = []
 
+    var isUsable: Bool { !presets.isEmpty && !idle.presetIDs.isEmpty && !unassigned.presetIDs.isEmpty }
+
     func selection(for stroke: KeyStroke?) -> PresetSelection {
         stroke.flatMap { key in mappings.first { $0.stroke == key }?.selection } ?? unassigned
     }
 }
 
 enum PetPackError: LocalizedError {
-    case invalidSelection, invalidPreset, invalidName, unreadableConfiguration
+    case invalidSelection, invalidPreset, invalidName, unreadableConfiguration, emptyPack, activePackNeedsImage, duplicateName, builtInPresetsReadOnly
     var errorDescription: String? {
         switch self {
         case .invalidSelection: L("Choose at least one preset for Unassigned and IDLE.")
         case .invalidPreset: L("A preset image is missing or cannot be read.")
         case .invalidName: L("Enter a name for the pack and each preset.")
         case .unreadableConfiguration: L("Could not read saved packs. The original file has been preserved.")
+        case .emptyPack: L("Add an image before using this pack.")
+        case .activePackNeedsImage: L("Use another pack before deleting the last image in the active pack.")
+        case .duplicateName: L("A pack with this name already exists.")
+        case .builtInPresetsReadOnly: L("Built-in presets are read-only. Create a pack to use your own images.")
         }
     }
 }
 
-/// Both the desktop pet and the settings preview use this same selection engine.
+/// Playback positions are independent for each mapped key, Unassigned, and IDLE.
 struct PresetPlaybackCursor {
     private struct Position {
         var selection: PresetSelection
@@ -136,6 +142,13 @@ final class PetPackStore {
     }
 
     func save(_ pack: PetPackConfiguration, for set: PetImageSet) throws {
+        if set.isBuiltIn && pack.presets != configuration(for: set).presets {
+            throw PetPackError.builtInPresetsReadOnly
+        }
+        try persistConfiguration(pack, for: set)
+    }
+
+    private func persistConfiguration(_ pack: PetPackConfiguration, for set: PetImageSet) throws {
         guard loadError == nil else { throw PetPackError.unreadableConfiguration }
         try validate(pack, in: set)
         var updated = configurations
@@ -144,8 +157,90 @@ final class PetPackStore {
         configurations = updated
     }
 
+    func activate(_ set: PetImageSet) throws {
+        let pack = configuration(for: set)
+        guard pack.isUsable else { throw PetPackError.emptyPack }
+        try validate(pack, in: set)
+        try library.activateSet(id: set.id)
+    }
+
+    func createPack(name: String) throws -> PetImageSet {
+        guard loadError == nil else { throw PetPackError.unreadableConfiguration }
+        let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { throw PetPackError.invalidName }
+        guard !library.imageSets.contains(where: { configuration(for: $0).name.localizedCaseInsensitiveCompare(name) == .orderedSame }) else { throw PetPackError.duplicateName }
+        let set = try library.addEmptySet(name: name)
+        do {
+            try save(PetPackConfiguration(name: name, presets: [], unassigned: PresetSelection(presetIDs: []), idle: PresetSelection(presetIDs: [])), for: set)
+            return set
+        } catch {
+            try? library.deleteSet(id: set.id)
+            throw error
+        }
+    }
+
+    /// Copy every image into the new set, including migrated key-reaction images.
+    /// Selecting a copy never changes the active desktop pet.
+    func duplicatePack(_ original: PetImageSet) throws -> PetImageSet {
+        guard loadError == nil else { throw PetPackError.unreadableConfiguration }
+        let source = configuration(for: original)
+        let base = L("%1$@ Copy", source.name)
+        var name = base
+        var suffix = 2
+        while library.imageSets.contains(where: { configuration(for: $0).name.localizedCaseInsensitiveCompare(name) == .orderedSame }) {
+            name = "\(base) \(suffix)"
+            suffix += 1
+        }
+        let copy = try createPack(name: name)
+        do {
+            var pack = source
+            pack.name = name
+            pack.presets = try source.presets.map { preset in
+                guard let url = imageURL(for: preset, in: original) else { throw PetPackError.invalidPreset }
+                var copied = preset
+                copied.fileName = try library.importPresetImage(from: url, into: copy)
+                copied.source = .imageSet
+                return copied
+            }
+            pack.mappings = pack.mappings.map { mapping in
+                var copied = mapping
+                copied.id = UUID()
+                return copied
+            }
+            try save(pack, for: copy)
+            return copy
+        } catch {
+            try? library.deleteSet(id: copy.id)
+            throw error
+        }
+    }
+
+    func removingPreset(id: String, from pack: PetPackConfiguration, in set: PetImageSet, replacementID: String?) throws -> PetPackConfiguration {
+        guard !set.isBuiltIn else { throw PetPackError.builtInPresetsReadOnly }
+        var result = pack
+        result.presets.removeAll { $0.id == id }
+        if result.presets.isEmpty && set.id == library.activeSetID { throw PetPackError.activePackNeedsImage }
+        let validReplacement = replacementID.flatMap { candidate in result.presets.contains { $0.id == candidate } ? candidate : nil }
+        func remove(_ selection: PresetSelection, fallback: Bool) -> PresetSelection {
+            var value = selection
+            value.presetIDs.removeAll { $0 == id }
+            if fallback && value.presetIDs.isEmpty, let validReplacement { value.presetIDs = [validReplacement] }
+            return value
+        }
+        result.idle = remove(result.idle, fallback: true)
+        result.unassigned = remove(result.unassigned, fallback: true)
+        result.mappings = result.mappings.compactMap { mapping in
+            var mapping = mapping
+            mapping.selection = remove(mapping.selection, fallback: false)
+            return mapping.selection.presetIDs.isEmpty ? nil : mapping
+        }
+        try validate(result, in: set)
+        return result
+    }
+
     func importPresets(_ urls: [URL], into set: PetImageSet) throws -> [PetImagePreset] {
-        try urls.map { url in
+        guard !set.isBuiltIn else { throw PetPackError.builtInPresetsReadOnly }
+        return try urls.map { url in
             let fileName = try library.importPresetImage(from: url, into: set)
             return PetImagePreset(id: UUID().uuidString, name: url.deletingPathExtension().lastPathComponent, fileName: fileName)
         }
@@ -172,7 +267,8 @@ final class PetPackStore {
 
     func resetToDefaults() throws {
         guard let builtIn = library.imageSets.first(where: { $0.id == PetImageLibrary.builtInID }) else { return }
-        try save(makeConfiguration(for: builtIn, includeLegacyKeys: false), for: builtIn)
+        // This explicit reset restores bundled defaults; ordinary edits cannot change their images.
+        try persistConfiguration(makeConfiguration(for: builtIn, includeLegacyKeys: false), for: builtIn)
         library.resetToDefaults()
     }
 
@@ -180,6 +276,11 @@ final class PetPackStore {
         guard !pack.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
               pack.presets.allSatisfy({ !$0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) else { throw PetPackError.invalidName }
         let ids = Set(pack.presets.map(\.id))
+        if pack.presets.isEmpty {
+            guard set.id != library.activeSetID else { throw PetPackError.activePackNeedsImage }
+            guard pack.idle.presetIDs.isEmpty, pack.unassigned.presetIDs.isEmpty, pack.mappings.isEmpty else { throw PetPackError.invalidSelection }
+            return
+        }
         let selections = [pack.idle, pack.unassigned] + pack.mappings.map(\.selection)
         guard ids.count == pack.presets.count, !ids.isEmpty,
               selections.allSatisfy({ !$0.presetIDs.isEmpty && Set($0.presetIDs).count == $0.presetIDs.count && Set($0.presetIDs).isSubset(of: ids) }),
@@ -198,6 +299,9 @@ final class PetPackStore {
     }
 
     private func makeConfiguration(for set: PetImageSet, includeLegacyKeys: Bool) -> PetPackConfiguration {
+        if set.idleFileName.isEmpty && set.reactionFileNames.isEmpty {
+            return PetPackConfiguration(name: set.name, presets: [], unassigned: PresetSelection(presetIDs: []), idle: PresetSelection(presetIDs: []))
+        }
         let fileNames = [set.idleFileName] + set.reactionFileNames
         var seen = Set<String>()
         let presets = fileNames.filter { seen.insert($0).inserted }.map { fileName in

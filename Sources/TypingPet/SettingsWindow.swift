@@ -37,6 +37,8 @@ final class TypingPetSettingsModel: ObservableObject {
     @Published private(set) var avoidsPointerWhenLocked: Bool
     @Published private(set) var launchAtLogin: Bool
     @Published private(set) var appearanceMode: SettingsAppearanceMode
+    @Published private(set) var inputMonitoringGranted = false
+    @Published private(set) var inputMonitoringConnected = false
     @Published var errorMessage: String?
     var onAppearanceChanged: ((SettingsAppearanceMode) -> Void)?
 
@@ -53,6 +55,9 @@ final class TypingPetSettingsModel: ObservableObject {
     private let applyPointerAvoidance: (Bool) -> Void
     private let reloadPet: () -> Void
     private let openInputMonitoringSettingsAction: () -> Void
+    private let monitoringIsRunning: () -> Bool
+    private let retryMonitoring: () -> Void
+    private let inputMonitoringAuthorized: () -> Bool
 
     init(
         library: PetImageLibrary,
@@ -74,6 +79,9 @@ final class TypingPetSettingsModel: ObservableObject {
         applyPointerAvoidance: @escaping (Bool) -> Void,
         reloadPet: @escaping () -> Void,
         openInputMonitoringSettings: @escaping () -> Void,
+        monitoringIsRunning: @escaping () -> Bool = { false },
+        retryMonitoring: @escaping () -> Void = {},
+        inputMonitoringAuthorized: @escaping () -> Bool = { CGPreflightListenEventAccess() },
         defaults: UserDefaults = AppEnvironment.defaults
     ) {
         self.library = library
@@ -96,6 +104,9 @@ final class TypingPetSettingsModel: ObservableObject {
         self.applyPointerAvoidance = applyPointerAvoidance
         self.reloadPet = reloadPet
         openInputMonitoringSettingsAction = openInputMonitoringSettings
+        self.monitoringIsRunning = monitoringIsRunning
+        self.retryMonitoring = retryMonitoring
+        self.inputMonitoringAuthorized = inputMonitoringAuthorized
         activeSetID = library.activeSetID
         selectedSetID = library.activeSetID
         launchAtLogin = SMAppService.mainApp.status == .enabled
@@ -104,7 +115,6 @@ final class TypingPetSettingsModel: ObservableObject {
     }
 
     var selectedSet: PetImageSet? { imageSets.first { $0.id == selectedSetID } }
-    var inputMonitoringGranted: Bool { CGPreflightListenEventAccess() }
 
     func thumbnail(for set: PetImageSet) -> NSImage? {
         library.idleURL(for: set).flatMap(NSImage.init(contentsOf:))
@@ -118,12 +128,21 @@ final class TypingPetSettingsModel: ObservableObject {
         imageSets = library.imageSets
         activeSetID = library.activeSetID
         rules = keyStore.rules
+        refreshPermissions()
         launchAtLogin = SMAppService.mainApp.status == .enabled
     }
 
-    func packDidChange() {
+    func packDidChange(reload: Bool = true) {
         refresh()
-        reloadPet()
+        if reload { reloadPet() }
+    }
+
+    func refreshPermissions(retryConnection: Bool = false) {
+        let granted = inputMonitoringAuthorized()
+        if retryConnection && granted { retryMonitoring() }
+        let connected = granted && monitoringIsRunning()
+        if inputMonitoringGranted != granted { inputMonitoringGranted = granted }
+        if inputMonitoringConnected != connected { inputMonitoringConnected = connected }
     }
 
     func setScale(_ value: Double) {
@@ -260,14 +279,16 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     private var languageSubscription: AnyCancellable?
 
     init(model: TypingPetSettingsModel, todoStore: TodoStore, updater: UpdateController) {
-        let root = SettingsRootView(model: model, todoStore: todoStore, updater: updater)
-        let window = NSWindow(contentViewController: NSHostingController(rootView: root))
+        let workspace = SettingsWorkspaceController(model: model, todoStore: todoStore, updater: updater)
+        let window = NSWindow(contentViewController: workspace)
         window.title = AppEnvironment.displayName + L(" Settings")
         window.setContentSize(SettingsWindowSizing.contentSize())
         window.contentMinSize = SettingsWindowSizing.minimumSize()
-        window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
+        window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
+        window.isMovableByWindowBackground = false
+        workspace.installToolbar(on: window)
         window.appearance = model.appearanceMode.windowAppearance
         window.center()
         super.init(window: window)
@@ -315,24 +336,6 @@ enum SettingsWindowSizing {
     static func minimumSize(fontSize: CGFloat = NSFont.preferredFont(forTextStyle: .body).pointSize) -> NSSize {
         let size = contentSize(fontSize: fontSize)
         return NSSize(width: size.width * (900.0 / 1100), height: size.height * (700.0 / 820))
-    }
-}
-
-private struct SettingsRootView: View {
-    @ObservedObject private var localization = AppLocalization.shared
-    @ObservedObject var model: TypingPetSettingsModel
-    @ObservedObject var todoStore: TodoStore
-    let updater: UpdateController
-
-    var body: some View {
-        SettingsWorkspaceView(model: model, todoStore: todoStore, updater: updater)
-        .environment(\.locale, localization.locale)
-        .alert(L("Error"), isPresented: Binding(
-            get: { model.errorMessage != nil },
-            set: { if !$0 { model.errorMessage = nil } }
-        )) { Button(L("OK")) { model.errorMessage = nil } } message: {
-            Text(model.errorMessage ?? "")
-        }
     }
 }
 
@@ -550,15 +553,23 @@ struct GeneralSettingsView: View {
                             )
                             Divider()
                             SettingsRow {
-                                HStack(spacing: SettingsMetrics.space3) {
-                                    Label(
-                                        model.inputMonitoringGranted ? L("Input Monitoring allowed") : L("Input Monitoring required"),
-                                        systemImage: model.inputMonitoringGranted ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"
-                                    )
-                                    .foregroundStyle(model.inputMonitoringGranted ? .green : .orange)
-                                    Spacer(minLength: SettingsMetrics.space3)
-                                    Button(L("Open System Settings")) { model.openInputMonitoringSettings() }
+                                VStack(alignment: .leading, spacing: 12) {
+                                    HStack {
+                                        Label(model.inputMonitoringGranted ? L("Input Monitoring allowed") : L("Input Monitoring required"),
+                                              systemImage: model.inputMonitoringGranted ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                                            .foregroundStyle(model.inputMonitoringGranted ? .green : .orange)
+                                        Spacer(minLength: 12)
+                                        Button(L("Check Again")) { model.refreshPermissions(retryConnection: true) }
+                                    }
+                                    HStack {
+                                        Label(model.inputMonitoringConnected ? L("Keyboard monitoring connected") : L("Keyboard monitoring disconnected"),
+                                              systemImage: model.inputMonitoringConnected ? "link" : "link.badge.plus")
+                                            .font(.callout).foregroundStyle(.secondary)
+                                        Spacer(minLength: 12)
+                                        Button(L("Open System Settings")) { model.openInputMonitoringSettings() }
+                                    }
                                 }
+                                .padding(.vertical, 10)
                             }
                             Divider()
                             SettingsNote(text: L("Only physical key codes and modifier keys are used to recognize shortcuts. Typed text is never stored or sent."))
@@ -598,6 +609,13 @@ struct GeneralSettingsView: View {
                 }
             }
             .padding(SettingsMetrics.space4)
+        }
+        .onAppear { model.refreshPermissions() }
+        .onReceive(Timer.publish(every: 2, on: .main, in: .common).autoconnect()) { _ in
+            if scope != .pet { model.refreshPermissions() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            if scope != .pet { model.refreshPermissions() }
         }
     }
 }

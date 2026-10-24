@@ -405,3 +405,51 @@
 "Unsaved Changes" = "Unsaved Changes";
 "Uses Unassigned settings" = "Uses Unassigned settings";
 "Your Little Companion" = "Your Little Companion";
+
+// Native pack workspace
+"%1$@ presets" = "%1$@ presets";
+"A pack with this name already exists." = "A pack with this name already exists.";
+"Add an image before using this pack." = "Add an image before using this pack.";
+"Add the first image to this pack." = "Add the first image to this pack.";
+"Changes saved automatically." = "Changes saved automatically.";
+"Check Again" = "Check Again";
+"Close" = "Close";
+"Create" = "Create";
+"Create Pack" = "Create Pack";
+"Create an empty pack, then add your images." = "Create an empty pack, then add your images.";
+"Delete Image" = "Delete Image";
+"Delete preset “%1$@”?" = "Delete preset “%1$@”?";
+"Edit Presets" = "Edit Presets";
+"Empty Pack" = "Empty Pack";
+"It will be removed from %1$@ key mappings. Keys with no remaining presets will use Unassigned. Original image files will not be changed." = "It will be removed from %1$@ key mappings. Keys with no remaining presets will use Unassigned. Original image files will not be changed.";
+"Keyboard monitoring connected" = "Keyboard monitoring connected";
+"Keyboard monitoring disconnected" = "Keyboard monitoring disconnected";
+"Replacement for %1$@" = "Replacement for %1$@";
+"Select %1$@" = "Select %1$@";
+"The first image is used for Unassigned and IDLE. You can change them in Keyboard Mapping." = "The first image is used for Unassigned and IDLE. You can change them in Keyboard Mapping.";
+"Toggle Sidebar" = "Toggle Sidebar";
+"Use Set" = "Use Set";
+"Use another pack before deleting the last image in the active pack." = "Use another pack before deleting the last image in the active pack.";
+"Using %1$@" = "Using %1$@";
+
+// Built-in preset protection
+"Built-in presets are read-only. Create a pack to use your own images." = "Built-in presets are read-only. Create a pack to use your own images.";
+"View Presets" = "View Presets";
+
+"Set Management" = "Set Management";
+"New Set" = "New Set";
+"Duplicate" = "Duplicate";
+"%1$@ Copy" = "%1$@ Copy";
+"Set Options" = "Set Options";
+"Changes apply immediately." = "Changes apply immediately.";
+"Built-in presets are fixed. Duplicate to edit them." = "Built-in presets are fixed. Duplicate to edit them.";
+"No images yet" = "No images yet";
+"The first image is used while typing and while resting." = "The first image is used while typing and while resting.";
+"When Resting" = "When Resting";
+"Multiple selections allowed" = "Select multiple";
+"Common Keys" = "Common Keys";
+"Space" = "Space";
+"Enter" = "Enter";
+"Quick setup for %1$@" = "Quick setup for %1$@";
+"Click a key to edit its presets." = "Click a key to edit its presets.";
+"Edit %1$@" = "Edit %1$@";

@@ -349,7 +349,7 @@
 "Appearance and Behavior" = "모양과 동작";
 "Back to Editing" = "편집으로 돌아가기";
 "Basic Expression" = "기본 표정";
-"Choose at least one preset for Unassigned and IDLE." = "지정 없음과 IDLE에 프리셋을 하나 이상 선택해 주세요.";
+"Choose at least one preset for Unassigned and IDLE." = "입력 중일 때와 쉬고 있을 때에 프리셋을 하나 이상 선택해 주세요.";
 "Choose at least one preset." = "프리셋을 하나 이상 선택해 주세요.";
 "Choose presets and a display mode for this key combination." = "이 키 조합에 사용할 프리셋과 표시 방식을 선택하세요.";
 "Choose presets shown for keys without a mapping." = "지정되지 않은 키를 누를 때 표시할 프리셋을 선택하세요.";
@@ -359,7 +359,7 @@
 "Collapse" = "접기";
 "Could not read saved packs. The original file has been preserved." = "저장된 팩을 읽을 수 없습니다. 원본 파일은 보존했습니다.";
 "Curious" = "궁금해";
-"Cycle Order" = "순환 순서";
+"Cycle Order" = "표시 순서";
 "Display Mode" = "표시 방식";
 "Edit Pack" = "팩 편집";
 "Editing Pack" = "편집 중인 팩";
@@ -382,7 +382,7 @@
 "My Packs" = "내 이미지 팩";
 "New Pack" = "새 이미지 팩";
 "Next IDLE Image" = "다음 IDLE 이미지";
-"Pack Name" = "팩 이름";
+"Pack Name" = "세트 이름";
 "Pack from Folder…" = "폴더로 팩 만들기…";
 "Pack from Images…" = "이미지로 팩 만들기…";
 "Pack saved and applied." = "팩을 저장하고 적용했습니다.";
@@ -395,13 +395,61 @@
 "Right Hand" = "오른손";
 "Save Pack" = "팩 저장";
 "Saved Pack" = "저장된 팩";
-"Select a key or an item above to edit its presets." = "키 또는 위 항목을 선택하면 프리셋 설정이 펼쳐집니다.";
-"Sequential" = "순차 순환";
+"Select a key or an item above to edit its presets." = "키 또는 위 항목을 선택하면 프리셋 설정이 나타납니다.";
+"Sequential" = "순서대로";
 "Surprised" = "깜짝";
 "Thumbnail: Assigned Preset · Dot: Unassigned" = "썸네일: 지정 프리셋 · 점: 지정 없음";
 "Todos and Focus" = "할 일과 집중";
 "Unassign" = "지정 해제";
-"Unassigned" = "지정 없음";
+"Unassigned" = "입력 중일 때";
 "Unsaved Changes" = "저장되지 않은 변경";
-"Uses Unassigned settings" = "지정 없음 설정을 사용합니다";
+"Uses Unassigned settings" = "‘입력 중일 때’ 설정을 사용합니다";
 "Your Little Companion" = "나의 작은 친구";
+
+// Native pack workspace
+"%1$@ presets" = "프리셋 %1$@개";
+"A pack with this name already exists." = "같은 이름의 팩이 이미 있습니다.";
+"Add an image before using this pack." = "이 팩을 사용하려면 먼저 이미지를 추가하세요.";
+"Add the first image to this pack." = "팩에 첫 이미지를 추가해 주세요.";
+"Changes saved automatically." = "변경사항이 자동으로 저장됩니다.";
+"Check Again" = "다시 확인";
+"Close" = "닫기";
+"Create" = "만들기";
+"Create Pack" = "새 세트 만들기";
+"Create an empty pack, then add your images." = "빈 세트를 만든 뒤 이미지를 추가합니다.";
+"Delete Image" = "이미지 삭제";
+"Delete preset “%1$@”?" = "프리셋 “%1$@”을 삭제할까요?";
+"Edit Presets" = "프리셋 수정";
+"Empty Pack" = "빈 팩";
+"It will be removed from %1$@ key mappings. Keys with no remaining presets will use Unassigned. Original image files will not be changed." = "키 매핑 %1$@개에서 해제됩니다. 남은 프리셋이 없는 키는 ‘입력 중일 때’ 설정을 사용합니다. 원본 이미지 파일은 변경되지 않습니다.";
+"Keyboard monitoring connected" = "키보드 감지 연결됨";
+"Keyboard monitoring disconnected" = "키보드 감지 연결 안 됨";
+"Replacement for %1$@" = "%1$@에 대신 표시할 프리셋";
+"Select %1$@" = "%1$@ 선택";
+"The first image is used for Unassigned and IDLE. You can change them in Keyboard Mapping." = "첫 이미지는 입력 중일 때와 쉬고 있을 때에 사용됩니다. 키보드 매핑에서 바꿀 수 있습니다.";
+"Toggle Sidebar" = "사이드바 보기/가리기";
+"Use Set" = "세트 사용";
+"Use another pack before deleting the last image in the active pack." = "사용 중인 팩의 마지막 이미지를 삭제하려면 먼저 다른 팩을 사용하세요.";
+"Using %1$@" = "%1$@ 사용 중";
+
+// Built-in preset protection
+"Built-in presets are read-only. Create a pack to use your own images." = "기본 프리셋은 고정되어 있어요. 복제해서 수정할 수 있어요.";
+"View Presets" = "프리셋 보기";
+
+"Set Management" = "세트 관리";
+"New Set" = "새 세트 만들기";
+"Duplicate" = "복제";
+"%1$@ Copy" = "%1$@ 복사본";
+"Set Options" = "세트 더 보기";
+"Changes apply immediately." = "변경사항이 바로 적용됩니다";
+"Built-in presets are fixed. Duplicate to edit them." = "기본 프리셋은 고정되어 있어요. 복제해서 수정할 수 있어요.";
+"No images yet" = "아직 이미지가 없어요";
+"The first image is used while typing and while resting." = "첫 이미지는 ‘입력 중일 때’와 ‘쉬고 있을 때’에 사용됩니다.";
+"When Resting" = "쉬고 있을 때";
+"Multiple selections allowed" = "여러 개 선택 가능";
+"Common Keys" = "자주 쓰는 키";
+"Space" = "스페이스";
+"Enter" = "엔터";
+"Quick setup for %1$@" = "%1$@ 빠른 설정";
+"Click a key to edit its presets." = "키를 클릭하면 프리셋 설정이 열립니다.";
+"Edit %1$@" = "%1$@ 프리셋 수정";

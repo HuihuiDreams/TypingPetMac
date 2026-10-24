@@ -62,6 +62,7 @@ final class PetImageLibrary {
     private enum Keys {
         static let gallery = "imageGalleryData-v1"
         static let activeSetID = "activeImageSetID-v1"
+        static let order = "imagePackOrder-v1"
         static let legacyIdleFile = "customIdleImageFile"
         static let legacyReactionFiles = "customReactionImageFiles"
     }
@@ -98,7 +99,32 @@ final class PetImageLibrary {
         repairActiveSelection()
     }
 
-    var imageSets: [PetImageSet] { [Self.builtInSet] + customSets }
+    var imageSets: [PetImageSet] {
+        let sets = [Self.builtInSet] + customSets
+        let order = defaults.stringArray(forKey: Keys.order) ?? []
+        let ranks = Dictionary(order.enumerated().map { ($1, $0) }, uniquingKeysWith: min)
+        return sets.enumerated().sorted {
+            (ranks[$0.element.id.uuidString] ?? (order.count + $0.offset))
+                < (ranks[$1.element.id.uuidString] ?? (order.count + $1.offset))
+        }.map(\.element)
+    }
+
+    func moveSet(id: UUID, before target: UUID) {
+        guard id != target, let set = imageSets.first(where: { $0.id == id }) else { return }
+        var reordered = imageSets.filter { $0.id != id }
+        guard let index = reordered.firstIndex(where: { $0.id == target }) else { return }
+        reordered.insert(set, at: index)
+        defaults.set(reordered.map { $0.id.uuidString }, forKey: Keys.order)
+    }
+
+    func addEmptySet(name: String) throws -> PetImageSet {
+        let id = UUID()
+        try fileManager.createDirectory(at: setsDirectory.appendingPathComponent(id.uuidString), withIntermediateDirectories: true)
+        let set = PetImageSet(id: id, name: name, storageFolder: id.uuidString, idleFileName: "", reactionFileNames: [], isBuiltIn: false)
+        customSets.append(set)
+        persistGallery()
+        return set
+    }
 
     var activeSetID: UUID {
         get { UUID(uuidString: defaults.string(forKey: Keys.activeSetID) ?? "") ?? Self.builtInID }

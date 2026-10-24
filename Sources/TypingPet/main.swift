@@ -1207,6 +1207,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         do {
             try packStore.replaceIdle(with: url)
             petController.reloadImages()
+            settingsModel?.refresh()
         } catch {
             showImageError(error)
         }
@@ -1222,6 +1223,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         do {
             try packStore.replaceUnassigned(with: urls)
             petController.reloadImages()
+            settingsModel?.refresh()
         } catch {
             showImageError(error)
         }
@@ -1319,7 +1321,9 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
                 applyPositionLock: { [weak self] in self?.petController.isPositionLocked = $0 },
                 applyPointerAvoidance: { [weak self] in self?.petController.avoidsPointerWhenLocked = $0 },
                 reloadPet: { [weak self] in self?.petController.reloadImages() },
-                openInputMonitoringSettings: { [weak self] in self?.openInputMonitoringSettings() }
+                openInputMonitoringSettings: { [weak self] in self?.openInputMonitoringSettings() },
+                monitoringIsRunning: { [weak self] in self?.keyMonitor?.isRunning == true },
+                retryMonitoring: { [weak self] in _ = self?.connectMonitoring(restart: true) }
             )
         }
         settingsModel?.refresh()

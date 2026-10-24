@@ -1,14 +1,12 @@
 import AppKit
+import Combine
 import SwiftUI
-import UniformTypeIdentifiers
 
 private enum WorkspacePage: String, CaseIterable {
-    case packs, presets, mapping, appearance, todos, general
+    case sets, appearance, todos, general
     var title: String {
         switch self {
-        case .packs: L("My Packs")
-        case .presets: L("Image Presets")
-        case .mapping: L("Keyboard Mapping")
+        case .sets: L("Set Management")
         case .appearance: L("Appearance and Behavior")
         case .todos: L("Todos and Focus")
         case .general: L("General")
@@ -16,9 +14,7 @@ private enum WorkspacePage: String, CaseIterable {
     }
     var symbol: String {
         switch self {
-        case .packs: "shippingbox"
-        case .presets: "photo.on.rectangle.angled"
-        case .mapping: "keyboard"
+        case .sets: "shippingbox"
         case .appearance: "slider.horizontal.3"
         case .todos: "checklist"
         case .general: "gearshape"
@@ -26,530 +22,326 @@ private enum WorkspacePage: String, CaseIterable {
     }
 }
 
-struct SettingsWorkspaceView: View {
+@MainActor
+private final class WorkspaceNavigation: ObservableObject {
+    @Published var page: WorkspacePage = .sets
+}
+
+/// AppKit owns the actual window, toolbar, split divider, and sidebar selection.
+/// The integrated preset gallery and keyboard editor are native SwiftUI views.
+@MainActor
+final class SettingsWorkspaceController: NSSplitViewController, NSToolbarDelegate {
+    private let editor: PackEditorModel
+    private let navigation = WorkspaceNavigation()
+    private let sidebarToggleID = NSToolbarItem.Identifier("TypingPetSidebarToggle")
+
+    init(model: TypingPetSettingsModel, todoStore: TodoStore, updater: UpdateController) {
+        editor = PackEditorModel(store: model.packStore, onChange: { reload in model.packDidChange(reload: reload) })
+        super.init(nibName: nil, bundle: nil)
+        let sidebar = NSSplitViewItem(sidebarWithViewController: WorkspaceSidebarController(editor: editor, navigation: navigation))
+        sidebar.minimumThickness = 190
+        sidebar.maximumThickness = 340
+        sidebar.canCollapse = true
+        sidebar.preferredThicknessFraction = 0.23
+        let content = NSSplitViewItem(viewController: WorkspaceContentController(
+            model: model, todoStore: todoStore, updater: updater, editor: editor, navigation: navigation))
+        content.minimumThickness = 530
+        addSplitViewItem(sidebar)
+        addSplitViewItem(content)
+        splitView.isVertical = true
+        splitView.dividerStyle = .thin
+        splitView.autosaveName = NSSplitView.AutosaveName("TypingPetSettingsSidebar")
+    }
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    override func splitView(_ splitView: NSSplitView, effectiveRect proposedEffectiveRect: NSRect, forDrawnRect drawnRect: NSRect, ofDividerAt dividerIndex: Int) -> NSRect {
+        let native = super.splitView(splitView, effectiveRect: proposedEffectiveRect, forDrawnRect: drawnRect, ofDividerAt: dividerIndex)
+        return native.isEmpty ? native : native.insetBy(dx: -3, dy: 0)
+    }
+
+    func installToolbar(on window: NSWindow) {
+        let toolbar = NSToolbar(identifier: "TypingPetSettingsToolbar")
+        toolbar.delegate = self
+        toolbar.displayMode = .iconOnly
+        window.toolbar = toolbar
+        window.toolbarStyle = .unified
+    }
+    func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] { [sidebarToggleID, .flexibleSpace] }
+    func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] { toolbarDefaultItemIdentifiers(toolbar) }
+    func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier itemIdentifier: NSToolbarItem.Identifier, willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
+        guard itemIdentifier == sidebarToggleID else { return nil }
+        let item = NSToolbarItem(itemIdentifier: sidebarToggleID)
+        item.label = L("Toggle Sidebar")
+        item.toolTip = L("Toggle Sidebar")
+        item.image = NSImage(systemSymbolName: "sidebar.left", accessibilityDescription: L("Toggle Sidebar"))
+        item.target = self
+        item.action = #selector(toggleSidebar(_:))
+        return item
+    }
+}
+
+@MainActor
+private final class SidebarBrandView: NSStackView {
+    override func mouseDown(with event: NSEvent) { window?.performDrag(with: event) }
+    override func hitTest(_ point: NSPoint) -> NSView? { super.hitTest(point) == nil ? nil : self }
+}
+
+@MainActor
+private final class WorkspaceSidebarController: NSViewController, NSTableViewDataSource, NSTableViewDelegate {
+    private enum Row: Equatable { case set(UUID), settings, page(WorkspacePage) }
+    private let editor: PackEditorModel
+    private let navigation: WorkspaceNavigation
+    private let table = NSTableView()
+    private let addButton = NSButton()
+    private let titleLabel = NSTextField(labelWithString: "")
+    private let brandLabel = NSTextField(labelWithString: AppEnvironment.displayName)
+    private let subtitle = NSTextField(labelWithString: "")
+    private var rows: [Row] = []
+    private var subscriptions = Set<AnyCancellable>()
+    private var createPopover: NSPopover?
+    private var updating = false
+
+    init(editor: PackEditorModel, navigation: WorkspaceNavigation) {
+        self.editor = editor
+        self.navigation = navigation
+        super.init(nibName: nil, bundle: nil)
+    }
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    override func loadView() {
+        let background = NSVisualEffectView()
+        background.material = .sidebar
+        background.blendingMode = .behindWindow
+        view = background
+        let artwork = NSImageView(image: editor.cover(for: editor.store.library.activeSet) ?? NSImage())
+        artwork.imageScaling = .scaleProportionallyUpOrDown
+        artwork.setAccessibilityHidden(true)
+        artwork.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([artwork.widthAnchor.constraint(equalToConstant: 35), artwork.heightAnchor.constraint(equalToConstant: 35)])
+        brandLabel.font = .systemFont(ofSize: 14, weight: .semibold)
+        subtitle.font = .systemFont(ofSize: 11)
+        subtitle.textColor = .secondaryLabelColor
+        let labels = NSStackView(views: [brandLabel, subtitle])
+        labels.orientation = .vertical
+        labels.alignment = .leading
+        labels.spacing = 3
+        let brand = SidebarBrandView(views: [artwork, labels])
+        brand.spacing = 10
+        brand.alignment = .centerY
+        titleLabel.font = .systemFont(ofSize: 11, weight: .medium)
+        titleLabel.textColor = .secondaryLabelColor
+        addButton.image = NSImage(systemSymbolName: "plus", accessibilityDescription: nil)
+        addButton.bezelStyle = .inline
+        addButton.isBordered = false
+        addButton.target = self
+        addButton.action = #selector(createSet)
+        let heading = NSStackView(views: [titleLabel, NSView(), addButton])
+        heading.alignment = .centerY
+        let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("navigation"))
+        table.addTableColumn(column)
+        table.headerView = nil
+        table.columnAutoresizingStyle = .uniformColumnAutoresizingStyle
+        table.style = .sourceList
+        table.backgroundColor = .clear
+        table.intercellSpacing = NSSize(width: 0, height: 4)
+        table.dataSource = self
+        table.delegate = self
+        table.setAccessibilityLabel(L("Set Management"))
+        table.registerForDraggedTypes([.string])
+        table.setDraggingSourceOperationMask(.move, forLocal: true)
+        let scroll = NSScrollView()
+        scroll.documentView = table
+        scroll.hasVerticalScroller = true
+        scroll.drawsBackground = false
+        for child in [brand, heading, scroll] {
+            child.translatesAutoresizingMaskIntoConstraints = false
+            view.addSubview(child)
+        }
+        NSLayoutConstraint.activate([
+            brand.topAnchor.constraint(equalTo: view.topAnchor, constant: 22),
+            brand.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 18),
+            brand.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -12),
+            heading.topAnchor.constraint(equalTo: brand.bottomAnchor, constant: 24),
+            heading.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 18),
+            heading.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+            scroll.topAnchor.constraint(equalTo: heading.bottomAnchor, constant: 8),
+            scroll.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 8),
+            scroll.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -8),
+            scroll.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -12)
+        ])
+        editor.objectWillChange.receive(on: DispatchQueue.main).sink { [weak self] in self?.reload() }.store(in: &subscriptions)
+        navigation.$page.receive(on: DispatchQueue.main).sink { [weak self] _ in self?.reload() }.store(in: &subscriptions)
+        AppLocalization.shared.$language.receive(on: DispatchQueue.main).sink { [weak self] _ in self?.reload() }.store(in: &subscriptions)
+        reload()
+    }
+
+    private func reload() {
+        guard isViewLoaded else { return }
+        updating = true
+        defer { updating = false }
+        titleLabel.stringValue = L("Set Management")
+        subtitle.stringValue = L("Your Little Companion")
+        addButton.setAccessibilityLabel(L("New Set"))
+        addButton.toolTip = L("New Set")
+        addButton.isEnabled = editor.canEdit
+        rows = editor.sets.map { .set($0.id) } + [.settings] + [WorkspacePage.appearance, .todos, .general].map(Row.page)
+        table.reloadData()
+        let desired: Row = navigation.page == .sets ? .set(editor.selectedSetID) : .page(navigation.page)
+        if let row = rows.firstIndex(of: desired) { table.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false) }
+    }
+    func numberOfRows(in tableView: NSTableView) -> Int { rows.count }
+    func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat { rows[row] == .settings ? 46 : 40 }
+    func tableView(_ tableView: NSTableView, isGroupRow row: Int) -> Bool { rows[row] == .settings }
+    func tableView(_ tableView: NSTableView, shouldSelectRow row: Int) -> Bool { rows[row] != .settings }
+    func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
+        let cell = NSTableCellView()
+        let name: String
+        let symbol: String
+        var active = false
+        switch rows[row] {
+        case .set(let id):
+            guard let set = editor.sets.first(where: { $0.id == id }) else { return cell }
+            name = editor.configuration(for: set).name
+            symbol = "shippingbox"
+            active = id == editor.activeSetID
+        case .settings: name = L("Settings"); symbol = ""
+        case .page(let page): name = page.title; symbol = page.symbol
+        }
+        let label = NSTextField(labelWithString: name)
+        label.lineBreakMode = .byTruncatingTail
+        label.font = .systemFont(ofSize: rows[row] == .settings ? 11 : 13)
+        label.textColor = rows[row] == .settings ? .secondaryLabelColor : .labelColor
+        cell.textField = label
+        let image = NSImageView(image: NSImage(systemSymbolName: symbol, accessibilityDescription: nil) ?? NSImage())
+        image.contentTintColor = .secondaryLabelColor
+        cell.imageView = image
+        let check = NSImageView(image: NSImage(systemSymbolName: "checkmark.circle.fill", accessibilityDescription: L("In Use")) ?? NSImage())
+        check.contentTintColor = .systemTeal
+        check.isHidden = !active
+        check.setAccessibilityLabel(L("In Use"))
+        for child in [image, label, check] { child.translatesAutoresizingMaskIntoConstraints = false; cell.addSubview(child) }
+        NSLayoutConstraint.activate([
+            image.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 10), image.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
+            image.widthAnchor.constraint(equalToConstant: rows[row] == .settings ? 0 : 18), image.heightAnchor.constraint(equalToConstant: 18),
+            label.leadingAnchor.constraint(equalTo: image.trailingAnchor, constant: 8), label.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
+            check.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -10), check.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
+            check.widthAnchor.constraint(equalToConstant: active ? 14 : 0), check.heightAnchor.constraint(equalToConstant: 14),
+            label.trailingAnchor.constraint(lessThanOrEqualTo: check.leadingAnchor, constant: -6)
+        ])
+        cell.toolTip = name
+        return cell
+    }
+    func tableViewSelectionDidChange(_ notification: Notification) {
+        guard !updating, rows.indices.contains(table.selectedRow) else { return }
+        switch rows[table.selectedRow] {
+        case .set(let id):
+            guard let set = editor.sets.first(where: { $0.id == id }) else { return }
+            editor.selectSet(set)
+            navigation.page = .sets
+        case .page(let page): navigation.page = page
+        case .settings: break
+        }
+    }
+    func tableView(_ tableView: NSTableView, pasteboardWriterForRow row: Int) -> NSPasteboardWriting? {
+        guard case .set(let id) = rows[row] else { return nil }
+        return id.uuidString as NSString
+    }
+    func tableView(_ tableView: NSTableView, validateDrop info: NSDraggingInfo, proposedRow row: Int, proposedDropOperation operation: NSTableView.DropOperation) -> NSDragOperation {
+        guard operation == .above, row >= 0, row < editor.sets.count,
+              let text = info.draggingPasteboard.string(forType: .string), let id = UUID(uuidString: text),
+              editor.sets.contains(where: { $0.id == id }) else { return [] }
+        return .move
+    }
+    func tableView(_ tableView: NSTableView, acceptDrop info: NSDraggingInfo, row: Int, dropOperation: NSTableView.DropOperation) -> Bool {
+        guard row >= 0, row < editor.sets.count, let text = info.draggingPasteboard.string(forType: .string), let id = UUID(uuidString: text) else { return false }
+        editor.moveSet(id: id, before: editor.sets[row].id)
+        return true
+    }
+    @objc private func createSet() {
+        if createPopover?.isShown == true { createPopover?.close(); return }
+        let popover = NSPopover()
+        popover.behavior = .transient
+        popover.contentViewController = NSHostingController(rootView: CreateSetPopover(editor: editor) { [weak self, weak popover] in
+            self?.navigation.page = .sets
+            popover?.close()
+        } onCancel: { [weak popover] in popover?.close() })
+        createPopover = popover
+        popover.show(relativeTo: addButton.bounds, of: addButton, preferredEdge: .maxX)
+    }
+}
+
+@MainActor
+private final class WorkspaceContentController: NSHostingController<WorkspaceContentView> {
+    init(model: TypingPetSettingsModel, todoStore: TodoStore, updater: UpdateController, editor: PackEditorModel, navigation: WorkspaceNavigation) {
+        super.init(rootView: WorkspaceContentView(model: model, todoStore: todoStore, updater: updater, editor: editor, navigation: navigation))
+        sizingOptions = []
+    }
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+}
+
+private struct WorkspaceContentView: View {
     @ObservedObject var model: TypingPetSettingsModel
     @ObservedObject var todoStore: TodoStore
     let updater: UpdateController
-    @StateObject private var editor: PackEditorModel
-    @AppStorage("SettingsWorkspacePage", store: AppEnvironment.defaults) private var pageRaw = WorkspacePage.mapping.rawValue
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    init(model: TypingPetSettingsModel, todoStore: TodoStore, updater: UpdateController) {
-        self.model = model
-        self.todoStore = todoStore
-        self.updater = updater
-        _editor = StateObject(wrappedValue: PackEditorModel(store: model.packStore))
-    }
-    private var page: WorkspacePage { WorkspacePage(rawValue: pageRaw) ?? .mapping }
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 16) {
-            sidebar
-                .frame(width: 200)
-            VStack(alignment: .leading, spacing: 14) {
-                header
-                if [.packs, .presets, .mapping].contains(page) { packBar }
-                Group {
-                    switch page {
-                    case .mapping: mapping
-                    case .presets: presetGallery
-                    case .packs: packs
-                    case .appearance: GeneralSettingsView(model: model, updater: updater, scope: .pet)
-                    case .todos: TodoSettingsView(store: todoStore)
-                    case .general: GeneralSettingsView(model: model, updater: updater, scope: .system)
-                    }
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                if !editor.statusMessage.isEmpty {
-                    Text(editor.statusMessage).font(.callout).foregroundStyle(.secondary).padding(.horizontal, 4)
-                }
-            }
-            .padding(.top, 8)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
-        .padding(12)
-        .background(Color(nsColor: .windowBackgroundColor))
-        .ignoresSafeArea()
-        .tint(.teal)
-        .onChange(of: pageRaw) { _ in editor.stopPreview() }
-        .onReceive(model.$imageSets) { _ in editor.refreshIfClean() }
-        .onDisappear { editor.stopPreview() }
-        .alert(L("Error"), isPresented: Binding(get: { editor.errorMessage != nil }, set: { if !$0 { editor.errorMessage = nil } })) {
-            Button(L("OK")) { editor.errorMessage = nil }
-        } message: { Text(editor.errorMessage ?? "") }
-    }
-
-    private var sidebar: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            HStack(spacing: 10) {
-                PresetArtwork(image: editor.image(id: editor.draft.idle.presetIDs.first))
-                    .frame(width: 42, height: 42)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(AppEnvironment.displayName).font(.system(size: 15, weight: .medium))
-                    Text(L("Your Little Companion")).font(.caption).foregroundStyle(.secondary)
-                }
-            }
-            .padding(.horizontal, 6)
-            navGroup(L("Library"), pages: [.packs, .presets, .mapping])
-            Divider().padding(.horizontal, 6)
-            navGroup(L("Settings"), pages: [.appearance, .todos, .general])
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 10)
-        .padding(.top, 46)
-        .padding(.bottom, 18)
-        .frame(maxHeight: .infinity)
-        .modifier(WorkspaceSurface(radius: 24))
-    }
-
-    private func navGroup(_ title: String, pages: [WorkspacePage]) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Text(title).font(.caption).foregroundStyle(.secondary).padding(.horizontal, 12).padding(.bottom, 2)
-            ForEach(pages, id: \.self) { item in
-                Button { pageRaw = item.rawValue } label: {
-                    Label(item.title, systemImage: item.symbol)
-                        .font(.system(size: 13, weight: page == item ? .medium : .regular))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 12).padding(.vertical, 11)
-                        .foregroundStyle(page == item ? Color.teal : Color.primary)
-                        .background(RoundedRectangle(cornerRadius: 12).fill(page == item ? Color.teal.opacity(0.13) : .clear))
-                }
-                .buttonStyle(.plain)
-                .accessibilityAddTraits(page == item ? .isSelected : [])
-            }
-        }
-    }
-
-    private var header: some View {
-        HStack(spacing: 10) {
-            Text(page.title).font(.system(size: 19, weight: .medium))
-            Spacer(minLength: 8)
-            if page == .mapping {
-                Button {
-                    if editor.isPreviewing { editor.stopPreview() } else { editor.startPreview() }
-                } label: {
-                    Label(editor.isPreviewing ? L("Back to Editing") : L("Preview Mode"), systemImage: editor.isPreviewing ? "pencil" : "play")
-                }
-                .accessibilityIdentifier("preview-mode")
-            }
-            if [.packs, .presets, .mapping].contains(page), !editor.isPreviewing {
-                Menu {
-                    Button(L("Pack from Images…")) { importPack(folder: false) }
-                    Button(L("Pack from Folder…")) { importPack(folder: true) }
-                } label: { Label(L("Import"), systemImage: "folder") }
-                .fixedSize()
-                Button(L("Save Pack")) { editor.saveAndApply { model.packDidChange() } }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(!editor.canSave)
-            }
-        }
-        .controlSize(.regular)
-        .padding(14)
-        .modifier(WorkspaceSurface(radius: 20))
-    }
-
-    private var packBar: some View {
-        HStack(spacing: 10) {
-            Text(L("Editing Pack")).foregroundStyle(.secondary)
-            TextField(L("Pack Name"), text: $editor.draft.name)
-                .textFieldStyle(.roundedBorder).frame(maxWidth: 220)
-                .disabled(editor.isPreviewing)
-            Text(editor.isDirty ? L("Unsaved Changes") : editor.isActive ? L("In Use") : L("Saved Pack"))
-                .font(.caption).foregroundStyle(.secondary)
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 5)
-    }
-
-    private var mapping: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                if editor.isPreviewing { preview }
-                HStack(spacing: 10) {
-                    behaviorButton(.unassigned)
-                    behaviorButton(.idle)
-                }
-                if !editor.isPreviewing, let target = editor.expandedTarget, target == .idle || target == .unassigned {
-                    accordion(target).transition(.opacity.combined(with: .move(edge: .top)))
-                }
-                HStack(spacing: 5) {
-                    Text(L("Modifier Combination")).font(.callout).foregroundStyle(.secondary).padding(.trailing, 4)
-                    modifierButton(.control, symbol: "⌃")
-                    modifierButton(.option, symbol: "⌥")
-                    modifierButton(.shift, symbol: "⇧")
-                    modifierButton(.command, symbol: "⌘")
-                    Spacer()
-                }
-                keyboard
-                HStack {
-                    Text(L("Mac · ANSI Layout"))
-                    Spacer()
-                    Text(L("Thumbnail: Assigned Preset · Dot: Unassigned"))
-                }
-                .font(.caption).foregroundStyle(.secondary)
-                if !editor.isPreviewing, editor.expandedTarget == nil {
-                    Text(L("Select a key or an item above to edit its presets."))
-                        .font(.callout).foregroundStyle(.secondary)
-                }
-            }
-            .padding(3)
-            .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: editor.expandedTarget)
-        }
-    }
-
-    private func behaviorButton(_ target: PackEditorTarget) -> some View {
-        let selection = editor.selection(for: target)
-        let expanded = !editor.isPreviewing && editor.expandedTarget == target
-        return Button {
-            if editor.isPreviewing {
-                if target == .idle { editor.showPreviewIdle() } else { editor.previewUnassigned() }
-            } else { editor.toggle(target) }
-        } label: {
-            HStack(spacing: 10) {
-                HStack(spacing: -9) {
-                    ForEach(Array(selection.presetIDs.prefix(3)), id: \.self) { id in
-                        PresetArtwork(image: editor.image(id: id)).frame(width: 31, height: 33)
-                    }
-                }
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(target.title).font(.system(size: 13, weight: .medium))
-                    Text(L("%1$@ presets · %2$@", selection.presetIDs.count, selection.mode.title))
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-                Spacer(minLength: 2)
-                Image(systemName: expanded ? "chevron.up" : "chevron.down").font(.caption).foregroundStyle(.secondary)
-            }
-            .padding(11)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: 12).fill(expanded ? Color.teal.opacity(0.10) : Color(nsColor: .controlBackgroundColor)))
-            .overlay(RoundedRectangle(cornerRadius: 12).stroke(expanded ? Color.teal.opacity(0.7) : Color.primary.opacity(0.09)))
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(target.title)
-        .accessibilityValue(expanded ? L("Expanded") : L("Collapsed"))
-    }
-
-    private func modifierButton(_ modifier: KeyModifiers, symbol: String) -> some View {
-        Button { editor.toggleModifier(modifier) } label: {
-            Text(symbol).frame(width: 24, height: 24)
-                .background(RoundedRectangle(cornerRadius: 7).fill(editor.modifiers.contains(modifier) ? Color.teal.opacity(0.18) : Color(nsColor: .controlBackgroundColor)))
-                .overlay(RoundedRectangle(cornerRadius: 7).stroke(editor.modifiers.contains(modifier) ? Color.teal : Color.primary.opacity(0.10)))
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(symbol)
-        .accessibilityAddTraits(editor.modifiers.contains(modifier) ? .isSelected : [])
-    }
-
-    private var keyboard: some View {
-        VStack(spacing: 5) {
-            ForEach(KeyboardLayoutKey.rows.indices, id: \.self) { index in
-                keyboardRow(KeyboardLayoutKey.rows[index], function: index == 0)
-                if !editor.isPreviewing, case .key(let stroke) = editor.expandedTarget,
-                   KeyboardLayoutKey.rows[index].contains(where: { $0.code == stroke.keyCode }) {
-                    accordion(.key(stroke)).padding(.vertical, 4).transition(.opacity.combined(with: .move(edge: .top)))
-                }
-            }
-        }
-        .padding(8)
-        .background(RoundedRectangle(cornerRadius: 16).fill(Color.primary.opacity(0.035)))
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.primary.opacity(0.09)))
-    }
-
-    private func keyboardRow(_ row: [KeyboardLayoutKey], function: Bool) -> some View {
-        GeometryReader { geometry in
-            let unit = max(0, geometry.size.width - CGFloat(row.count - 1) * 4) / row.reduce(0) { $0 + $1.width }
-            HStack(spacing: 4) {
-                ForEach(row) { key in
-                    keyboardKey(key, function: function).frame(width: unit * key.width)
-                }
-            }
-        }
-        .frame(height: function ? 44 : 54)
-    }
-
-    private func keyboardKey(_ key: KeyboardLayoutKey, function: Bool) -> some View {
-        let stroke = key.code.map { KeyStroke(keyCode: $0, modifiers: editor.modifiers) }
-        let selection = stroke.map { editor.selection(for: .key($0)) }
-        let selected = editor.isPreviewing ? stroke == editor.previewStroke && stroke != nil : stroke.map { editor.expandedTarget == .key($0) } ?? false
-        return Button {
-            guard let stroke else { return }
-            if editor.isPreviewing { editor.previewKey(stroke) } else { editor.toggle(.key(stroke)) }
-        } label: {
-            VStack(alignment: .leading, spacing: 0) {
-                Text(key.label.replacingOccurrences(of: "L", with: key.code == nil ? "" : "L").replacingOccurrences(of: "R", with: key.code == nil ? "" : "R"))
-                    .font(.system(size: 10)).foregroundStyle(key.code == nil ? .tertiary : .secondary)
-                    .lineLimit(1)
-                if !function || selection?.presetIDs.isEmpty == false {
-                    Spacer(minLength: 0)
-                    if let id = selection?.presetIDs.first {
-                        PresetArtwork(image: editor.image(id: id)).frame(maxWidth: .infinity).frame(height: function ? 20 : 29)
-                    } else if key.code != nil {
-                        Text("·").foregroundStyle(.tertiary).frame(maxWidth: .infinity)
-                    }
-                }
-            }
-            .padding(4).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .background(RoundedRectangle(cornerRadius: 6).fill(selected ? Color.teal.opacity(0.12) : Color(nsColor: .controlBackgroundColor).opacity(key.code == nil ? 0.4 : 1)))
-            .overlay(RoundedRectangle(cornerRadius: 6).stroke(selected ? Color.teal : Color.primary.opacity(0.10), lineWidth: selected ? 1.5 : 0.6))
-        }
-        .buttonStyle(.plain).disabled(key.code == nil)
-        .accessibilityLabel(stroke?.displayName ?? key.label)
-        .accessibilityValue(selection?.presetIDs.map { editor.name(id: $0) }.joined(separator: ", ") ?? "")
-        .onDrop(of: [UTType.plainText], isTargeted: nil) { providers in
-            guard !editor.isPreviewing, let stroke, let provider = providers.first else { return false }
-            _ = provider.loadObject(ofClass: String.self) { value, _ in
-                guard let value else { return }
-                DispatchQueue.main.async { editor.assignPreset(value, to: stroke) }
-            }
-            return true
-        }
-    }
-
-    private func accordion(_ target: PackEditorTarget) -> some View {
-        let selection = editor.selection(for: target)
-        return VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
-                Text(target.title).font(.headline)
-                Spacer()
-                if case .key = target {
-                    Button(L("Unassign")) { editor.unassign(target) }.disabled(selection.presetIDs.isEmpty)
-                }
-                Button { editor.expandedTarget = nil } label: { Label(L("Collapse"), systemImage: "chevron.up") }
-            }
-            .controlSize(.small)
-            Text(target == .idle ? L("Choose presets shown when you stop typing.") : target == .unassigned ? L("Choose presets shown for keys without a mapping.") : L("Choose presets and a display mode for this key combination."))
-                .font(.callout).foregroundStyle(.secondary)
-            HStack {
-                Picker(L("Display Mode"), selection: Binding(get: { selection.mode }, set: { editor.setMode($0, for: target) })) {
-                    ForEach(PresetPlaybackMode.allCases, id: \.self) { mode in Text(mode.title).tag(mode) }
-                }
-                .frame(maxWidth: 210).disabled(selection.presetIDs.isEmpty)
-                Text(selection.presetIDs.isEmpty ? L("Uses Unassigned settings") : L("%1$@ selected", selection.presetIDs.count))
-                    .font(.caption).foregroundStyle(.secondary)
-                Spacer()
-            }
-            HStack {
-                Text(L("Image Presets · Select Multiple")).font(.callout)
-                Spacer()
-                Button(L("Manage Presets")) { pageRaw = WorkspacePage.presets.rawValue }.buttonStyle(.link)
-            }
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 78, maximum: 104))], alignment: .leading, spacing: 8) {
-                ForEach(editor.draft.presets) { preset in
-                    presetTile(preset, selected: selection.presetIDs.contains(preset.id), height: 49) {
-                        editor.togglePreset(preset.id, for: target)
-                    }
-                }
-            }
-            if selection.mode == .cycle, selection.presetIDs.count > 1 {
-                Text(L("Cycle Order")).font(.caption).foregroundStyle(.secondary)
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 170))], alignment: .leading, spacing: 6) {
-                    ForEach(Array(selection.presetIDs.enumerated()), id: \.element) { index, id in
-                        HStack(spacing: 5) {
-                            Text("\(index + 1). \(editor.name(id: id))").lineLimit(1).help(editor.name(id: id))
-                            Spacer(minLength: 0)
-                            Button { editor.movePreset(id, by: -1, for: target) } label: { Image(systemName: "arrow.left") }
-                                .disabled(index == 0).accessibilityLabel(L("Move Earlier"))
-                            Button { editor.movePreset(id, by: 1, for: target) } label: { Image(systemName: "arrow.right") }
-                                .disabled(index == selection.presetIDs.count - 1).accessibilityLabel(L("Move Later"))
-                        }
-                        .font(.caption).controlSize(.mini)
-                    }
-                }
-            }
-        }
-        .padding(14)
-        .background(RoundedRectangle(cornerRadius: 14).fill(Color(nsColor: .controlBackgroundColor)))
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.primary.opacity(0.10)))
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(L("Preset Editor"))
-    }
-
-    private func presetTile(_ preset: PetImagePreset, selected: Bool, height: CGFloat, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            VStack(spacing: 5) {
-                PresetArtwork(image: editor.image(for: preset)).frame(height: height)
-                Text(preset.name).font(.caption).lineLimit(2).frame(maxWidth: .infinity)
-            }
-            .padding(7).frame(maxWidth: .infinity)
-            .background(RoundedRectangle(cornerRadius: 11).fill(selected ? Color.teal.opacity(0.12) : Color(nsColor: .controlBackgroundColor)))
-            .overlay(RoundedRectangle(cornerRadius: 11).stroke(selected ? Color.teal : Color.primary.opacity(0.10)))
-            .overlay(alignment: .topTrailing) {
-                if selected { Image(systemName: "checkmark.circle.fill").font(.caption).foregroundStyle(.teal).padding(5) }
-            }
-        }
-        .buttonStyle(.plain).help(preset.name)
-        .accessibilityLabel(preset.name)
-        .accessibilityAddTraits(selected ? .isSelected : [])
-        .onDrag { NSItemProvider(object: preset.id as NSString) }
-    }
-
-    private var presetGallery: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                HStack {
-                    Text(L("Give presets any name and reuse them across keys and reactions.")).foregroundStyle(.secondary)
-                    Spacer()
-                    Button { editor.addPresets() } label: { Label(L("Add Images…"), systemImage: "plus") }
-                }
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 130, maximum: 180))], alignment: .leading, spacing: 12) {
-                    ForEach(editor.draft.presets) { preset in
-                        presetTile(preset, selected: preset.id == editor.selectedPresetID, height: 90) { editor.selectedPresetID = preset.id }
-                    }
-                }
-                Divider()
-                HStack(spacing: 12) {
-                    TextField(L("Preset Name"), text: Binding(
-                        get: { editor.name(id: editor.selectedPresetID) },
-                        set: { value in
-                            if let index = editor.draft.presets.firstIndex(where: { $0.id == editor.selectedPresetID }) { editor.draft.presets[index].name = value }
-                        }
-                    ))
-                    .textFieldStyle(.roundedBorder).frame(maxWidth: 230)
-                    Button(L("Replace Image…")) { editor.replacePresetImage() }
-                }
-            }
-            .padding(3)
-        }
-    }
-
-    private var packs: some View {
-        ScrollView {
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 170, maximum: 220))], alignment: .leading, spacing: 14) {
-                ForEach(editor.sets) { set in
-                    let config = set.id == editor.selectedSetID ? editor.draft : editor.store.configuration(for: set)
-                    Button {
-                        editor.selectSet(set)
-                        pageRaw = WorkspacePage.mapping.rawValue
-                    } label: {
-                        VStack(spacing: 8) {
-                            PresetArtwork(image: config.idle.presetIDs.first.flatMap { id in config.presets.first { $0.id == id } }.flatMap { editor.image(for: $0, in: set) })
-                                .frame(height: 110)
-                            Text(config.name).font(.headline).lineLimit(2)
-                            Text(set.id == editor.store.library.activeSetID ? L("In Use") : L("Edit Pack"))
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                        .padding(16).frame(maxWidth: .infinity)
-                        .modifier(WorkspaceSurface(radius: 16))
-                    }
-                    .buttonStyle(.plain)
-                    .contextMenu {
-                        if !set.isBuiltIn {
-                            Button(L("Remove")) { editor.removePack(set) { model.packDidChange() } }
-                        }
-                    }
-                }
-            }
-            .padding(3)
-        }
-    }
-
-    private var preview: some View {
-        HStack(spacing: 18) {
-            AnimatedPresetArtwork(image: editor.image(id: editor.previewPresetID))
-                .frame(width: 145, height: 145).clipped()
-            VStack(alignment: .leading, spacing: 8) {
-                Text(L("Preview Mode")).font(.headline)
-                Text(editor.previewSource).font(.callout).foregroundStyle(.teal)
-                Text(editor.name(id: editor.previewPresetID)).font(.title2)
-                Text(L("Click the keyboard or type here. When typing stops, IDLE resumes."))
-                    .font(.callout).foregroundStyle(.secondary)
-                HStack {
-                    PreviewKeyInput(onStroke: { editor.previewKey($0) }).frame(width: 190, height: 30)
-                    Button(L("Next IDLE Image")) { editor.showPreviewIdle() }
-                }
-                if !editor.lastPreviewKey.isEmpty {
-                    Text(L("Last Input · %1$@", editor.lastPreviewKey)).font(.caption).foregroundStyle(.secondary)
-                }
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(16)
-        .background(RoundedRectangle(cornerRadius: 18).fill(Color(nsColor: .controlBackgroundColor)))
-        .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.teal.opacity(0.7)))
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(L("Preview Mode"))
-    }
-
-    private func importPack(folder: Bool) {
-        editor.importPack(folder: folder) {
-            model.packDidChange()
-            pageRaw = WorkspacePage.mapping.rawValue
-        }
-    }
-}
-
-private struct WorkspaceSurface: ViewModifier {
-    var radius: CGFloat
-    func body(content: Content) -> some View {
-        content
-            .background(RoundedRectangle(cornerRadius: radius).fill(Color(nsColor: .controlBackgroundColor)))
-            .overlay(RoundedRectangle(cornerRadius: radius).stroke(Color.primary.opacity(0.09)))
-            .shadow(color: .black.opacity(0.025), radius: 4, y: 2)
-    }
-}
-
-private struct PresetArtwork: View {
-    var image: NSImage?
+    @ObservedObject var editor: PackEditorModel
+    @ObservedObject var navigation: WorkspaceNavigation
     var body: some View {
         Group {
-            if let image { Image(nsImage: image).resizable().scaledToFit() }
-            else { Image(systemName: "photo").foregroundStyle(.tertiary) }
+            if navigation.page == .sets { NativeSetWorkspace(editor: editor) }
+            else { NativeSettingsPages(model: model, todoStore: todoStore, updater: updater, navigation: navigation) }
         }
-        .accessibilityHidden(true)
+        .onReceive(model.$imageSets) { _ in editor.refresh() }
     }
 }
 
-private struct AnimatedPresetArtwork: NSViewRepresentable {
-    var image: NSImage?
-    final class FlexibleImageView: NSImageView {
-        override var intrinsicContentSize: NSSize { NSSize(width: NSView.noIntrinsicMetric, height: NSView.noIntrinsicMetric) }
+private struct NativeSettingsPages: View {
+    @ObservedObject private var localization = AppLocalization.shared
+    @ObservedObject var model: TypingPetSettingsModel
+    @ObservedObject var todoStore: TodoStore
+    let updater: UpdateController
+    @ObservedObject var navigation: WorkspaceNavigation
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            Text(navigation.page.title).font(.system(size: 22, weight: .semibold))
+            Group {
+                switch navigation.page {
+                case .sets: EmptyView()
+                case .appearance: GeneralSettingsView(model: model, updater: updater, scope: .pet)
+                case .todos: TodoSettingsView(store: todoStore)
+                case .general: GeneralSettingsView(model: model, updater: updater, scope: .system)
+                }
+            }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }
+        .padding(22).background(Color(nsColor: .windowBackgroundColor)).tint(.teal)
+        .environment(\.locale, localization.locale)
+        .alert(L("Error"), isPresented: Binding(get: { model.errorMessage != nil }, set: { if !$0 { model.errorMessage = nil } })) {
+            Button(L("OK")) { model.errorMessage = nil }
+        } message: { Text(model.errorMessage ?? "") }
     }
-    func makeNSView(context: Context) -> NSImageView {
-        let view = FlexibleImageView()
-        view.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        view.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
-        view.imageScaling = .scaleProportionallyUpOrDown
-        view.animates = true
-        return view
-    }
-    func updateNSView(_ view: NSImageView, context: Context) { if view.image !== image { view.image = image } }
 }
 
-/// This local responder exists only in Preview Mode. It never requests global input access.
-private struct PreviewKeyInput: NSViewRepresentable {
-    let onStroke: (KeyStroke) -> Void
-    func makeNSView(context: Context) -> PreviewInputButton {
-        let button = PreviewInputButton(title: L("Click Here and Type"), target: nil, action: nil)
-        button.bezelStyle = .rounded
-        button.target = button
-        button.action = #selector(PreviewInputButton.focusPreview)
-        button.onStroke = onStroke
-        return button
-    }
-    func updateNSView(_ view: PreviewInputButton, context: Context) {
-        view.title = L("Click Here and Type")
-        view.onStroke = onStroke
-    }
-    final class PreviewInputButton: NSButton {
-        var onStroke: ((KeyStroke) -> Void)?
-        override var acceptsFirstResponder: Bool { true }
-        @objc func focusPreview() { window?.makeFirstResponder(self) }
-        override func viewDidMoveToWindow() {
-            super.viewDidMoveToWindow()
-            DispatchQueue.main.async { [weak self] in self?.focusPreview() }
-        }
-        override func keyDown(with event: NSEvent) {
-            if event.keyCode == 48 {
-                if event.modifierFlags.contains(.shift) { window?.selectPreviousKeyView(self) }
-                else { window?.selectNextKeyView(self) }
-                return
+private struct CreateSetPopover: View {
+    @ObservedObject var editor: PackEditorModel
+    let onCreated: () -> Void
+    let onCancel: () -> Void
+    @State private var name = ""
+    @State private var error: String?
+    @FocusState private var focused: Bool
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text(L("New Set")).font(.headline)
+            TextField(L("Pack Name"), text: $name).textFieldStyle(.roundedBorder).focused($focused).onSubmit(create)
+            Text(L("Create an empty pack, then add your images.")).font(.callout).foregroundStyle(.secondary)
+            if let error { Text(error).foregroundStyle(.red).font(.callout) }
+            HStack {
+                Spacer()
+                Button(L("Cancel"), action: onCancel).keyboardShortcut(.cancelAction)
+                Button(L("Create"), action: create).keyboardShortcut(.defaultAction).disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
-            onStroke?(KeyStroke(keyCode: event.keyCode, modifiers: KeyModifiers(eventFlags: CGEventFlags(rawValue: UInt64(event.modifierFlags.rawValue)))))
-        }
-        override func performKeyEquivalent(with event: NSEvent) -> Bool {
-            guard window?.firstResponder === self else { return super.performKeyEquivalent(with: event) }
-            keyDown(with: event)
-            return true
-        }
+        }.padding(20).frame(width: 290).onAppear { focused = true }
+    }
+    private func create() {
+        do { try editor.createPack(name: name); onCreated() }
+        catch { self.error = error.localizedDescription }
     }
 }

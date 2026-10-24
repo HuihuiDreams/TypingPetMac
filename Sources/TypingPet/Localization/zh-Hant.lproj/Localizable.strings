@@ -405,3 +405,51 @@
 "Unsaved Changes" = "未儲存的變更";
 "Uses Unassigned settings" = "使用未指派設定";
 "Your Little Companion" = "你的小夥伴";
+
+// Native pack workspace
+"%1$@ presets" = "%1$@ 個預設";
+"A pack with this name already exists." = "已存在同名圖片包。";
+"Add an image before using this pack." = "請先加入圖片再使用此圖片包。";
+"Add the first image to this pack." = "為此圖片包加入第一張圖片。";
+"Changes saved automatically." = "更改會自動儲存。";
+"Check Again" = "重新檢查";
+"Close" = "關閉";
+"Create" = "建立";
+"Create Pack" = "建立圖片包";
+"Create an empty pack, then add your images." = "先建立空圖片包，再加入圖片。";
+"Delete Image" = "刪除圖片";
+"Delete preset “%1$@”?" = "刪除預設「%1$@」？";
+"Edit Presets" = "編輯預設";
+"Empty Pack" = "空圖片包";
+"It will be removed from %1$@ key mappings. Keys with no remaining presets will use Unassigned. Original image files will not be changed." = "將從 %1$@ 個按鍵對應中移除。沒有剩餘預設的按鍵將使用「未指派」。原始圖片檔案不會改變。";
+"Keyboard monitoring connected" = "鍵盤監聽已連線";
+"Keyboard monitoring disconnected" = "鍵盤監聽未連線";
+"Replacement for %1$@" = "%1$@ 的替代預設";
+"Select %1$@" = "選取 %1$@";
+"The first image is used for Unassigned and IDLE. You can change them in Keyboard Mapping." = "第一張圖片用於「未指派」和 IDLE，可在鍵盤對應中更改。";
+"Toggle Sidebar" = "顯示或隱藏側邊欄";
+"Use Set" = "使用此套組";
+"Use another pack before deleting the last image in the active pack." = "刪除目前圖片包的最後一張圖片前，請先使用其他圖片包。";
+"Using %1$@" = "正在使用 %1$@";
+
+// Built-in preset protection
+"Built-in presets are read-only. Create a pack to use your own images." = "預設套組的圖片預設無法修改。請建立新圖片包以使用自己的圖片。";
+"View Presets" = "檢視預設";
+
+"Set Management" = "套裝管理";
+"New Set" = "新增套裝";
+"Duplicate" = "複製";
+"%1$@ Copy" = "%1$@ 副本";
+"Set Options" = "套裝選項";
+"Changes apply immediately." = "變更會立即生效。";
+"Built-in presets are fixed. Duplicate to edit them." = "預設圖像無法修改。複製後即可編輯。";
+"No images yet" = "尚無圖片";
+"The first image is used while typing and while resting." = "第一張圖片用於輸入時和休息時。";
+"When Resting" = "休息時";
+"Multiple selections allowed" = "可多選";
+"Common Keys" = "常用按鍵";
+"Space" = "空白鍵";
+"Enter" = "Enter";
+"Quick setup for %1$@" = "快速設定 %1$@";
+"Click a key to edit its presets." = "點擊按鍵以編輯預設。";
+"Edit %1$@" = "編輯 %1$@";

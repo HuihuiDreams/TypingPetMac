@@ -13,6 +13,9 @@ final class PetPackTests: XCTestCase {
             URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
                 .appendingPathComponent("Sources/TypingPet/Resources/pet-left.png")
         }
+        var sampleImages: [URL] {
+            ["pet-idle.png", "pet-left.png", "pet-right.png"].map { image.deletingLastPathComponent().appendingPathComponent($0) }
+        }
         init() throws {
             suite = "TypingPetPacks.\(UUID())"
             defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
@@ -46,23 +49,26 @@ final class PetPackTests: XCTestCase {
         XCTAssertTrue(store.configuration(for: new).mappings.isEmpty)
         XCTAssertEqual(store.configuration(for: new).presets.count, 1, "A single imported image is shared by IDLE and Unassigned")
         XCTAssertTrue(FileManager.default.fileExists(atPath: oldURL.path))
+        try store.resetToDefaults()
+        XCTAssertEqual(store.activeConfiguration.presets.count, 5, "Explicit reset can restore the bundled images after legacy migration")
+        XCTAssertTrue(store.activeConfiguration.mappings.isEmpty)
     }
 
     @MainActor func testRoundTripKeepsPerPackSelectionsModesNamesAndModifierCombinations() throws {
         let f = try Fixture(); defer { f.cleanup() }
         let store = f.store()
-        let builtIn = f.library.activeSet
-        var pack = store.configuration(for: builtIn)
+        let set = try f.library.addSet(from: f.sampleImages, name: "Editable")
+        var pack = store.configuration(for: set)
         let ids = Array(pack.presets.prefix(3).map(\.id))
         pack.name = "자유로운 팩 이름"
         pack.presets[0].name = "자유로운 표정"
         pack.idle = PresetSelection(presetIDs: Array(ids.reversed()), mode: .cycle)
         pack.unassigned = PresetSelection(presetIDs: ids, mode: .random)
         pack.mappings = [PresetKeyMapping(stroke: KeyStroke(keyCode: 40, modifiers: [.control, .option, .shift, .command]), selection: PresetSelection(presetIDs: ids, mode: .cycle))]
-        try store.save(pack, for: builtIn)
+        try store.save(pack, for: set)
         let second = try f.library.addSet(from: [f.image], name: "Separate")
         let restored = f.store()
-        XCTAssertEqual(restored.configuration(for: builtIn), pack)
+        XCTAssertEqual(restored.configuration(for: set), pack)
         XCTAssertTrue(restored.configuration(for: second).mappings.isEmpty)
         XCTAssertNotEqual(restored.configuration(for: second).name, pack.name)
     }
@@ -100,9 +106,10 @@ final class PetPackTests: XCTestCase {
         }
     }
 
-    @MainActor func testImportedPresetIsIndependentOfOriginalAndCanBeSavedInBuiltInPack() throws {
+    @MainActor func testImportedPresetIsIndependentOfOriginalAndCanBeSavedInCustomPack() throws {
         let f = try Fixture(); defer { f.cleanup() }
         let store = f.store()
+        _ = try f.library.addSet(from: [f.image], name: "Editable")
         let source = f.root.appendingPathComponent("my-expression.png")
         try FileManager.default.copyItem(at: f.image, to: source)
         let preset = try XCTUnwrap(store.importPresets([source], into: f.library.activeSet).first)
@@ -146,9 +153,10 @@ final class PetPackTests: XCTestCase {
         }
     }
 
-    @MainActor func testEditorOpensOnlyOneTargetAndPreviewUsesDraftThenReturnsToIdle() async throws {
+    @MainActor func testEditorAutosavesExactModifierMappingAndOpensOnlyOneTarget() throws {
         let f = try Fixture(); defer { f.cleanup() }
-        let editor = PackEditorModel(store: f.store())
+        var reloads: [Bool] = []
+        let editor = PackEditorModel(store: f.store(), onChange: { reloads.append($0) })
         let stroke = KeyStroke(keyCode: 0, modifiers: [.command, .option])
         editor.toggle(.unassigned)
         editor.toggle(.idle)
@@ -157,18 +165,183 @@ final class PetPackTests: XCTestCase {
         XCTAssertNil(editor.expandedTarget)
         let ids = editor.draft.presets.map(\.id)
         editor.assignPreset(ids[1], to: stroke)
-        XCTAssertTrue(editor.isDirty)
-        editor.startPreview()
-        editor.previewKey(stroke)
-        XCTAssertEqual(editor.previewPresetID, ids[1])
-        XCTAssertEqual(editor.previewStroke, stroke)
-        try await Task.sleep(nanoseconds: 850_000_000)
-        XCTAssertEqual(editor.previewSource, "IDLE")
-        XCTAssertEqual(editor.previewPresetID, editor.draft.idle.presetIDs.first)
-        editor.stopPreview()
-        editor.saveAndApply(onApplied: {})
-        XCTAssertFalse(editor.isDirty)
-        XCTAssertEqual(f.store().activeConfiguration.mappings.first?.stroke, stroke)
+        editor.togglePreset(ids[2], for: .key(stroke))
+        editor.setMode(.cycle, for: .key(stroke))
+        let saved = try XCTUnwrap(f.store().activeConfiguration.mappings.first)
+        XCTAssertEqual(saved.stroke, stroke)
+        XCTAssertEqual(saved.selection, PresetSelection(presetIDs: [ids[1], ids[2]], mode: .cycle))
+        XCTAssertEqual(reloads, [true, true, true])
+        editor.unassign(.key(stroke))
+        XCTAssertTrue(f.store().activeConfiguration.mappings.isEmpty)
+    }
+
+    @MainActor func testEmptyPackCreationAndInactiveEditsNeverSwitchActivePet() throws {
+        let f = try Fixture(); defer { f.cleanup() }
+        let store = f.store()
+        let original = store.activeConfiguration
+        let originalID = f.library.activeSetID
+        var reloads: [Bool] = []
+        let editor = PackEditorModel(store: store, onChange: { reloads.append($0) })
+        try editor.createPack(name: "My empty pack")
+        let set = editor.selectedSet
+        XCTAssertTrue(editor.draft.presets.isEmpty)
+        XCTAssertFalse(editor.draft.isUsable)
+        XCTAssertEqual(f.library.activeSetID, originalID)
+        XCTAssertThrowsError(try store.activate(set))
+        XCTAssertThrowsError(try store.createPack(name: "  my EMPTY pack  "))
+        editor.addPresets(from: [f.image])
+        XCTAssertEqual(editor.draft.presets.count, 1)
+        XCTAssertEqual(editor.draft.idle.presetIDs, editor.draft.unassigned.presetIDs)
+        XCTAssertTrue(editor.draft.isUsable)
+        XCTAssertEqual(store.activeConfiguration, original)
+        XCTAssertEqual(reloads, [false, false])
+        editor.activate(set)
+        XCTAssertEqual(f.library.activeSetID, set.id)
+        XCTAssertEqual(reloads.last, true)
+        let restoredLibrary = PetImageLibrary(defaults: f.defaults, imagesDirectory: f.root.appendingPathComponent("Images"))
+        let restored = PetPackStore(library: restoredLibrary, keyStore: f.keys)
+        XCTAssertEqual(restoredLibrary.activeSetID, set.id)
+        XCTAssertEqual(restored.activeConfiguration, editor.draft)
+    }
+
+    @MainActor func testDeletingPresetRequiresFallbackReplacementAndRemovesEmptyKeyMapping() throws {
+        let f = try Fixture(); defer { f.cleanup() }
+        let store = f.store()
+        let set = try f.library.addSet(from: f.sampleImages, name: "Editable")
+        var pack = store.activeConfiguration
+        let removed = pack.idle.presetIDs[0]
+        let replacement = try XCTUnwrap(pack.presets.first { $0.id != removed }?.id)
+        pack.unassigned.presetIDs = [removed]
+        pack.mappings = [PresetKeyMapping(stroke: KeyStroke(keyCode: 0, modifiers: []), selection: PresetSelection(presetIDs: [removed]))]
+        try store.save(pack, for: set)
+        XCTAssertThrowsError(try store.removingPreset(id: removed, from: pack, in: set, replacementID: nil))
+        let result = try store.removingPreset(id: removed, from: pack, in: set, replacementID: replacement)
+        try store.save(result, for: set)
+        XCTAssertEqual(result.idle.presetIDs, [replacement])
+        XCTAssertEqual(result.unassigned.presetIDs, [replacement])
+        XCTAssertTrue(result.mappings.isEmpty)
+        XCTAssertFalse(result.presets.contains { $0.id == removed })
+        XCTAssertNotNil(store.imageURL(id: removed, in: pack, set: set), "Deleting a preset retains the source image")
+        XCTAssertEqual(f.store().activeConfiguration, result)
+    }
+
+    @MainActor func testBuiltInPresetsRejectChangesButAllowMappingAndPlaybackEdits() throws {
+        let f = try Fixture(); defer { f.cleanup() }
+        let store = f.store()
+        let set = f.library.activeSet
+        let original = store.activeConfiguration
+        let bytes = try Data(contentsOf: f.library.packConfigurationsURL)
+        var renamed = original
+        renamed.presets[0].name = "Changed"
+        var replaced = original
+        replaced.presets[0].fileName = original.presets[1].fileName
+        var removed = original
+        removed.presets.removeLast()
+        var added = original
+        var extra = original.presets[0]
+        extra.id = UUID().uuidString
+        added.presets.append(extra)
+        for edited in [renamed, replaced, removed, added] {
+            XCTAssertThrowsError(try store.save(edited, for: set)) { error in
+                guard case PetPackError.builtInPresetsReadOnly = error else { return XCTFail("Unexpected error: \(error)") }
+            }
+        }
+        XCTAssertThrowsError(try store.importPresets([f.image], into: set))
+        XCTAssertThrowsError(try store.removingPreset(id: original.presets[0].id, from: original, in: set, replacementID: nil))
+        XCTAssertThrowsError(try store.replaceIdle(with: f.image))
+        XCTAssertThrowsError(try store.replaceUnassigned(with: [f.image]))
+        XCTAssertEqual(try Data(contentsOf: f.library.packConfigurationsURL), bytes)
+
+        let editor = PackEditorModel(store: store)
+        XCTAssertFalse(editor.canEditPresets)
+        editor.renamePreset("Changed")
+        editor.addPresets(from: [f.image])
+        editor.replacePresetImage()
+        editor.removeSelectedPreset()
+        XCTAssertEqual(editor.draft, original)
+        let stroke = KeyStroke(keyCode: 0, modifiers: [.command, .shift])
+        editor.assignPreset(original.presets[1].id, to: stroke)
+        editor.setMode(.cycle, for: .unassigned)
+        editor.togglePreset(original.presets[1].id, for: .idle)
+        let restored = f.store().activeConfiguration
+        XCTAssertEqual(restored.presets, original.presets)
+        XCTAssertEqual(restored.mappings.first?.stroke, stroke)
+        XCTAssertEqual(restored.unassigned.mode, .cycle)
+        XCTAssertEqual(restored.idle.presetIDs.count, 2)
+        try editor.createPack(name: "My editable pack")
+        XCTAssertTrue(editor.canEditPresets)
+        editor.addPresets(from: [f.image])
+        editor.renamePreset("My image")
+        XCTAssertEqual(editor.draft.presets.first?.name, "My image")
+    }
+
+    @MainActor func testLastImageCanOnlyBeRemovedFromInactivePackAndOrderPersists() throws {
+        let f = try Fixture(); defer { f.cleanup() }
+        let store = f.store()
+        let editor = PackEditorModel(store: store)
+        try editor.createPack(name: "One image")
+        editor.addPresets(from: [f.image])
+        let set = editor.selectedSet
+        let pack = editor.draft
+        let id = try XCTUnwrap(pack.presets.first?.id)
+        let empty = try store.removingPreset(id: id, from: pack, in: set, replacementID: nil)
+        XCTAssertTrue(empty.presets.isEmpty)
+        editor.activate(set)
+        XCTAssertThrowsError(try store.removingPreset(id: id, from: pack, in: set, replacementID: nil))
+        editor.moveSet(id: set.id, before: PetImageLibrary.builtInID)
+        let library = PetImageLibrary(defaults: f.defaults, imagesDirectory: f.root.appendingPathComponent("Images"))
+        XCTAssertEqual(library.imageSets.first?.id, set.id)
+        try store.activate(try XCTUnwrap(library.imageSets.first { $0.isBuiltIn }))
+        try store.save(empty, for: set)
+        XCTAssertTrue(f.store().configuration(for: set).presets.isEmpty)
+    }
+
+    @MainActor func testDuplicateCopiesImagesAndMappingsWithoutActivatingOrSharingEdits() throws {
+        let f = try Fixture(); defer { f.cleanup() }
+        let store = f.store()
+        let basic = f.library.activeSet
+        var original = store.configuration(for: basic)
+        original.idle.mode = .cycle
+        original.mappings = [PresetKeyMapping(stroke: KeyStroke(keyCode: 49, modifiers: [.command, .shift]), selection: original.unassigned)]
+        try store.save(original, for: basic)
+        let copy = try store.duplicatePack(basic)
+        var copied = store.configuration(for: copy)
+        XCTAssertFalse(copy.isBuiltIn)
+        XCTAssertEqual(f.library.activeSetID, basic.id)
+        XCTAssertEqual(copied.idle, original.idle)
+        XCTAssertEqual(copied.unassigned, original.unassigned)
+        XCTAssertEqual(copied.mappings.first?.stroke, original.mappings.first?.stroke)
+        XCTAssertNotEqual(copied.mappings.first?.id, original.mappings.first?.id)
+        for (source, destination) in zip(original.presets, copied.presets) {
+            let sourceURL = try XCTUnwrap(store.imageURL(for: source, in: basic))
+            let copiedURL = try XCTUnwrap(store.imageURL(for: destination, in: copy))
+            XCTAssertNotEqual(sourceURL, copiedURL)
+            XCTAssertEqual(try Data(contentsOf: sourceURL), try Data(contentsOf: copiedURL))
+            XCTAssertEqual(source.id, destination.id)
+        }
+        copied.presets[0].name = "Only in the copy"
+        try store.save(copied, for: copy)
+        XCTAssertEqual(store.configuration(for: basic), original)
+        XCTAssertEqual(f.store().configuration(for: copy), copied)
+        let second = try store.duplicatePack(basic)
+        XCTAssertNotEqual(store.configuration(for: second).name, copied.name)
+        XCTAssertEqual(f.library.activeSetID, basic.id)
+    }
+
+    @MainActor func testDuplicatePreservesMigratedKeyImagesAndSupportsEmptySets() throws {
+        let f = try Fixture(); defer { f.cleanup() }
+        try f.keys.setRule(for: KeyStroke(keyCode: 36, modifiers: [.option]), image: f.image)
+        let store = f.store()
+        let source = store.activeConfiguration
+        let copy = try store.duplicatePack(f.library.activeSet)
+        let pack = store.configuration(for: copy)
+        XCTAssertTrue(pack.presets.allSatisfy { $0.source == .imageSet })
+        XCTAssertEqual(pack.mappings.map(\.selection), source.mappings.map(\.selection))
+        for p in pack.presets { XCTAssertNotNil(store.imageURL(for: p, in: copy)) }
+        let empty = try store.createPack(name: "Empty")
+        let emptyCopy = try store.duplicatePack(empty)
+        XCTAssertTrue(store.configuration(for: emptyCopy).presets.isEmpty)
+        XCTAssertFalse(store.configuration(for: emptyCopy).isUsable)
     }
 
     private func samplePack() -> PetPackConfiguration {

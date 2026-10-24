@@ -405,3 +405,51 @@
 "Unsaved Changes" = "未保存の変更";
 "Uses Unassigned settings" = "未割り当ての設定を使用";
 "Your Little Companion" = "小さな相棒";
+
+// Native pack workspace
+"%1$@ presets" = "プリセット%1$@個";
+"A pack with this name already exists." = "同じ名前のパックがすでにあります。";
+"Add an image before using this pack." = "このパックを使う前に画像を追加してください。";
+"Add the first image to this pack." = "パックに最初の画像を追加しましょう。";
+"Changes saved automatically." = "変更は自動的に保存されます。";
+"Check Again" = "再確認";
+"Close" = "閉じる";
+"Create" = "作成";
+"Create Pack" = "パックを作成";
+"Create an empty pack, then add your images." = "空のパックを作成してから画像を追加します。";
+"Delete Image" = "画像を削除";
+"Delete preset “%1$@”?" = "プリセット「%1$@」を削除しますか？";
+"Edit Presets" = "プリセットを編集";
+"Empty Pack" = "空のパック";
+"It will be removed from %1$@ key mappings. Keys with no remaining presets will use Unassigned. Original image files will not be changed." = "%1$@件のキーマッピングから解除されます。プリセットがなくなったキーは「未割り当て」を使用します。元の画像ファイルは変更されません。";
+"Keyboard monitoring connected" = "キーボード監視：接続済み";
+"Keyboard monitoring disconnected" = "キーボード監視：未接続";
+"Replacement for %1$@" = "%1$@に代わりに表示するプリセット";
+"Select %1$@" = "%1$@を選択";
+"The first image is used for Unassigned and IDLE. You can change them in Keyboard Mapping." = "最初の画像は「未割り当て」とIDLEに使われます。キーボードマッピングで変更できます。";
+"Toggle Sidebar" = "サイドバーの表示／非表示";
+"Use Set" = "セットを使用";
+"Use another pack before deleting the last image in the active pack." = "使用中のパックの最後の画像を削除する前に、別のパックを使用してください。";
+"Using %1$@" = "%1$@を使用中";
+
+// Built-in preset protection
+"Built-in presets are read-only. Create a pack to use your own images." = "基本セットの画像プリセットは変更できません。自分の画像を使うには新しいパックを作成してください。";
+"View Presets" = "プリセットを表示";
+
+"Set Management" = "セット管理";
+"New Set" = "新規セット";
+"Duplicate" = "複製";
+"%1$@ Copy" = "%1$@ のコピー";
+"Set Options" = "セットの操作";
+"Changes apply immediately." = "変更はすぐに適用されます。";
+"Built-in presets are fixed. Duplicate to edit them." = "標準プリセットは固定されています。複製して編集できます。";
+"No images yet" = "画像がまだありません";
+"The first image is used while typing and while resting." = "最初の画像は入力中と待機中に使用されます。";
+"When Resting" = "待機中";
+"Multiple selections allowed" = "複数選択可能";
+"Common Keys" = "よく使うキー";
+"Space" = "スペース";
+"Enter" = "Enter";
+"Quick setup for %1$@" = "%1$@ をクイック設定";
+"Click a key to edit its presets." = "キーをクリックしてプリセットを設定します。";
+"Edit %1$@" = "%1$@ を編集";

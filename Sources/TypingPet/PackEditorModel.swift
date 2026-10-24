@@ -7,9 +7,10 @@ enum PackEditorTarget: Hashable {
     case key(KeyStroke), unassigned, idle
     var title: String {
         switch self {
-        case .key(let stroke): stroke.displayName
+        case .key(let stroke):
+            stroke.modifiers.displayPrefix + (stroke.keyCode == 49 ? L("Space") : stroke.keyCode == 36 ? L("Enter") : KeyCodeNames.name(for: stroke.keyCode))
         case .unassigned: L("Unassigned")
-        case .idle: "IDLE"
+        case .idle: L("When Resting")
         }
     }
 }
@@ -19,61 +20,53 @@ final class PackEditorModel: ObservableObject {
     let store: PetPackStore
     @Published private(set) var sets: [PetImageSet]
     @Published private(set) var selectedSetID: UUID
-    @Published var draft: PetPackConfiguration
+    @Published private(set) var activeSetID: UUID
+    @Published private(set) var draft: PetPackConfiguration
     @Published var selectedPresetID: String
     @Published var modifiers: KeyModifiers = []
     @Published var expandedTarget: PackEditorTarget?
     @Published var errorMessage: String?
-    @Published var statusMessage = ""
-    @Published private(set) var isPreviewing = false
-    @Published private(set) var previewPresetID: String?
-    @Published private(set) var previewStroke: KeyStroke?
-    @Published private(set) var previewSource = "IDLE"
-    @Published private(set) var lastPreviewKey = ""
-    private var saved: PetPackConfiguration
-    private var drafts: [UUID: (PetPackConfiguration, PetPackConfiguration)] = [:]
+    @Published private(set) var statusMessage = ""
+    private let onChange: (Bool) -> Void
     private var imageCache: [URL: NSImage] = [:]
-    private var cursor = PresetPlaybackCursor()
-    private var idleWork: DispatchWorkItem?
-    private var generation = 0
-    private var editingModifiers: KeyModifiers = []
 
-    init(store: PetPackStore) {
+    init(store: PetPackStore, onChange: @escaping (Bool) -> Void = { _ in }) {
         self.store = store
+        self.onChange = onChange
         sets = store.library.imageSets
         selectedSetID = store.library.activeSetID
-        let pack = store.activeConfiguration
-        draft = pack
-        saved = pack
-        selectedPresetID = pack.presets.first?.id ?? ""
+        activeSetID = store.library.activeSetID
+        let initialPack = store.activeConfiguration
+        draft = initialPack
+        selectedPresetID = initialPack.presets.first?.id ?? ""
         errorMessage = store.loadError?.localizedDescription
     }
 
     var selectedSet: PetImageSet { sets.first { $0.id == selectedSetID } ?? store.library.activeSet }
-    var isDirty: Bool { draft != saved }
-    var isActive: Bool { selectedSetID == store.library.activeSetID }
-    var canSave: Bool { store.loadError == nil }
+    var isActive: Bool { selectedSetID == activeSetID }
+    var canEdit: Bool { store.loadError == nil }
+    var canEditPresets: Bool { canEdit && !selectedSet.isBuiltIn }
+    var selectedPreset: PetImagePreset? { draft.presets.first { $0.id == selectedPresetID } }
 
-    func refreshIfClean() {
+    func refresh() {
         sets = store.library.imageSets
-        guard !isDirty else { return }
-        if !sets.contains(where: { $0.id == selectedSetID }) { selectedSetID = store.library.activeSetID }
+        activeSetID = store.library.activeSetID
+        if !sets.contains(where: { $0.id == selectedSetID }) { selectedSetID = activeSetID }
         draft = store.configuration(for: selectedSet)
-        saved = draft
-        if !draft.presets.contains(where: { $0.id == selectedPresetID }) { selectedPresetID = draft.presets.first?.id ?? "" }
+        if selectedPreset == nil { selectedPresetID = draft.presets.first?.id ?? "" }
     }
 
     func selectSet(_ set: PetImageSet) {
         guard selectedSetID != set.id else { return }
-        stopPreview()
-        drafts[selectedSetID] = (draft, saved)
         selectedSetID = set.id
-        let remembered = drafts[set.id]
-        draft = remembered?.0 ?? store.configuration(for: set)
-        saved = remembered?.1 ?? draft
+        draft = store.configuration(for: set)
         selectedPresetID = draft.presets.first?.id ?? ""
         expandedTarget = nil
         statusMessage = ""
+    }
+
+    func configuration(for set: PetImageSet) -> PetPackConfiguration {
+        set.id == selectedSetID ? draft : store.configuration(for: set)
     }
 
     func image(for preset: PetImagePreset, in set: PetImageSet? = nil) -> NSImage? {
@@ -86,7 +79,11 @@ final class PackEditorModel: ObservableObject {
     func image(id: String?) -> NSImage? {
         id.flatMap { value in draft.presets.first { $0.id == value } }.flatMap { image(for: $0) }
     }
-    func name(id: String?) -> String { draft.presets.first { $0.id == id }?.name ?? "" }
+    func cover(for set: PetImageSet) -> NSImage? {
+        let pack = configuration(for: set)
+        return pack.presets.first(where: { $0.id == pack.idle.presetIDs.first }).flatMap { image(for: $0, in: set) }
+    }
+    func name(id: String) -> String { draft.presets.first { $0.id == id }?.name ?? "" }
 
     func selection(for target: PackEditorTarget) -> PresetSelection {
         switch target {
@@ -96,19 +93,34 @@ final class PackEditorModel: ObservableObject {
         }
     }
 
+    @discardableResult
+    private func commit(_ pack: PetPackConfiguration) -> Bool {
+        do {
+            try store.save(pack, for: selectedSet)
+            draft = pack
+            statusMessage = L("Changes saved automatically.")
+            onChange(isActive)
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
     private func update(_ selection: PresetSelection, for target: PackEditorTarget) {
+        var next = draft
         switch target {
-        case .unassigned: draft.unassigned = selection
-        case .idle: draft.idle = selection
+        case .unassigned: next.unassigned = selection
+        case .idle: next.idle = selection
         case .key(let stroke):
-            if let index = draft.mappings.firstIndex(where: { $0.stroke == stroke }) {
-                if selection.presetIDs.isEmpty { draft.mappings.remove(at: index) }
-                else { draft.mappings[index].selection = selection }
+            if let index = next.mappings.firstIndex(where: { $0.stroke == stroke }) {
+                if selection.presetIDs.isEmpty { next.mappings.remove(at: index) }
+                else { next.mappings[index].selection = selection }
             } else if !selection.presetIDs.isEmpty {
-                draft.mappings.append(PresetKeyMapping(stroke: stroke, selection: selection))
+                next.mappings.append(PresetKeyMapping(stroke: stroke, selection: selection))
             }
         }
-        statusMessage = ""
+        commit(next)
     }
 
     func toggle(_ target: PackEditorTarget) { expandedTarget = expandedTarget == target ? nil : target }
@@ -116,7 +128,6 @@ final class PackEditorModel: ObservableObject {
         if modifiers.contains(modifier) { modifiers.remove(modifier) } else { modifiers.insert(modifier) }
         if case .key(let old) = expandedTarget { expandedTarget = .key(KeyStroke(keyCode: old.keyCode, modifiers: modifiers)) }
     }
-
     func togglePreset(_ id: String, for target: PackEditorTarget) {
         var value = selection(for: target)
         if value.presetIDs.contains(id) {
@@ -128,90 +139,128 @@ final class PackEditorModel: ObservableObject {
         } else { value.presetIDs.append(id) }
         update(value, for: target)
     }
-
     func setMode(_ mode: PresetPlaybackMode, for target: PackEditorTarget) {
         var value = selection(for: target)
         value.mode = mode
         update(value, for: target)
     }
-
     func movePreset(_ id: String, by offset: Int, for target: PackEditorTarget) {
         var value = selection(for: target)
         guard let index = value.presetIDs.firstIndex(of: id), value.presetIDs.indices.contains(index + offset) else { return }
         value.presetIDs.swapAt(index, index + offset)
         update(value, for: target)
     }
-
     func unassign(_ target: PackEditorTarget) { if case .key = target { update(PresetSelection(presetIDs: []), for: target) } }
-
     func assignPreset(_ id: String, to stroke: KeyStroke) {
         guard draft.presets.contains(where: { $0.id == id }) else { return }
         update(PresetSelection(presetIDs: [id]), for: .key(stroke))
         expandedTarget = .key(stroke)
     }
+    func renamePreset(_ value: String) {
+        guard canEditPresets, !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              let index = draft.presets.firstIndex(where: { $0.id == selectedPresetID }), value != draft.presets[index].name else { return }
+        var next = draft
+        next.presets[index].name = value
+        commit(next)
+    }
 
-    func saveAndApply(onApplied: () -> Void) {
+    func createPack(name: String) throws {
+        let set = try store.createPack(name: name)
+        sets = store.library.imageSets
+        selectSet(set)
+        onChange(false)
+    }
+    func duplicatePack() throws {
+        let set = try store.duplicatePack(selectedSet)
+        sets = store.library.imageSets
+        selectSet(set)
+        onChange(false)
+    }
+    func activate(_ set: PetImageSet) {
         do {
-            draft.name = draft.name.trimmingCharacters(in: .whitespacesAndNewlines)
-            try store.save(draft, for: selectedSet)
-            try store.library.activateSet(id: selectedSetID)
-            saved = draft
-            drafts.removeValue(forKey: selectedSetID)
-            statusMessage = L("Pack saved and applied.")
-            onApplied()
+            try store.activate(set)
+            activeSetID = set.id
+            statusMessage = L("Using %1$@", configuration(for: set).name)
+            onChange(true)
         } catch { errorMessage = error.localizedDescription }
+    }
+    func moveSet(id: UUID, before target: UUID) {
+        store.library.moveSet(id: id, before: target)
+        sets = store.library.imageSets
+        onChange(false)
     }
 
     func addPresets() {
+        guard canEditPresets else { return }
         let panel = NSOpenPanel()
         panel.title = L("Add Preset Images")
         panel.allowedContentTypes = [.image]
         panel.allowsMultipleSelection = true
         guard panel.runModal() == .OK else { return }
+        addPresets(from: panel.urls)
+    }
+    func addPresets(from urls: [URL]) {
+        guard canEditPresets else { return }
         do {
-            let presets = try store.importPresets(panel.urls, into: selectedSet)
-            draft.presets.append(contentsOf: presets)
-            selectedPresetID = presets.first?.id ?? selectedPresetID
+            let imported = try store.importPresets(urls, into: selectedSet)
+            guard !imported.isEmpty else { return }
+            var next = draft
+            if next.presets.isEmpty {
+                next.idle.presetIDs = [imported[0].id]
+                next.unassigned.presetIDs = [imported[0].id]
+            }
+            next.presets.append(contentsOf: imported)
+            if commit(next) { selectedPresetID = imported[0].id }
         } catch { errorMessage = error.localizedDescription }
     }
-
     func replacePresetImage() {
-        guard let index = draft.presets.firstIndex(where: { $0.id == selectedPresetID }) else { return }
+        guard canEditPresets, let index = draft.presets.firstIndex(where: { $0.id == selectedPresetID }) else { return }
         let panel = NSOpenPanel()
         panel.title = L("Replace Preset Image")
         panel.allowedContentTypes = [.image]
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
             guard let replacement = try store.importPresets([url], into: selectedSet).first else { return }
-            draft.presets[index].fileName = replacement.fileName
-            draft.presets[index].source = replacement.source
+            var next = draft
+            next.presets[index].fileName = replacement.fileName
+            next.presets[index].source = replacement.source
+            commit(next)
         } catch { errorMessage = error.localizedDescription }
     }
 
-    func importPack(folder: Bool, onImported: () -> Void) {
-        let panel = NSOpenPanel()
-        panel.title = L("Import Image Pack")
-        panel.canChooseDirectories = folder
-        panel.canChooseFiles = !folder
-        panel.allowsMultipleSelection = !folder
-        if !folder { panel.allowedContentTypes = [.image] }
-        guard panel.runModal() == .OK else { return }
-        do {
-            let set: PetImageSet
-            if folder, let url = panel.url { set = try store.library.addSet(from: url) }
-            else { set = try store.library.addSet(from: panel.urls, name: L("New Pack")) }
-            sets = store.library.imageSets
-            selectSet(set)
-            try store.save(draft, for: set)
-            saved = draft
-            onImported()
-        } catch { errorMessage = error.localizedDescription }
-    }
-
-    func removePack(_ set: PetImageSet, onRemoved: () -> Void) {
-        guard !set.isBuiltIn else { return }
+    func removeSelectedPreset() {
+        guard canEditPresets, let preset = selectedPreset else { return }
+        let remaining = draft.presets.filter { $0.id != preset.id }
+        if isActive && remaining.isEmpty { errorMessage = PetPackError.activePackNeedsImage.localizedDescription; return }
+        expandedTarget = nil
+        let affectedKeys = draft.mappings.filter { $0.selection.presetIDs.contains(preset.id) }.count
+        let targets: [String] = [draft.idle.presetIDs == [preset.id] ? L("When Resting") : nil,
+                                  draft.unassigned.presetIDs == [preset.id] ? L("Unassigned") : nil].compactMap { $0 }
         let alert = NSAlert()
-        alert.messageText = L("Remove “%1$@” from the list?", store.configuration(for: set).name)
+        alert.messageText = L("Delete preset “%1$@”?", preset.name)
+        alert.informativeText = L("It will be removed from %1$@ key mappings. Keys with no remaining presets will use Unassigned. Original image files will not be changed.", affectedKeys)
+        let replacement = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 260, height: 28))
+        if !remaining.isEmpty && !targets.isEmpty {
+            replacement.addItems(withTitles: remaining.map(\.name))
+            let stack = NSStackView(views: [NSTextField(labelWithString: L("Replacement for %1$@", targets.joined(separator: " · "))), replacement])
+            stack.orientation = .vertical
+            stack.alignment = .leading
+            alert.accessoryView = stack
+        }
+        alert.addButton(withTitle: L("Delete Image"))
+        alert.addButton(withTitle: L("Cancel"))
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        do {
+            let replacementID = !remaining.isEmpty && !targets.isEmpty ? remaining[replacement.indexOfSelectedItem].id : nil
+            let next = try store.removingPreset(id: preset.id, from: draft, in: selectedSet, replacementID: replacementID)
+            if commit(next) { selectedPresetID = next.presets.first?.id ?? "" }
+        } catch { errorMessage = error.localizedDescription }
+    }
+
+    func removePack(_ set: PetImageSet) {
+        guard !set.isBuiltIn, set.id != activeSetID else { return }
+        let alert = NSAlert()
+        alert.messageText = L("Remove “%1$@” from the list?", configuration(for: set).name)
         alert.informativeText = L("Original images will not be changed.")
         alert.addButton(withTitle: L("Remove"))
         alert.addButton(withTitle: L("Cancel"))
@@ -219,63 +268,28 @@ final class PackEditorModel: ObservableObject {
         do {
             try store.library.deleteSet(id: set.id)
             sets = store.library.imageSets
-            if selectedSetID == set.id {
-                selectSet(store.library.activeSet)
-            }
-            drafts.removeValue(forKey: set.id)
-            onRemoved()
+            if selectedSetID == set.id { selectSet(store.library.activeSet) }
+            onChange(false)
         } catch { errorMessage = error.localizedDescription }
     }
-
-    func startPreview() {
-        editingModifiers = modifiers
-        cursor = PresetPlaybackCursor()
-        isPreviewing = true
-        previewStroke = nil
-        lastPreviewKey = ""
-        showPreviewIdle()
-    }
-    func stopPreview() {
-        generation += 1
-        idleWork?.cancel()
-        idleWork = nil
-        guard isPreviewing else { return }
-        isPreviewing = false
-        modifiers = editingModifiers
-        previewStroke = nil
-    }
-    func previewKey(_ stroke: KeyStroke) {
-        guard isPreviewing else { return }
-        generation += 1
-        let currentGeneration = generation
-        idleWork?.cancel()
-        modifiers = stroke.modifiers
-        previewStroke = stroke
-        lastPreviewKey = stroke.displayName
-        previewSource = draft.mappings.contains { $0.stroke == stroke } ? L("Key Mapping") + " · " + stroke.displayName : L("Unassigned")
-        previewPresetID = cursor.reaction(for: stroke, in: draft)
-        let work = DispatchWorkItem { [weak self] in
-            guard let self, self.generation == currentGeneration, self.isPreviewing else { return }
-            self.showPreviewIdle()
-        }
-        idleWork = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.75, execute: work)
-    }
-    func showPreviewIdle() {
-        guard isPreviewing else { return }
-        generation += 1
-        idleWork?.cancel()
-        idleWork = nil
-        previewSource = "IDLE"
-        previewStroke = nil
-        previewPresetID = cursor.idle(in: draft)
-    }
-    func previewUnassigned() {
-        previewKey(KeyStroke(keyCode: UInt16.max, modifiers: []))
-        lastPreviewKey = L("Unassigned")
+    func renamePack(_ set: PetImageSet) {
+        var pack = configuration(for: set)
+        let field = NSTextField(string: pack.name)
+        field.frame = NSRect(x: 0, y: 0, width: 270, height: 24)
+        let alert = NSAlert()
+        alert.messageText = L("Pack Name")
+        alert.accessoryView = field
+        alert.addButton(withTitle: L("Rename"))
+        alert.addButton(withTitle: L("Cancel"))
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        pack.name = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        do {
+            try store.save(pack, for: set)
+            if selectedSetID == set.id { draft = pack }
+            onChange(false)
+        } catch { errorMessage = error.localizedDescription }
     }
 }
-
 struct KeyboardLayoutKey: Identifiable {
     var code: UInt16?
     var label: String
