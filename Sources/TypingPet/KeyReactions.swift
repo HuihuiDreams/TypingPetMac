@@ -85,7 +85,11 @@ final class KeyReactionStore {
     }
 
     func imageURL(for rule: KeyReactionRule) -> URL? {
-        let url = directory.appendingPathComponent(rule.imageFileName)
+        imageURL(fileName: rule.imageFileName)
+    }
+
+    func imageURL(fileName: String) -> URL? {
+        let url = directory.appendingPathComponent(fileName)
         return fileManager.fileExists(atPath: url.path) ? url : nil
     }
 
@@ -126,7 +130,7 @@ enum KeyCodeNames {
         21: "4", 22: "6", 23: "5", 24: "=", 25: "9", 26: "7", 27: "-", 28: "8", 29: "0", 30: "]",
         31: "O", 32: "U", 33: "[", 34: "I", 35: "P", 36: "Return", 37: "L", 38: "J", 39: "'", 40: "K",
         41: ";", 42: "\\", 43: ",", 44: "/", 45: "N", 46: "M", 47: ".", 48: "Tab", 49: "Space", 50: "`",
-        51: "Delete", 53: "Esc", 76: "Enter", 96: "F5", 97: "F6", 98: "F7", 99: "F3", 100: "F8",
+        51: "Delete", 53: "Esc", 122: "F1", 120: "F2", 118: "F4", 76: "Enter", 96: "F5", 97: "F6", 98: "F7", 99: "F3", 100: "F8",
         101: "F9", 103: "F11", 109: "F10", 111: "F12", 115: "Home", 116: "Page Up", 117: "Forward Delete",
         119: "End", 121: "Page Down", 123: "←", 124: "→", 125: "↓", 126: "↑"
     ]

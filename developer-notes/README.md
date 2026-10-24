@@ -10,6 +10,7 @@ Implementation guides and design reviews for Typing Pet. Design reviews describe
 
 | 노트 | 내용 |
 | --- | --- |
+| [프리셋 팩과 키보드 매핑](preset-editor.md) | 프리셋 갤러리, 키별 아코디언, 미리보기, 저장과 기존 설정 보존 |
 | [로컬 개발](development.md) | 개발용 앱 실행, 배포용 앱과의 데이터 분리, 입력 모니터링 확인 |
 | [할 일과 집중 타이머](todos.md) | 사용법, 시간 측정, 로컬 저장과 복구 |
 | [자동 업데이트](updates.md) | feed, 서명 검증, 설치 흐름과 개발용 점검 |

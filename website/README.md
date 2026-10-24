@@ -17,6 +17,11 @@ npm run preview
 archive size and SHA-256, and requires notes in all five languages in `src/releases.json` before building.
 Unpublished notes are omitted. The website journal starts at 0.16.0; historical repository changelogs remain intact.
 
+When the matching release includes a DMG and its checksum, `sync-release` also checks the server's
+full DMG against the GitHub asset digest and checksum file. The homepage then adds a DMG download
+and a translated installation tab, alongside ZIP and Homebrew. Releases without a DMG retain ZIP
+and Homebrew. DMG packaging is currently a separate step for v0.17.1; see the release guide.
+
 To publish on this Mac after a public GitHub release:
 
 ```sh
@@ -77,7 +82,7 @@ personal and project-secret API keys are not needed for collection.
 | Event | Properties specific to the event |
 | --- | --- |
 | `$pageview` | locale, page, app_version |
-| `download_clicked` | source (`github` / `direct`), placement (`hero` / `install`) |
+| `download_clicked` | source (`github` / `direct`), placement (`hero` / `install`), format (`zip` / `dmg`) |
 | `homebrew_copied` | command (`install` / `update`), sent only after a successful copy |
 | `language_changed` | to_locale, sent only when choosing a different language |
 

@@ -114,6 +114,23 @@ GitHub 없이 업데이트 서버에만 게시해도 이 다운로드 리디렉�
 원인을 수정한 뒤 저장소 루트에서 `./scripts/deploy_website.sh`를 실행하세요.
 세부 배포·복구 구조는 [웹사이트 문서](../website/README.md)를 참고하세요.
 
+## 기존 릴리스에 DMG 추가
+
+v0.17.1에는 이미 공개된 ZIP과 같은 앱을 DMG로도 제공합니다. 기존 ZIP·업데이트 feed·Homebrew cask를 바꾸지 않고 추가한 설치 형식입니다.
+DMG 생성은 위의 새 버전 자동 릴리스 파이프라인과 별도입니다. 공개 ZIP의 SHA-256을 확인한 후 압축을 풀어 사용하세요.
+
+```sh
+./scripts/build_dmg.sh /absolute/path/TypingPet.app /absolute/path/TypingPetMac-v0.17.1-arm64.dmg
+```
+
+이 스크립트는 앱의 서명·공증을 검사하고, 앱과 `/Applications` 바로가기를 넣어 DMG를 만듭니다.
+앱 자체는 다시 빌드하거나 서명하지 않습니다. DMG를 같은 Developer ID로 서명하고 기존 `typingpet-notary` 프로필로
+Apple 공증·staple·Gatekeeper 검사를 수행합니다. 읽기 전용으로 마운트해 원본 앱과 파일을 비교하고 앱의 Gatekeeper 검사도 다시 수행합니다.
+DMG 옆에 `.sha256`과 `.notary-result.json`을 남기며 기존 DMG나 체크섬은 덮어쓰지 않습니다.
+
+검증한 DMG와 `.sha256`만 해당 GitHub 릴리스와 업데이트 서버의 `production/` 폴더에 추가한 뒤
+`./scripts/deploy_website.sh`로 홈페이지를 갱신합니다. `.notary-result.json`은 로컬 증거로 보관합니다.
+
 ## 자동화 자체 검증
 
 ```sh

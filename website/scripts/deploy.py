@@ -78,6 +78,13 @@ def main():
     archive = feed_path.parent / feed['url'].rsplit('/', 1)[1]
     if hashlib.sha256(archive.read_bytes()).hexdigest() != feed['sha256']:
         raise RuntimeError('Published archive does not match its feed')
+    if dmg := metadata.get('dmg'):
+        name = f'TypingPetMac-v{feed["version"]}-arm64.dmg'
+        if dmg['url'] != f'https://pet.miel.ing/update/production/{name}':
+            raise RuntimeError('Unexpected DMG URL')
+        disk_image = feed_path.parent / name
+        if disk_image.stat().st_size != dmg['size'] or hashlib.sha256(disk_image.read_bytes()).hexdigest() != dmg['sha256']:
+            raise RuntimeError('Published DMG differs from the GitHub-verified build')
     locales = json.loads((WEBSITE / 'src/locales.json').read_text())
     pages = [f'{locale}/{suffix}index.html' for locale in locales for suffix in ('', 'changelog/')]
     for path in [*pages, 'assets/social-preview.png']:

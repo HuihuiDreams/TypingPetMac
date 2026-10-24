@@ -18,12 +18,15 @@ class Page(HTMLParser):
         self.meta, self.assets, self.lang = {}, [], None
         self.alternates, self.canonical, self.text = {}, None, []
         self.emails = set()
+        self.links = set()
 
     def handle_data(self, data):
         self.text.append(data)
 
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
+        if tag == 'a' and attrs.get('href'):
+            self.links.add(attrs['href'])
         if tag == 'html':
             self.lang = attrs.get('lang')
         if tag == 'meta':
@@ -79,6 +82,9 @@ def main():
             require(note_titles[metadata['version']][language]['title'] in visible, f'Missing translated release notes: {path}')
             if not suffix:
                 require(headings[language] in visible, f'Missing translated homepage: {path}')
+                require(metadata['githubUrl'] in page.links, f'Missing ZIP download: {path}')
+                if dmg := metadata.get('dmg'):
+                    require(dmg['githubUrl'] in page.links, f'Missing DMG download: {path}')
             require(page.meta.get('twitter:card') == 'summary_large_image', f'Missing X card: {path}')
             require(page.meta.get('og:image') == BASE + '/assets/social-preview.png', f'Missing OG image: {path}')
             require(page.meta.get('og:image:width') == '1200' and page.meta.get('og:image:height') == '630', f'Wrong declared image size: {path}')
@@ -124,6 +130,19 @@ def main():
     with urllib.request.urlopen(urllib.request.Request(target, headers={'Range': 'bytes=0-31'}), timeout=20) as response:
         require(response.status == 206 and len(response.read()) == 32, 'Range downloads failed')
         result['range'] = {'status': response.status, 'content_range': response.headers['Content-Range']}
+    if dmg := metadata.get('dmg'):
+        result['dmg'] = {}
+        for source, url in (('direct', dmg['url']), ('github', dmg['githubUrl'])):
+            with urllib.request.urlopen(url, timeout=40) as response:
+                data = response.read()
+                digest = hashlib.sha256(data).hexdigest()
+                require(len(data) == dmg['size'] and digest == dmg['sha256'], f'Downloaded DMG differs: {source}')
+                result['dmg'][source] = {'status': response.status, 'size': len(data), 'sha256': digest}
+        with urllib.request.urlopen(dmg['checksumUrl'], timeout=20) as response:
+            require(response.read().decode().strip() == f"{dmg['sha256']}  {dmg['url'].rsplit('/', 1)[1]}", 'DMG checksum differs')
+        with urllib.request.urlopen(urllib.request.Request(dmg['url'], headers={'Range': 'bytes=0-31'}), timeout=20) as response:
+            require(response.status == 206 and len(response.read()) == 32, 'DMG Range downloads failed')
+            result['dmg']['range'] = {'status': response.status, 'content_range': response.headers['Content-Range']}
     for path in ('/missing-page', '/.env', '/release.json', '/relay/admin', '/relay/flags'):
         try:
             urllib.request.urlopen(BASE + path, timeout=20)

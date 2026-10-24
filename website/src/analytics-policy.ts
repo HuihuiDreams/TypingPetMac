@@ -7,7 +7,7 @@ const properties = new Set([
   '$screen_width', '$screen_height', '$viewport_width', '$viewport_height',
   '$host', '$pathname', '$current_url', '$referrer', '$referring_domain',
   '$process_person_profile', '$is_identified', '$pageview_id', 'title',
-  'locale', 'page', 'app_version', 'source', 'placement', 'command', 'to_locale',
+  'locale', 'page', 'app_version', 'source', 'placement', 'format', 'command', 'to_locale',
 ]);
 
 // Only deliberate site events and these properties may leave the browser.

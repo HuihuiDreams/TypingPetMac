@@ -71,7 +71,7 @@ function capturePageview() {
 }
 
 type SiteEvent =
-  | { event: 'download_clicked'; source: 'github' | 'direct'; placement: 'hero' | 'install' }
+  | { event: 'download_clicked'; source: 'github' | 'direct'; placement: 'hero' | 'install'; format: 'zip' | 'dmg' }
   | { event: 'homebrew_copied'; command: 'install' | 'update' }
   | { event: 'language_changed'; to_locale: string };
 

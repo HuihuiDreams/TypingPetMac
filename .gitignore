@@ -3,6 +3,7 @@
 dist/
 *.xcuserstate
 *.zip
+*.dmg
 
 
 dist-dev/

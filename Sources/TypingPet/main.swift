@@ -3,7 +3,6 @@ import CoreGraphics
 import QuartzCore
 import ServiceManagement
 import UniformTypeIdentifiers
-import Combine
 
 private enum PetConstants {
     static let fallbackBaseSize = NSSize(width: 453, height: 354)
@@ -16,12 +15,6 @@ private final class PetPanel: NSPanel {
 }
 
 private final class PetResizeHandleView: NSView {
-    func refreshLocalizedInterface() {
-        toolTip = L("Drag to resize")
-        setAccessibilityLabel(L("Resize pet"))
-        setAccessibilityHelp(L("Drag to resize your pet."))
-    }
-
     var onResizeBegan: ((NSPoint) -> Void)?
     var onResizeDragged: ((NSPoint) -> Void)?
     var onResizeEnded: (() -> Void)?
@@ -123,13 +116,6 @@ private final class PetResizeHandleView: NSView {
 }
 
 private final class PetContentView: NSView {
-    func refreshLocalizedInterface() {
-        closeButton.setAccessibilityLabel(L("Hide Pet"))
-        settingsButton.toolTip = L("Open Settings")
-        settingsButton.setAccessibilityLabel(L("Open Pet Settings"))
-        resizeHandle.refreshLocalizedInterface()
-    }
-
     var onClose: (() -> Void)?
     var onOpenSettings: (() -> Void)?
     var onResizeBegan: ((NSPoint) -> Void)?
@@ -395,21 +381,16 @@ private final class PetContentView: NSView {
 @MainActor
 private final class PetController: NSObject, NSWindowDelegate {
     private let library: PetImageLibrary
-    private let keyStore: KeyReactionStore
+    private let packStore: PetPackStore
+    private var playback = PresetPlaybackCursor()
     private let panel: PetPanel
     var todoAnchorWindow: NSWindow { panel }
-
-    func refreshLocalizedInterface() {
-        panel.title = AppEnvironment.displayName + L(" · Pet")
-        contentView.refreshLocalizedInterface()
-    }
     var shouldHoldPosition: (() -> Bool)?
     var onPresentationChanged: (() -> Void)?
     private let contentView: PetContentView
     private let imageView: NSImageView
     private let onScaleChanged: (CGFloat) -> Void
     private var baseSize: NSSize
-    private var currentImageKey = ""
     private var idleWorkItem: DispatchWorkItem?
     private var resizeInitialMouseLocation: NSPoint?
     private var resizeInitialFrame: NSRect?
@@ -430,14 +411,14 @@ private final class PetController: NSObject, NSWindowDelegate {
 
     init(
         library: PetImageLibrary,
-        keyStore: KeyReactionStore,
+        packStore: PetPackStore,
         onScaleChanged: @escaping (CGFloat) -> Void = { _ in },
         onOpenSettings: @escaping () -> Void = {}
     ) {
         self.library = library
-        self.keyStore = keyStore
+        self.packStore = packStore
         self.onScaleChanged = onScaleChanged
-        let initialImage = library.idleURL.flatMap(NSImage.init(contentsOf:))
+        let initialImage = packStore.idleURL.flatMap(NSImage.init(contentsOf:))
         baseSize = Self.normalizedBaseSize(for: initialImage?.size ?? PetConstants.fallbackBaseSize)
         panel = PetPanel(
             contentRect: NSRect(
@@ -563,15 +544,9 @@ private final class PetController: NSObject, NSWindowDelegate {
     }
 
     func handleKeystroke(_ stroke: KeyStroke? = nil) {
-        let chosenURL: URL?
-        if let stroke, let exactMatch = keyStore.imageURL(matching: stroke) {
-            chosenURL = exactMatch
-        } else {
-            let reactions = library.reactionURLs
-            let picker = ImagePicker(names: reactions.map(\.path))
-            chosenURL = picker.next(excluding: currentImageKey).map(URL.init(fileURLWithPath:))
-        }
-        guard let chosenURL else { return }
+        let pack = packStore.activeConfiguration
+        guard let id = playback.reaction(for: stroke, in: pack),
+              let chosenURL = packStore.imageURL(id: id, in: pack, set: library.activeSet) else { return }
 
         idleWorkItem?.cancel()
         showImage(at: chosenURL)
@@ -586,7 +561,8 @@ private final class PetController: NSObject, NSWindowDelegate {
 
     func reloadImages() {
         idleWorkItem?.cancel()
-        if let idleImage = library.idleURL.flatMap(NSImage.init(contentsOf:)) {
+        playback = PresetPlaybackCursor()
+        if let idleImage = packStore.idleURL.flatMap(NSImage.init(contentsOf:)) {
             baseSize = Self.normalizedBaseSize(for: idleImage.size)
         } else {
             baseSize = PetConstants.fallbackBaseSize
@@ -634,13 +610,14 @@ private final class PetController: NSObject, NSWindowDelegate {
     }
 
     private func showIdleImage() {
-        guard let idleURL = library.idleURL else { return }
+        let pack = packStore.activeConfiguration
+        guard let id = playback.idle(in: pack),
+              let idleURL = packStore.imageURL(id: id, in: pack, set: library.activeSet) else { return }
         showImage(at: idleURL)
     }
 
     private func showImage(at url: URL) {
         guard let image = NSImage(contentsOf: url) else { return }
-        currentImageKey = url.path
         imageView.image = nil
         imageView.image = image
     }
@@ -1059,6 +1036,7 @@ private final class GlobalKeyMonitor {
 private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let imageLibrary = PetImageLibrary()
     private let keyReactionStore = KeyReactionStore()
+    private lazy var packStore = PetPackStore(library: imageLibrary, keyStore: keyReactionStore)
     private let todoStore: TodoStore = {
         #if DEBUG
         if let path = ProcessInfo.processInfo.environment["TYPINGPET_TODO_TEST_PATH"] {
@@ -1084,14 +1062,13 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     private var settingsWindowController: SettingsWindowController?
     private var settingsModel: TypingPetSettingsModel?
     private var inputMonitoringGuideController: InputMonitoringGuideController?
-    private var languageSubscription: AnyCancellable?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         TextEditingShortcuts.installEditMenu(appName: AppEnvironment.displayName)
         BackgroundCursor.enable()
         petController = PetController(
             library: imageLibrary,
-            keyStore: keyReactionStore,
+            packStore: packStore,
             onScaleChanged: { [weak self] scale in self?.settingsModel?.syncScale(scale) },
             onOpenSettings: { [weak self] in self?.showSettings() }
         )
@@ -1099,15 +1076,6 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         petController.shouldHoldPosition = { [weak self] in self?.todoBubble?.isInteracting == true }
         petController.onPresentationChanged = { [weak self] in self?.todoBubble?.synchronize() }
         configureStatusItem()
-        languageSubscription = AppLocalization.shared.$language.dropFirst().sink { [weak self] _ in
-            DispatchQueue.main.async {
-                guard let self else { return }
-                self.configureStatusItem()
-                TextEditingShortcuts.installEditMenu(appName: AppEnvironment.displayName)
-                self.petController.refreshLocalizedInterface()
-                self.todoBubble?.refreshLocalizedInterface()
-            }
-        }
         updater.isTimerRunning = { [weak self] in self?.todoStore.engine.activeSession?.status == .running }
         updater.onChange = { [weak self] in self?.updateUpdateItem() }
         updater.start()
@@ -1136,7 +1104,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
            ProcessInfo.processInfo.arguments.indices.contains(index + 1),
            let phase = InputMonitoringGuideModel.Phase(rawValue: ProcessInfo.processInfo.arguments[index + 1]) {
             inputMonitoringGuideController = .preview(
-                phase: phase, idleURL: imageLibrary.idleURL, reactionURLs: imageLibrary.reactionURLs
+                phase: phase, idleURL: packStore.idleURL, reactionURLs: imageLibrary.reactionURLs
             )
             inputMonitoringGuideController?.show()
         }
@@ -1237,7 +1205,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         )?.first else { return }
 
         do {
-            try imageLibrary.replaceIdle(with: url)
+            try packStore.replaceIdle(with: url)
             petController.reloadImages()
         } catch {
             showImageError(error)
@@ -1252,7 +1220,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         ), !urls.isEmpty else { return }
 
         do {
-            try imageLibrary.replaceReactions(with: urls)
+            try packStore.replaceUnassigned(with: urls)
             petController.reloadImages()
         } catch {
             showImageError(error)
@@ -1308,8 +1276,12 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
             secondaryButton: L("Cancel")
         ) { [weak self] response in
             guard response == .alertFirstButtonReturn else { return }
-            self?.imageLibrary.resetToDefaults()
-            self?.petController.reloadImages()
+            guard let self else { return }
+            do {
+                try self.packStore.resetToDefaults()
+                self.petController.reloadImages()
+                self.settingsModel?.refresh()
+            } catch { self.showImageError(error) }
         }
     }
 
@@ -1331,6 +1303,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
             settingsModel = TypingPetSettingsModel(
                 library: imageLibrary,
                 keyStore: keyReactionStore,
+                packStore: packStore,
                 scale: petController.scale,
                 restingOpacity: petController.restingOpacity,
                 hoverOpacity: petController.hoverOpacity,
@@ -1351,7 +1324,6 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         }
         settingsModel?.refresh()
         if settingsWindowController == nil, let settingsModel {
-            settingsModel.onAppearanceChanged = { [weak self] in self?.todoBubble?.setAppearanceMode($0) }
             settingsWindowController = SettingsWindowController(model: settingsModel, todoStore: todoStore, updater: updater)
         }
         settingsWindowController?.show()
@@ -1369,7 +1341,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         AppEnvironment.defaults.set(true, forKey: Self.inputMonitoringWelcomeShownKey)
         if inputMonitoringGuideController == nil {
             inputMonitoringGuideController = InputMonitoringGuideController(
-                idleURL: imageLibrary.idleURL,
+                idleURL: packStore.idleURL,
                 reactionURLs: imageLibrary.reactionURLs,
                 resumeSetup: AppEnvironment.defaults.bool(forKey: Self.inputMonitoringSetupPendingKey),
                 onSetupStarted: {
@@ -1412,9 +1384,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
     }
 
     private func configureStatusItem() {
-        if statusItem == nil {
-            statusItem = NSStatusBar.system.statusItem(withLength: AppEnvironment.isDevelopment ? NSStatusItem.variableLength : NSStatusItem.squareLength)
-        }
+        statusItem = NSStatusBar.system.statusItem(withLength: AppEnvironment.isDevelopment ? NSStatusItem.variableLength : NSStatusItem.squareLength)
         if let button = statusItem.button {
             let image = NSImage(systemSymbolName: AppEnvironment.isDevelopment ? "flask.fill" : "pawprint.fill", accessibilityDescription: AppEnvironment.displayName)
             image?.isTemplate = true

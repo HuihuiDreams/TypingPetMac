@@ -4,8 +4,8 @@ import XCTest
 
 final class SettingsAppearanceTests: XCTestCase {
     func testSettingsWidthMatchesReferenceAndGrowsWithText() {
-        XCTAssertEqual(SettingsWindowSizing.contentSize(fontSize: 13).width, 490)
-        XCTAssertEqual(SettingsWindowSizing.contentSize(fontSize: 26).width, 980)
+        XCTAssertEqual(SettingsWindowSizing.contentSize(fontSize: 13).width, 1100)
+        XCTAssertEqual(SettingsWindowSizing.contentSize(fontSize: 26).width, 2200)
     }
 
     @MainActor

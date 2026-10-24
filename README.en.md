@@ -23,6 +23,14 @@ Open `TypingPet.app` from Applications after installation. Use `--adopt` only if
 
 The app supports automatic updates. To update through Homebrew, quit the app, run `brew update`, then `brew upgrade --cask --greedy ynifamily3/tap/typing-pet`.
 
+### Install the DMG manually
+
+1. Download the [v0.17.1 DMG](https://github.com/ynifamily3/TypingPetMac/releases/download/v0.17.1/TypingPetMac-v0.17.1-arm64.dmg) and double-click to open it.
+2. Drag `TypingPet` into the `Applications` folder beside it.
+3. Eject the disk image and open the app from Applications.
+
+The DMG is also Developer ID signed and notarized by Apple. The release includes a `.dmg.sha256` file for integrity checks.
+
 ### Install the ZIP manually
 
 1. Open the [v0.17.1 release](https://github.com/ynifamily3/TypingPetMac/releases/tag/v0.17.1) and download `TypingPetMac-v0.17.1-arm64.zip`. For an optional integrity check, download the `.sha256` file from the same page.
@@ -83,17 +91,20 @@ These screenshots use sample tasks in the isolated development app. The distribu
 
 Move the pointer near the pet and select `할 일` (Todo). Enter a title and press Return. Each task has its own countdown or count-up setting; use the arrow to change it and the main button to start. The focus view supports pause, resume, stop, and countdown extension.
 
-Tasks and measured focus time are stored on this Mac in `~/Library/Application Support/TypingPet/todo-state.json`. Open the file from Settings > `할 일` > `기록 데이터 열기` (Reveal Record Data). Sleep and app restarts do not add offline time to a focus session. See the [Todo guide](developer-notes/todos.md) for details.
+Tasks and measured focus time are stored on this Mac in `~/Library/Application Support/TypingPet/todo-state.json`. Open the file from Settings > Todos and Focus > `기록 데이터 열기` (Reveal Record Data). Sleep and app restarts do not add offline time to a focus session. See the [Todo guide](developer-notes/todos.md) for details.
 
 ## Settings and images
 
 Open `설정` (Settings) from the paw icon in the menu bar.
 
-- `일반` (General): pet size, opacity, bounce, always-on-top, position lock and pointer avoidance, language (System/Korean/English/Japanese/Simplified Chinese/Traditional Chinese), Settings and bubble appearance (System/Light/Dark), launch at login, Input Monitoring, and updates.
-- `갤러리` (Gallery): add, preview, select, rename, and remove image sets.
-- `키 반응` (Key Reactions): assign or remove images for keys and key combinations.
+- My Packs: import, select, save and apply packs; remove a custom pack from its context menu.
+- Image Presets: freely name presets and add or replace their images.
+- Keyboard Mapping: assign multiple presets to keys and modifier combinations, configure Unassigned and IDLE, and preview the current draft.
+- Appearance and Behavior: size, opacity, bounce, always-on-top, position lock, and pointer avoidance.
+- Todos and Focus: timer and record preferences.
+- General: language, appearance, launch at login, Input Monitoring, and updates.
 
-The Gallery can change the idle image, replace reaction images, import a folder as a set, or restore the built-in images. Imported sets are copied to `~/Library/Application Support/TypingPet/Images/Sets`; key-specific images go to `~/Library/Application Support/TypingPet/KeyReactions`, so their originals may be moved afterward.
+Import images or a folder to create a pack. The menu bar also offers quick idle/reaction replacements and restoring defaults. Imported presets are copied to `~/Library/Application Support/TypingPet/Images/Sets`; legacy key-specific images remain in `~/Library/Application Support/TypingPet/KeyReactions`, so their originals may be moved afterward.
 
 For a folder set, name the idle image `idle.*` or `pet-idle.*`; other supported images become reactions. If there is no idle-named image, the first image in sorted order is used. A one-image folder works for both idle and reaction states. PNG, APNG, JPG, JPEG, GIF, TIFF, HEIC, HEIF, and WebP are supported. Images of different proportions are fitted inside a canvas based on the idle image.
 
@@ -118,6 +129,12 @@ open "dist/TypingPet Dev.app"
 ```
 
 The build script selects a Developer ID Application, Apple Development, or ad-hoc signing identity from Keychain, in that order. Set `CODE_SIGN_IDENTITY` to choose one explicitly. Public distribution also requires an Apple Developer Program membership, a Developer ID Application certificate, and notarization credentials; see the [Developer ID guide](developer-notes/developer-id.md).
+
+### Preset packs and keyboard mapping
+
+Use the settings sidebar to name and manage image presets, then assign multiple presets to each key and modifier combination. **Unassigned** and **IDLE** sit above the keyboard, each with random or sequential playback. Clicking a key or behavior opens one inline editor. Try the current draft in **Preview Mode**, then apply it with **Save Pack**. Import multiple images or a folder to create a new pack.
+
+See the [preset editor notes](developer-notes/preset-editor.md) for storage and compatibility details.
 
 ## Developer notes
 

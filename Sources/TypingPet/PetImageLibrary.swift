@@ -109,6 +109,18 @@ final class PetImageLibrary {
     var idleURL: URL? { idleURL(for: activeSet) }
     var reactionURLs: [URL] { reactionURLs(for: activeSet) }
     var usesCustomImages: Bool { activeSetID != Self.builtInID }
+    var packConfigurationsURL: URL { imagesDirectory.appendingPathComponent("packs-v1.json") }
+
+    func presetImageURL(fileName: String, in set: PetImageSet) -> URL? {
+        if let existing = resolvedURL(fileName: fileName, set: set) { return existing }
+        let imported = setsDirectory.appendingPathComponent(set.storageFolder ?? set.id.uuidString)
+            .appendingPathComponent(fileName)
+        return fileManager.fileExists(atPath: imported.path) ? imported : nil
+    }
+
+    func importPresetImage(from url: URL, into set: PetImageSet) throws -> String {
+        try copyImage(from: url, to: storageDirectory(for: set))
+    }
 
     func idleURL(for set: PetImageSet) -> URL? { resolvedURL(fileName: set.idleFileName, set: set) }
 
@@ -128,7 +140,12 @@ final class PetImageLibrary {
             includingPropertiesForKeys: [.isRegularFileKey],
             options: [.skipsHiddenFiles]
         )
-        let selection = FolderImageSelection.make(from: contents)
+        return try addSet(from: contents, name: name ?? folderURL.lastPathComponent)
+    }
+
+    @discardableResult
+    func addSet(from imageURLs: [URL], name: String) throws -> PetImageSet {
+        let selection = FolderImageSelection.make(from: imageURLs)
         let allImages = ([selection.idleURL].compactMap { $0 } + selection.reactionURLs)
         guard !allImages.isEmpty else { throw PetImageLibraryError.noImagesInFolder }
 
@@ -142,9 +159,11 @@ final class PetImageLibrary {
         try fileManager.createDirectory(at: destination, withIntermediateDirectories: true)
 
         let idleName = try copyImage(from: idleSource, to: destination)
-        let reactionNames = try reactionSources.map { try copyImage(from: $0, to: destination) }
-        let requestedName = name?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let displayName = (requestedName?.isEmpty == false ? requestedName! : folderURL.lastPathComponent)
+        let reactionNames = try reactionSources.map { source in
+            source == idleSource ? idleName : try copyImage(from: source, to: destination)
+        }
+        let requestedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let displayName = requestedName.isEmpty ? L("New Pack") : requestedName
         let set = PetImageSet(
             id: id,
             name: displayName,

@@ -42,6 +42,7 @@ final class TypingPetSettingsModel: ObservableObject {
 
     let library: PetImageLibrary
     let keyStore: KeyReactionStore
+    let packStore: PetPackStore
     private let defaults: UserDefaults
     private let applyScale: (CGFloat) -> Void
     private let applyRestingOpacity: (CGFloat) -> Void
@@ -56,6 +57,7 @@ final class TypingPetSettingsModel: ObservableObject {
     init(
         library: PetImageLibrary,
         keyStore: KeyReactionStore,
+        packStore: PetPackStore? = nil,
         scale: CGFloat,
         restingOpacity: CGFloat,
         hoverOpacity: CGFloat,
@@ -76,6 +78,7 @@ final class TypingPetSettingsModel: ObservableObject {
     ) {
         self.library = library
         self.keyStore = keyStore
+        self.packStore = packStore ?? PetPackStore(library: library, keyStore: keyStore)
         self.defaults = defaults
         self.scale = Double(scale)
         self.restingOpacity = Double(restingOpacity)
@@ -116,6 +119,11 @@ final class TypingPetSettingsModel: ObservableObject {
         activeSetID = library.activeSetID
         rules = keyStore.rules
         launchAtLogin = SMAppService.mainApp.status == .enabled
+    }
+
+    func packDidChange() {
+        refresh()
+        reloadPet()
     }
 
     func setScale(_ value: Double) {
@@ -257,7 +265,9 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         window.title = AppEnvironment.displayName + L(" Settings")
         window.setContentSize(SettingsWindowSizing.contentSize())
         window.contentMinSize = SettingsWindowSizing.minimumSize()
-        window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
+        window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
+        window.titleVisibility = .hidden
+        window.titlebarAppearsTransparent = true
         window.appearance = model.appearanceMode.windowAppearance
         window.center()
         super.init(window: window)
@@ -296,15 +306,15 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 }
 
 enum SettingsWindowSizing {
-    // The reference is about 490 points wide on a Retina display. Allow larger text to grow it.
+    // Keep the keyboard and grouped sidebar visible together, including at larger text sizes.
     static func contentSize(fontSize: CGFloat = NSFont.preferredFont(forTextStyle: .body).pointSize) -> NSSize {
         let scale = max(1, fontSize / 13)
-        return NSSize(width: 490 * scale, height: 600 * scale)
+        return NSSize(width: 1100 * scale, height: 820 * scale)
     }
 
     static func minimumSize(fontSize: CGFloat = NSFont.preferredFont(forTextStyle: .body).pointSize) -> NSSize {
         let size = contentSize(fontSize: fontSize)
-        return NSSize(width: size.width, height: size.height * 0.9)
+        return NSSize(width: size.width * (900.0 / 1100), height: size.height * (700.0 / 820))
     }
 }
 
@@ -315,17 +325,7 @@ private struct SettingsRootView: View {
     let updater: UpdateController
 
     var body: some View {
-        TabView {
-            GeneralSettingsView(model: model, updater: updater)
-                .tabItem { Label(L("General"), systemImage: "gearshape") }
-            TodoSettingsView(store: todoStore)
-                .tabItem { Label(L("Todos"), systemImage: "checklist") }
-            GallerySettingsView(model: model)
-                .tabItem { Label(L("Gallery"), systemImage: "photo.on.rectangle.angled") }
-            KeyReactionSettingsView(model: model)
-                .tabItem { Label(L("Key Reactions"), systemImage: "keyboard") }
-        }
-        .padding(SettingsMetrics.space4)
+        SettingsWorkspaceView(model: model, todoStore: todoStore, updater: updater)
         .environment(\.locale, localization.locale)
         .alert(L("Error"), isPresented: Binding(
             get: { model.errorMessage != nil },
@@ -431,162 +431,169 @@ private struct SettingsNote: View {
     }
 }
 
-private struct GeneralSettingsView: View {
+enum GeneralSettingsScope { case all, pet, system }
+
+struct GeneralSettingsView: View {
     @ObservedObject private var localization = AppLocalization.shared
     @ObservedObject var model: TypingPetSettingsModel
     @ObservedObject var updater: UpdateController
+    var scope: GeneralSettingsScope = .all
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: SettingsMetrics.space6) {
-                FlatSettingsSection(L("Pet")) {
-                    VStack(spacing: 0) {
-                        SettingsSliderRow(
-                            title: L("Size"),
-                            value: Binding(get: { model.scale }, set: model.setScale),
-                            range: 0.35...1.25
-                        )
-                        Divider()
-                        SettingsSliderRow(
-                            title: L("Resting opacity"),
-                            value: Binding(get: { model.restingOpacity }, set: model.setRestingOpacity),
-                            range: 0...1
-                        )
-                        Divider()
-                        SettingsSliderRow(
-                            title: L("Hover opacity"),
-                            value: Binding(get: { model.hoverOpacity }, set: model.setHoverOpacity),
-                            range: 0...1
-                        )
-                        Divider()
-                        SettingsNote(text: L("100% is fully visible. 0% is completely transparent."))
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        Divider()
-                        SettingsRow {
-                            HStack(spacing: SettingsMetrics.space3) {
-                                Text(L("Bounce strength"))
-                                Spacer(minLength: SettingsMetrics.space3)
-                                Picker("", selection: Binding(get: { model.shakeLevel }, set: model.setShakeLevel)) {
-                                    Text(L("Off")).tag(0)
-                                    Text(L("Gentle")).tag(1)
-                                    Text(L("Medium")).tag(2)
-                                    Text(L("Strong")).tag(3)
+                if scope != .system {
+                    FlatSettingsSection(L("Pet")) {
+                        VStack(spacing: 0) {
+                            SettingsSliderRow(
+                                title: L("Size"),
+                                value: Binding(get: { model.scale }, set: model.setScale),
+                                range: 0.35...1.25
+                            )
+                            Divider()
+                            SettingsSliderRow(
+                                title: L("Resting opacity"),
+                                value: Binding(get: { model.restingOpacity }, set: model.setRestingOpacity),
+                                range: 0...1
+                            )
+                            Divider()
+                            SettingsSliderRow(
+                                title: L("Hover opacity"),
+                                value: Binding(get: { model.hoverOpacity }, set: model.setHoverOpacity),
+                                range: 0...1
+                            )
+                            Divider()
+                            SettingsNote(text: L("100% is fully visible. 0% is completely transparent."))
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            Divider()
+                            SettingsRow {
+                                HStack(spacing: SettingsMetrics.space3) {
+                                    Text(L("Bounce strength"))
+                                    Spacer(minLength: SettingsMetrics.space3)
+                                    Picker("", selection: Binding(get: { model.shakeLevel }, set: model.setShakeLevel)) {
+                                        Text(L("Off")).tag(0)
+                                        Text(L("Gentle")).tag(1)
+                                        Text(L("Medium")).tag(2)
+                                        Text(L("Strong")).tag(3)
+                                    }
+                                    .labelsHidden()
+                                    .frame(width: 112)
                                 }
-                                .labelsHidden()
-                                .frame(width: 112)
                             }
+                            Divider()
+                            SettingsToggleRow(
+                                title: L("Always on top"),
+                                isOn: Binding(get: { model.alwaysOnTop }, set: model.setAlwaysOnTop)
+                            )
+                            Divider()
+                            SettingsToggleRow(
+                                title: L("Lock position (click through)"),
+                                isOn: Binding(get: { model.positionLocked }, set: model.setPositionLocked)
+                            )
+                            Divider()
+                            SettingsToggleRow(
+                                title: L("Avoid pointer while locked"),
+                                isOn: Binding(get: { model.avoidsPointerWhenLocked }, set: model.setPointerAvoidance),
+                                isEnabled: model.positionLocked
+                            )
+                            Divider()
+                            SettingsNote(text: L("Your pet smoothly moves aside when the pointer gets close, staying on screen."))
+                                .frame(maxWidth: .infinity, alignment: .leading)
                         }
-                        Divider()
-                        SettingsToggleRow(
-                            title: L("Always on top"),
-                            isOn: Binding(get: { model.alwaysOnTop }, set: model.setAlwaysOnTop)
-                        )
-                        Divider()
-                        SettingsToggleRow(
-                            title: L("Lock position (click through)"),
-                            isOn: Binding(get: { model.positionLocked }, set: model.setPositionLocked)
-                        )
-                        Divider()
-                        SettingsToggleRow(
-                            title: L("Avoid pointer while locked"),
-                            isOn: Binding(get: { model.avoidsPointerWhenLocked }, set: model.setPointerAvoidance),
-                            isEnabled: model.positionLocked
-                        )
-                        Divider()
-                        SettingsNote(text: L("Your pet smoothly moves aside when the pointer gets close, staying on screen."))
-                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                }
 
-                FlatSettingsSection(L("System")) {
-                    VStack(spacing: 0) {
-                        SettingsRow {
-                            HStack(spacing: SettingsMetrics.space3) {
-                                Text(L("Language"))
-                                Spacer(minLength: SettingsMetrics.space3)
-                                Picker(L("Language"), selection: Binding(
-                                    get: { localization.mode },
-                                    set: localization.setMode
-                                )) {
-                                    Text(L("System")).tag(AppLanguageMode.system)
-                                    Text(L("language.korean")).tag(AppLanguageMode.korean)
-                                    Text(L("language.english")).tag(AppLanguageMode.english)
-                                    Text(L("language.japanese")).tag(AppLanguageMode.japanese)
-                                    Text(L("language.simplifiedChinese")).tag(AppLanguageMode.simplifiedChinese)
-                                    Text(L("language.traditionalChinese")).tag(AppLanguageMode.traditionalChinese)
+                }
+                if scope != .pet {
+                    FlatSettingsSection(L("System")) {
+                        VStack(spacing: 0) {
+                            SettingsRow {
+                                HStack(spacing: SettingsMetrics.space3) {
+                                    Text(L("Language"))
+                                    Spacer(minLength: SettingsMetrics.space3)
+                                    Picker(L("Language"), selection: Binding(
+                                        get: { localization.mode },
+                                        set: localization.setMode
+                                    )) {
+                                        Text(L("System")).tag(AppLanguageMode.system)
+                                        Text(L("language.korean")).tag(AppLanguageMode.korean)
+                                        Text(L("language.english")).tag(AppLanguageMode.english)
+                                        Text(L("language.japanese")).tag(AppLanguageMode.japanese)
+                                        Text(L("language.simplifiedChinese")).tag(AppLanguageMode.simplifiedChinese)
+                                        Text(L("language.traditionalChinese")).tag(AppLanguageMode.traditionalChinese)
+                                    }
+                                    .labelsHidden()
+                                    .frame(width: 200)
                                 }
-                                .labelsHidden()
-                                .frame(width: 200)
                             }
-                        }
-                        Divider()
-                        SettingsRow {
-                            HStack(spacing: SettingsMetrics.space3) {
-                                Text(L("Appearance"))
-                                Spacer(minLength: SettingsMetrics.space3)
-                                Picker(L("Appearance"), selection: Binding(
-                                    get: { model.appearanceMode },
-                                    set: model.setAppearanceMode
-                                )) {
-                                    Text(L("System")).tag(SettingsAppearanceMode.system)
-                                    Text(L("Light")).tag(SettingsAppearanceMode.light)
-                                    Text(L("Dark")).tag(SettingsAppearanceMode.dark)
+                            Divider()
+                            SettingsRow {
+                                HStack(spacing: SettingsMetrics.space3) {
+                                    Text(L("Appearance"))
+                                    Spacer(minLength: SettingsMetrics.space3)
+                                    Picker(L("Appearance"), selection: Binding(
+                                        get: { model.appearanceMode },
+                                        set: model.setAppearanceMode
+                                    )) {
+                                        Text(L("System")).tag(SettingsAppearanceMode.system)
+                                        Text(L("Light")).tag(SettingsAppearanceMode.light)
+                                        Text(L("Dark")).tag(SettingsAppearanceMode.dark)
+                                    }
+                                    .pickerStyle(.segmented)
+                                    .labelsHidden()
+                                    .frame(width: 252)
                                 }
-                                .pickerStyle(.segmented)
-                                .labelsHidden()
-                                .frame(width: 252)
                             }
-                        }
-                        Divider()
-                        SettingsToggleRow(
-                            title: L("Launch at login"),
-                            isOn: Binding(get: { model.launchAtLogin }, set: model.toggleLaunchAtLogin)
-                        )
-                        Divider()
-                        SettingsRow {
-                            HStack(spacing: SettingsMetrics.space3) {
-                                Label(
-                                    model.inputMonitoringGranted ? L("Input Monitoring allowed") : L("Input Monitoring required"),
-                                    systemImage: model.inputMonitoringGranted ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"
-                                )
-                                .foregroundStyle(model.inputMonitoringGranted ? .green : .orange)
-                                Spacer(minLength: SettingsMetrics.space3)
-                                Button(L("Open System Settings")) { model.openInputMonitoringSettings() }
+                            Divider()
+                            SettingsToggleRow(
+                                title: L("Launch at login"),
+                                isOn: Binding(get: { model.launchAtLogin }, set: model.toggleLaunchAtLogin)
+                            )
+                            Divider()
+                            SettingsRow {
+                                HStack(spacing: SettingsMetrics.space3) {
+                                    Label(
+                                        model.inputMonitoringGranted ? L("Input Monitoring allowed") : L("Input Monitoring required"),
+                                        systemImage: model.inputMonitoringGranted ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"
+                                    )
+                                    .foregroundStyle(model.inputMonitoringGranted ? .green : .orange)
+                                    Spacer(minLength: SettingsMetrics.space3)
+                                    Button(L("Open System Settings")) { model.openInputMonitoringSettings() }
+                                }
                             }
+                            Divider()
+                            SettingsNote(text: L("Only physical key codes and modifier keys are used to recognize shortcuts. Typed text is never stored or sent."))
+                                .frame(maxWidth: .infinity, alignment: .leading)
                         }
-                        Divider()
-                        SettingsNote(text: L("Only physical key codes and modifier keys are used to recognize shortcuts. Typed text is never stored or sent."))
-                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                }
 
-                FlatSettingsSection(L("Updates")) {
-                    VStack(spacing: 0) {
-                        SettingsRow {
-                            HStack(spacing: SettingsMetrics.space3) {
-                                VStack(alignment: .leading, spacing: SettingsMetrics.space1) {
-                                    Text(L("Current version %1$@", updater.currentVersionText))
-                                    Text(updater.statusText)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                        .fixedSize(horizontal: false, vertical: true)
+                    FlatSettingsSection(L("Updates")) {
+                        VStack(spacing: 0) {
+                            SettingsRow {
+                                HStack(spacing: SettingsMetrics.space3) {
+                                    VStack(alignment: .leading, spacing: SettingsMetrics.space1) {
+                                        Text(L("Current version %1$@", updater.currentVersionText))
+                                        Text(updater.statusText)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                            .fixedSize(horizontal: false, vertical: true)
+                                    }
+                                    Spacer(minLength: SettingsMetrics.space3)
+                                    if updater.isBusy { ProgressView().controlSize(.small) }
+                                    Button(updater.menuTitle) { updater.performPrimaryAction() }
+                                        .disabled(updater.isBusy || updater.unavailableReason != nil)
                                 }
-                                Spacer(minLength: SettingsMetrics.space3)
-                                if updater.isBusy { ProgressView().controlSize(.small) }
-                                Button(updater.menuTitle) { updater.performPrimaryAction() }
-                                    .disabled(updater.isBusy || updater.unavailableReason != nil)
+                                .padding(.vertical, SettingsMetrics.space2)
                             }
-                            .padding(.vertical, SettingsMetrics.space2)
+                            Divider()
+                            SettingsToggleRow(
+                                title: L("Check for updates automatically"),
+                                isOn: $updater.automaticChecks,
+                                isEnabled: updater.unavailableReason == nil
+                            )
+                            Divider()
+                            SettingsNote(text: L("Checks pet.miel.ing once a day. Only the app version is sent, and only updates with a verified signature are installed."))
+                                .frame(maxWidth: .infinity, alignment: .leading)
                         }
-                        Divider()
-                        SettingsToggleRow(
-                            title: L("Check for updates automatically"),
-                            isOn: $updater.automaticChecks,
-                            isEnabled: updater.unavailableReason == nil
-                        )
-                        Divider()
-                        SettingsNote(text: L("Checks pet.miel.ing once a day. Only the app version is sent, and only updates with a verified signature are installed."))
-                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
             }
@@ -595,7 +602,7 @@ private struct GeneralSettingsView: View {
     }
 }
 
-private struct TodoSettingsView: View {
+struct TodoSettingsView: View {
     @ObservedObject private var localization = AppLocalization.shared
     @ObservedObject var store: TodoStore
 
@@ -768,195 +775,5 @@ private struct ZoomStepButton: View {
         .disabled(!enabled)
         .help(label)
         .accessibilityLabel(label)
-    }
-}
-
-private struct GallerySettingsView: View {
-    @ObservedObject private var localization = AppLocalization.shared
-    @ObservedObject var model: TypingPetSettingsModel
-    private let columns = [GridItem(.adaptive(minimum: 152, maximum: 192), spacing: SettingsMetrics.space4)]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: SettingsMetrics.space4) {
-            HStack(spacing: SettingsMetrics.space3) {
-                Text(L("Image Sets")).font(.title2).bold()
-                Spacer()
-                Button { model.importImageSet() } label: { Label(L("Add Folder"), systemImage: "plus") }
-            }
-            ScrollView {
-                LazyVGrid(columns: columns, spacing: SettingsMetrics.space4) {
-                    ForEach(model.imageSets) { set in
-                        GalleryCard(set: set, image: model.thumbnail(for: set), active: set.id == model.activeSetID, selected: set.id == model.selectedSetID)
-                            .onTapGesture { model.selectedSetID = set.id }
-                    }
-                }
-                .padding(SettingsMetrics.space1)
-            }
-            Divider()
-            VStack(alignment: .leading, spacing: SettingsMetrics.space2) {
-                if let set = model.selectedSet {
-                    Text(L("%1$@ · %2$@ reaction images", set.name, model.library.reactionURLs(for: set).count))
-                        .foregroundStyle(.secondary)
-                }
-                HStack(spacing: SettingsMetrics.space2) {
-                    Spacer()
-                    Button(L("Rename")) { model.renameSelectedSet() }.disabled(model.selectedSet?.isBuiltIn != false)
-                    Button(L("Remove")) { model.deleteSelectedSet() }.disabled(model.selectedSet?.isBuiltIn != false)
-                    Button(L("Apply")) { model.activateSelectedSet() }.buttonStyle(.borderedProminent).disabled(model.selectedSetID == model.activeSetID)
-                }
-            }
-        }
-        .padding(SettingsMetrics.space4)
-    }
-}
-
-private struct GalleryCard: View {
-    @ObservedObject private var localization = AppLocalization.shared
-    let set: PetImageSet
-    let image: NSImage?
-    let active: Bool
-    let selected: Bool
-
-    var body: some View {
-        VStack(spacing: SettingsMetrics.space2) {
-            ZStack(alignment: .topTrailing) {
-                RoundedRectangle(cornerRadius: SettingsMetrics.space2)
-                    .fill(Color(nsColor: .controlBackgroundColor))
-                    .frame(height: 112)
-                if let image {
-                    Image(nsImage: image)
-                        .resizable()
-                        .scaledToFit()
-                        .padding(SettingsMetrics.space3)
-                        .frame(maxWidth: .infinity, maxHeight: 112)
-                }
-                if active {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
-                        .padding(SettingsMetrics.space2)
-                }
-            }
-            Text(set.name).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .padding(SettingsMetrics.space3)
-        .background(RoundedRectangle(cornerRadius: SettingsMetrics.space3).fill(selected ? Color.accentColor.opacity(0.13) : .clear))
-        .overlay(RoundedRectangle(cornerRadius: SettingsMetrics.space3).stroke(selected ? Color.accentColor : Color.secondary.opacity(0.2), lineWidth: selected ? 2 : 1))
-    }
-}
-
-private struct KeyReactionSettingsView: View {
-    @ObservedObject private var localization = AppLocalization.shared
-    @ObservedObject var model: TypingPetSettingsModel
-    @State private var pendingImageURL: URL?
-    @State private var isCapturing = false
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: SettingsMetrics.space4) {
-            HStack(spacing: SettingsMetrics.space3) {
-                VStack(alignment: .leading, spacing: SettingsMetrics.space1) {
-                    Text(L("Custom Key Reactions")).font(.title2).bold()
-                    Text(L("Assigned images take priority for the keys and shortcuts you register.")).foregroundStyle(.secondary)
-                }
-                Spacer()
-                Button { chooseImage() } label: { Label(L("Add Rule"), systemImage: "plus") }
-            }
-            if model.rules.isEmpty {
-                VStack(spacing: SettingsMetrics.space2) {
-                    Image(systemName: "keyboard").font(.system(size: 40)).foregroundStyle(.secondary)
-                    Text(L("No key reactions yet")).font(.headline)
-                    Text(L("Click Add Rule to choose an image and a shortcut.")).foregroundStyle(.secondary)
-                }.frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                List(model.rules) { rule in
-                    HStack(spacing: SettingsMetrics.space3) {
-                        Group {
-                            if let image = model.ruleImage(for: rule) { Image(nsImage: image).resizable().scaledToFit() }
-                            else { Image(systemName: "photo") }
-                        }.frame(width: 46, height: 46)
-                        Text(rule.stroke.displayName).font(.system(size: 16, weight: .semibold, design: .rounded))
-                        Spacer()
-                        Button(role: .destructive) { model.removeRule(rule) } label: { Image(systemName: "trash") }
-                            .buttonStyle(.borderless)
-                    }
-                    .padding(.vertical, SettingsMetrics.space2)
-                    .listRowInsets(EdgeInsets(
-                        top: 0,
-                        leading: SettingsMetrics.space1,
-                        bottom: 0,
-                        trailing: SettingsMetrics.space1
-                    ))
-                }
-                .listStyle(.plain)
-            }
-        }
-        .padding(SettingsMetrics.space4)
-        .sheet(isPresented: $isCapturing) {
-            KeyCaptureSheet { stroke in
-                if let url = pendingImageURL { model.addRule(stroke: stroke, imageURL: url) }
-                pendingImageURL = nil
-                isCapturing = false
-            } onCancel: {
-                pendingImageURL = nil
-                isCapturing = false
-            }
-        }
-    }
-
-    private func chooseImage() {
-        let panel = NSOpenPanel()
-        panel.title = L("Choose Key Reaction Image")
-        panel.canChooseDirectories = false
-        panel.canChooseFiles = true
-        panel.allowedContentTypes = [.image]
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        pendingImageURL = url
-        isCapturing = true
-    }
-}
-
-private struct KeyCaptureSheet: View {
-    @ObservedObject private var localization = AppLocalization.shared
-    let onCapture: (KeyStroke) -> Void
-    let onCancel: () -> Void
-    @State private var captured: KeyStroke?
-
-    var body: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "keyboard.badge.ellipsis").font(.system(size: 42)).foregroundStyle(.tint)
-            Text(L("Press a key or shortcut to use")).font(.title3).bold()
-            Text(captured?.displayName ?? L("Example: K, ⌘K, ⌃⌥Space"))
-                .font(.system(size: 22, weight: .semibold, design: .rounded)).frame(minHeight: 32)
-            KeyCaptureView { captured = $0 }.frame(width: 1, height: 1)
-            HStack {
-                Button(L("Cancel"), action: onCancel)
-                Button(L("Add")) { if let captured { onCapture(captured) } }
-                    .buttonStyle(.borderedProminent).disabled(captured == nil)
-            }
-        }.padding(32).frame(width: 420, height: 260)
-    }
-}
-
-private struct KeyCaptureView: NSViewRepresentable {
-    let onCapture: (KeyStroke) -> Void
-
-    func makeNSView(context: Context) -> CaptureNSView {
-        let view = CaptureNSView()
-        view.onCapture = onCapture
-        return view
-    }
-
-    func updateNSView(_ nsView: CaptureNSView, context: Context) { nsView.onCapture = onCapture }
-
-    final class CaptureNSView: NSView {
-        var onCapture: ((KeyStroke) -> Void)?
-        override var acceptsFirstResponder: Bool { true }
-        override func viewDidMoveToWindow() {
-            super.viewDidMoveToWindow()
-            DispatchQueue.main.async { [weak self] in if let self { self.window?.makeFirstResponder(self) } }
-        }
-        override func keyDown(with event: NSEvent) {
-            let modifiers = KeyModifiers(eventFlags: CGEventFlags(rawValue: UInt64(event.modifierFlags.rawValue)))
-            onCapture?(KeyStroke(keyCode: event.keyCode, modifiers: modifiers))
-        }
     }
 }

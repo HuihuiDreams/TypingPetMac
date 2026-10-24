@@ -30,7 +30,14 @@ for (const locale of locales) {
       assert.ok(html.includes(`hreflang="${alternate}" href="https://typing-pet.miel.ing/${alternate}/${suffix}"`));
     }
     assert.ok(html.includes(notes.find(note => note.version === release.version)[locale].title));
-    if (!suffix) assert.ok(html.includes(content[locale].hero1));
+    if (!suffix) {
+      assert.ok(html.includes(content[locale].hero1));
+      assert.ok(html.includes(`href="${release.githubUrl}"`), 'ZIP download retained');
+      if (release.dmg) {
+        assert.ok(html.includes(`href="${release.dmg.githubUrl}"`), 'DMG download');
+        assert.ok(html.includes(content[locale].dmgTab), 'translated DMG tab');
+      }
+    }
     assert.ok(!html.includes('undefined'));
     const themeScript = html.match(/<script src="(\/assets\/theme-([a-f0-9]{12})\.js)"><\/script>/);
     assert.ok(themeScript, `${locale}/${suffix} blocking theme bootstrap`);
