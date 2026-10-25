@@ -16,10 +16,13 @@ final class SettingsAppearanceTests: XCTestCase {
         let controller = TodoBubbleWindowController(store: store, pet: NSWindow())
         controller.setAppearanceMode(.dark)
         XCTAssertEqual(controller.panel.appearance?.name, .darkAqua)
+        XCTAssertEqual(controller.entry.appearance?.name, .darkAqua)
         controller.setAppearanceMode(.light)
         XCTAssertEqual(controller.panel.appearance?.name, .aqua)
+        XCTAssertEqual(controller.entry.appearance?.name, .aqua)
         controller.setAppearanceMode(.system)
         XCTAssertNil(controller.panel.appearance)
+        XCTAssertNil(controller.entry.appearance)
     }
     func testStoredAppearanceAndInvalidValue() throws {
         let suite = "TypingPetAppearanceTests.\(UUID())"
@@ -52,6 +55,7 @@ final class SettingsAppearanceTests: XCTestCase {
             alwaysOnTop: false, positionLocked: false, avoidsPointerWhenLocked: false,
             applyScale: { _ in }, applyRestingOpacity: { _ in }, applyHoverOpacity: { _ in }, applyShake: { _ in },
             applyAlwaysOnTop: { _ in }, applyPositionLock: { _ in }, applyPointerAvoidance: { _ in },
+            applyAppearance: { _ in },
             reloadPet: {}, openInputMonitoringSettings: {},
             monitoringIsRunning: { connected }, retryMonitoring: { retryCount += 1; connected = true },
             inputMonitoringAuthorized: { granted }, defaults: defaults)
@@ -72,7 +76,7 @@ final class SettingsAppearanceTests: XCTestCase {
     }
 
     @MainActor
-    func testChangingModePersistsAndUpdatesWindowAppearance() throws {
+    func testChangingModeUpdatesSettingsBubbleAndCollapsedEntryWithoutRestarting() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("TypingPetAppearance-\(UUID())")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
@@ -80,6 +84,8 @@ final class SettingsAppearanceTests: XCTestCase {
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
 
+        let store = TodoStore(url: root.appendingPathComponent("todos.json"), defaults: defaults)
+        let bubble = TodoBubbleWindowController(store: store, pet: NSWindow(), defaults: defaults)
         let model = TypingPetSettingsModel(
             library: PetImageLibrary(defaults: defaults, imagesDirectory: root.appendingPathComponent("Images")),
             keyStore: KeyReactionStore(defaults: defaults, directory: root.appendingPathComponent("Keys")),
@@ -97,15 +103,14 @@ final class SettingsAppearanceTests: XCTestCase {
             applyAlwaysOnTop: { _ in },
             applyPositionLock: { _ in },
             applyPointerAvoidance: { _ in },
+            applyAppearance: { bubble.setAppearanceMode($0) },
             reloadPet: {},
             openInputMonitoringSettings: {},
             defaults: defaults
         )
-        let window = NSWindow()
-        model.onAppearanceChanged = { window.appearance = $0.windowAppearance }
         let settings = SettingsWindowController(
             model: model,
-            todoStore: TodoStore(url: root.appendingPathComponent("todos.json"), defaults: defaults),
+            todoStore: store,
             updater: UpdateController(defaults: defaults)
         )
 
@@ -124,16 +129,27 @@ final class SettingsAppearanceTests: XCTestCase {
 
         model.setAppearanceMode(.dark)
         XCTAssertEqual(defaults.string(forKey: SettingsAppearanceMode.defaultsKey), "dark")
-        XCTAssertEqual(window.appearance?.name, .darkAqua)
+        XCTAssertEqual(bubble.panel.appearance?.name, .darkAqua)
+        XCTAssertEqual(bubble.entry.appearance?.name, .darkAqua)
+        XCTAssertEqual(bubble.panel.contentView?.effectiveAppearance.name, .darkAqua)
+        XCTAssertEqual(bubble.entry.contentView?.effectiveAppearance.name, .darkAqua)
         XCTAssertEqual(settings.window?.appearance?.name, .darkAqua)
         XCTAssertEqual(SettingsAppearanceMode.load(from: defaults), .dark)
 
+        let reopened = TodoBubbleWindowController(store: store, pet: NSWindow(), defaults: defaults)
+        XCTAssertEqual(reopened.panel.appearance?.name, .darkAqua)
+        XCTAssertEqual(reopened.entry.appearance?.name, .darkAqua)
+
         model.setAppearanceMode(.light)
-        XCTAssertEqual(window.appearance?.name, .aqua)
+        XCTAssertEqual(bubble.panel.appearance?.name, .aqua)
+        XCTAssertEqual(bubble.entry.appearance?.name, .aqua)
+        XCTAssertEqual(bubble.panel.contentView?.effectiveAppearance.name, .aqua)
+        XCTAssertEqual(bubble.entry.contentView?.effectiveAppearance.name, .aqua)
         XCTAssertEqual(settings.window?.appearance?.name, .aqua)
 
         model.setAppearanceMode(.system)
-        XCTAssertNil(window.appearance)
+        XCTAssertNil(bubble.panel.appearance)
+        XCTAssertNil(bubble.entry.appearance)
         XCTAssertNil(settings.window?.appearance)
 
     }

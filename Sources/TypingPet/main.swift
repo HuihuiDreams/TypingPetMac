@@ -1320,6 +1320,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
                 applyAlwaysOnTop: { [weak self] in self?.petController.isAlwaysOnTop = $0 },
                 applyPositionLock: { [weak self] in self?.petController.isPositionLocked = $0 },
                 applyPointerAvoidance: { [weak self] in self?.petController.avoidsPointerWhenLocked = $0 },
+                applyAppearance: { [weak self] in self?.todoBubble?.setAppearanceMode($0) },
                 reloadPet: { [weak self] in self?.petController.reloadImages() },
                 openInputMonitoringSettings: { [weak self] in self?.openInputMonitoringSettings() },
                 monitoringIsRunning: { [weak self] in self?.keyMonitor?.isRunning == true },
