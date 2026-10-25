@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.18.2 - 2026-10-26
+
+- Validate stored image filenames and set folders across preset, resting, and typing-reaction lookups; reject symbolic links and non-regular files when importing images.
+- Save Todo records with owner-only permissions before atomically replacing the original. Permission or write failures preserve the previous records, and reads and writes enforce a 10 MiB file limit.
+- Bound long text input before processing and reject invalid stored Todo titles.
+- Release Todo input focus when clicking another app, locking the screen, or sleeping, and limit the settings launch shortcut to debug builds.
+
+Thanks to @HuihuiDreams for contributing the input and storage hardening in #5.
+
 ## 0.18.1 - 2026-10-25
 
 - Drag preset images onto keyboard keys to assign them, with a glow on the active drop target; drop image files into the gallery to import them.

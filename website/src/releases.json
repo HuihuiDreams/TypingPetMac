@@ -1,5 +1,54 @@
 [
   {
+    "version": "0.18.2",
+    "date": "2026-10-26",
+    "ko": {
+      "title": "입력 및 로컬 데이터 보호 강화",
+      "items": [
+        "프리셋·대기·키 반응 이미지의 저장 경로 검사를 보강하고, 이미지를 가져올 때 심볼릭 링크와 일반 파일이 아닌 항목을 거부합니다.",
+        "할 일 기록을 사용자 전용 권한으로 저장한 뒤 기존 파일을 교체합니다. 저장에 실패하면 기존 기록을 보존하며, 읽기와 쓰기 모두 10 MiB 파일 제한을 적용합니다.",
+        "긴 텍스트 입력을 처리하기 전에 길이를 제한하고, 저장된 할 일 제목을 검증합니다.",
+        "다른 앱을 클릭하거나 화면을 잠그고 잠자기에 들어갈 때 할 일 입력 포커스를 해제합니다. HuihuiDreams님의 보안 개선 기여에 감사드립니다."
+      ]
+    },
+    "en": {
+      "title": "Safer input and local data storage",
+      "items": [
+        "Strengthen stored path validation for preset, resting, and key-reaction images. Reject symbolic links and non-regular files when importing images.",
+        "Save Todo records with owner-only permissions before replacing the original file. Preserve existing records on failure and enforce a 10 MiB limit for both reads and writes.",
+        "Limit long text input before processing and validate stored Todo titles.",
+        "Release Todo input focus when clicking another app, locking the screen, or sleeping. Thanks to HuihuiDreams for contributing the security improvements."
+      ]
+    },
+    "ja": {
+      "title": "入力とローカルデータの保護を強化",
+      "items": [
+        "プリセット・待機・キー反応画像の保存パス検証を強化しました。画像の読み込み時にシンボリックリンクと通常のファイル以外を拒否します。",
+        "Todoの記録を所有者のみがアクセスできる権限で保存してから元のファイルを置き換えます。保存に失敗した場合は既存の記録を保持し、読み書きの両方に10 MiBの上限を適用します。",
+        "長いテキスト入力を処理前に制限し、保存されたTodoのタイトルを検証します。",
+        "別のアプリのクリック、画面ロック、スリープ時にTodoの入力フォーカスを解除します。セキュリティ改善に貢献してくださったHuihuiDreamsさんに感謝します。"
+      ]
+    },
+    "zh-Hans": {
+      "title": "加强输入与本地数据保护",
+      "items": [
+        "加强预设、休息和按键反应图片的存储路径验证。导入图片时拒绝符号链接和非普通文件。",
+        "先以仅当前用户可访问的权限保存待办记录，再替换原文件。保存失败时保留已有记录，读取和写入均限制为10 MiB。",
+        "在处理长文本输入前限制其长度，并验证已保存的待办标题。",
+        "点击其他应用、锁屏或进入睡眠时取消待办输入焦点。感谢HuihuiDreams贡献的安全改进。"
+      ]
+    },
+    "zh-Hant": {
+      "title": "加強輸入與本機資料保護",
+      "items": [
+        "加強預設、休息和按鍵反應圖片的儲存路徑驗證。匯入圖片時拒絕符號連結和非一般檔案。",
+        "先以僅目前使用者可存取的權限儲存待辦記錄，再取代原始檔案。儲存失敗時保留既有記錄，讀取和寫入均限制為10 MiB。",
+        "在處理長文字輸入前限制其長度，並驗證已儲存的待辦標題。",
+        "點擊其他應用程式、鎖定螢幕或進入睡眠時取消待辦輸入焦點。感謝HuihuiDreams貢獻的安全改進。"
+      ]
+    }
+  },
+  {
     "version": "0.18.1",
     "date": "2026-10-25",
     "ko": {
