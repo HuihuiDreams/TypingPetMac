@@ -80,8 +80,7 @@ final class KeyReactionStore {
 
     func imageURL(matching stroke: KeyStroke) -> URL? {
         guard let rule = rules.first(where: { $0.stroke == stroke }) else { return nil }
-        let url = directory.appendingPathComponent(rule.imageFileName)
-        return fileManager.fileExists(atPath: url.path) ? url : nil
+        return imageURL(fileName: rule.imageFileName)
     }
 
     func imageURL(for rule: KeyReactionRule) -> URL? {

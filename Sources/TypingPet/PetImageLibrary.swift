@@ -4,7 +4,7 @@ import Foundation
 /// Validates that a file or folder name is a single path component to prevent directory traversal.
 enum StoredFileName {
     static func isSafe(_ name: String) -> Bool {
-        !name.isEmpty && name != "." && name != ".." && !name.contains("/")
+        !name.isEmpty && name != "." && name != ".." && !name.contains("/") && !name.contains("\0")
     }
 }
 
@@ -271,6 +271,9 @@ final class PetImageLibrary {
     }
 
     private func resolvedURL(fileName: String, set: PetImageSet) -> URL? {
+        // All idle, reaction, and preset lookups pass through this check before constructing a path.
+        guard StoredFileName.isSafe(fileName),
+              set.storageFolder.map(StoredFileName.isSafe) != false else { return nil }
         if set.isBuiltIn {
             return builtInResourceURL(fileName: fileName)
         }

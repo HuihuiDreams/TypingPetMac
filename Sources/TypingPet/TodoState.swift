@@ -25,12 +25,12 @@ enum TodoTitlePolicy {
     static let warningLength = 100
     // Line breaks and runs of whitespace become one space; the result is trimmed and capped.
     static func normalized(_ title: String) -> String {
-        let prefix = title.count > 1000 ? String(title.prefix(1000)) : title
+        let prefix = String(title.prefix(1000))
         return String(prefix.split(whereSeparator: \.isWhitespace).joined(separator: " ").prefix(maxLength))
     }
     // While typing, keep the user's spacing but drop line breaks and stop at the cap.
     static func limitedDraft(_ text: String) -> String {
-        let bounded = text.count > 1000 ? String(text.prefix(1000)) : text
+        let bounded = String(text.prefix(1000))
         let flat = bounded.contains(where: \.isNewline) ? bounded.components(separatedBy: .newlines).joined(separator: " ") : bounded
         return flat.count > maxLength ? String(flat.prefix(maxLength)) : flat
     }
@@ -119,7 +119,7 @@ struct TodoState: Codable, Equatable {
         guard todoIDs.count == todos.count, Set(sessions.map(\.id)).count == sessions.count,
               todos.allSatisfy({
                   let trimmed = $0.title.trimmingCharacters(in: .whitespacesAndNewlines)
-                  return !trimmed.isEmpty && $0.title.count <= 1000 && !$0.title.contains("\n") && $0.timerPreference.isValid
+                  return !trimmed.isEmpty && $0.title.count <= 1000 && !$0.title.contains(where: \.isNewline) && $0.timerPreference.isValid
               })
         else { throw TodoDataError.invalidState }
         let active = sessions.filter { $0.status != .finished }
