@@ -3,4 +3,21 @@
 dist/
 *.xcuserstate
 *.zip
+*.dmg
 
+
+dist-dev/
+
+# Local credentials and private signing material must never be committed.
+.env
+.env.*
+!.env.example
+*.key
+*.p12
+*.pfx
+*.p8
+*.pem
+__pycache__/
+
+# Local planning and working drafts. Curated public writing lives in developer-notes/.
+/docs/

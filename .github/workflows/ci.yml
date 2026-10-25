@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'feat/**']
   pull_request:
 
 jobs:
@@ -14,3 +14,11 @@ jobs:
         run: swift --version
       - name: Run tests
         run: swift test
+      - name: Check Todo time and storage
+        run: ./scripts/check_todo.sh
+      - name: Check release guards
+        run: python3 -m unittest discover -s scripts -p 'test_release.py'
+      - name: Check update publication
+        run: ./scripts/check_publish_update.sh
+      - name: Build release
+        run: swift build -c release

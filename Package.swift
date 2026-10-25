@@ -14,6 +14,7 @@ let package = Package(
         .executableTarget(
             name: "TypingPet",
             exclude: ["Resources"],
+            resources: [.copy("Localization")],
             swiftSettings: [
                 .swiftLanguageMode(.v5)
             ]

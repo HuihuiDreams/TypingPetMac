@@ -22,9 +22,20 @@ fi
 
 work_dir="$(mktemp -d)"
 trap 'rm -rf "$work_dir"' EXIT
+mkdir -p "${output_zip:h}"
 submission_zip="$work_dir/TypingPet-notary.zip"
 ditto -c -k --sequesterRsrc --keepParent "$app_path" "$submission_zip"
-xcrun notarytool submit "$submission_zip" --keychain-profile "$keychain_profile" --wait
+result_path="${NOTARY_RESULT_PATH:-$work_dir/notary-result.json}"
+xcrun notarytool submit "$submission_zip" --keychain-profile "$keychain_profile" \
+    --wait --timeout "${NOTARY_TIMEOUT:-30m}" --output-format json >"$result_path"
+python3 - "$result_path" <<'PYNOTARY'
+import json, sys
+with open(sys.argv[1]) as file:
+    result = json.load(file)
+print(f"Notary submission {result.get('id', 'unknown')}: {result.get('status', 'unknown')}")
+if result.get("status") != "Accepted":
+    raise SystemExit("Notarization was not accepted. Inspect the submission with notarytool info/log before retrying.")
+PYNOTARY
 xcrun stapler staple "$app_path"
 xcrun stapler validate "$app_path"
 spctl --assess --type execute --verbose=2 "$app_path"

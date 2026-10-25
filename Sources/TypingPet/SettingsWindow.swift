@@ -1,7 +1,26 @@
 import AppKit
+import Combine
 import ServiceManagement
 import SwiftUI
 import UniformTypeIdentifiers
+
+enum SettingsAppearanceMode: String, CaseIterable {
+    case system, light, dark
+
+    static let defaultsKey = "SettingsAppearanceMode"
+
+    static func load(from defaults: UserDefaults) -> Self {
+        Self(rawValue: defaults.string(forKey: defaultsKey) ?? "") ?? .system
+    }
+
+    var windowAppearance: NSAppearance? {
+        switch self {
+        case .system: nil
+        case .light: NSAppearance(named: .aqua)
+        case .dark: NSAppearance(named: .darkAqua)
+        }
+    }
+}
 
 @MainActor
 final class TypingPetSettingsModel: ObservableObject {
@@ -17,38 +36,58 @@ final class TypingPetSettingsModel: ObservableObject {
     @Published private(set) var positionLocked: Bool
     @Published private(set) var avoidsPointerWhenLocked: Bool
     @Published private(set) var launchAtLogin: Bool
+    @Published private(set) var appearanceMode: SettingsAppearanceMode
+    @Published private(set) var inputMonitoringGranted = false
+    @Published private(set) var inputMonitoringConnected = false
     @Published var errorMessage: String?
+    var onAppearanceChanged: ((SettingsAppearanceMode) -> Void)?
 
-    private let library: PetImageLibrary
-    private let keyStore: KeyReactionStore
+    let library: PetImageLibrary
+    let keyStore: KeyReactionStore
+    let packStore: PetPackStore
+    private let defaults: UserDefaults
     private let applyScale: (CGFloat) -> Void
     private let applyRestingOpacity: (CGFloat) -> Void
     private let applyHoverOpacity: (CGFloat) -> Void
     private let applyShake: (Int) -> Void
     private let applyAlwaysOnTop: (Bool) -> Void
     private let applyPositionLock: (Bool) -> Void
-    private let currentPositionLock: () -> Bool
     private let applyPointerAvoidance: (Bool) -> Void
     private let reloadPet: () -> Void
     private let openInputMonitoringSettingsAction: () -> Void
+    private let monitoringIsRunning: () -> Bool
+    private let retryMonitoring: () -> Void
+    private let inputMonitoringAuthorized: () -> Bool
 
     init(
-        library: PetImageLibrary, keyStore: KeyReactionStore,
-        scale: CGFloat, restingOpacity: CGFloat, hoverOpacity: CGFloat, shakeLevel: Int,
-        alwaysOnTop: Bool, positionLocked: Bool, avoidsPointerWhenLocked: Bool,
+        library: PetImageLibrary,
+        keyStore: KeyReactionStore,
+        packStore: PetPackStore? = nil,
+        scale: CGFloat,
+        restingOpacity: CGFloat,
+        hoverOpacity: CGFloat,
+        shakeLevel: Int,
+        alwaysOnTop: Bool,
+        positionLocked: Bool,
+        avoidsPointerWhenLocked: Bool,
         applyScale: @escaping (CGFloat) -> Void,
         applyRestingOpacity: @escaping (CGFloat) -> Void,
         applyHoverOpacity: @escaping (CGFloat) -> Void,
         applyShake: @escaping (Int) -> Void,
         applyAlwaysOnTop: @escaping (Bool) -> Void,
         applyPositionLock: @escaping (Bool) -> Void,
-        currentPositionLock: @escaping () -> Bool,
         applyPointerAvoidance: @escaping (Bool) -> Void,
         reloadPet: @escaping () -> Void,
-        openInputMonitoringSettings: @escaping () -> Void
+        openInputMonitoringSettings: @escaping () -> Void,
+        monitoringIsRunning: @escaping () -> Bool = { false },
+        retryMonitoring: @escaping () -> Void = {},
+        inputMonitoringAuthorized: @escaping () -> Bool = { CGPreflightListenEventAccess() },
+        defaults: UserDefaults = AppEnvironment.defaults
     ) {
         self.library = library
         self.keyStore = keyStore
+        self.packStore = packStore ?? PetPackStore(library: library, keyStore: keyStore)
+        self.defaults = defaults
         self.scale = Double(scale)
         self.restingOpacity = Double(restingOpacity)
         self.hoverOpacity = Double(hoverOpacity)
@@ -62,28 +101,48 @@ final class TypingPetSettingsModel: ObservableObject {
         self.applyShake = applyShake
         self.applyAlwaysOnTop = applyAlwaysOnTop
         self.applyPositionLock = applyPositionLock
-        self.currentPositionLock = currentPositionLock
         self.applyPointerAvoidance = applyPointerAvoidance
         self.reloadPet = reloadPet
         openInputMonitoringSettingsAction = openInputMonitoringSettings
+        self.monitoringIsRunning = monitoringIsRunning
+        self.retryMonitoring = retryMonitoring
+        self.inputMonitoringAuthorized = inputMonitoringAuthorized
         activeSetID = library.activeSetID
         selectedSetID = library.activeSetID
         launchAtLogin = SMAppService.mainApp.status == .enabled
+        appearanceMode = SettingsAppearanceMode.load(from: defaults)
         refresh()
     }
 
     var selectedSet: PetImageSet? { imageSets.first { $0.id == selectedSetID } }
-    var inputMonitoringGranted: Bool { CGPreflightListenEventAccess() }
 
-    func thumbnail(for set: PetImageSet) -> NSImage? { library.thumbnail(for: set) }
-    func ruleImage(for rule: KeyReactionRule) -> NSImage? { keyStore.imageURL(for: rule).flatMap { library.image(for: $0) } }
+    func thumbnail(for set: PetImageSet) -> NSImage? {
+        library.idleURL(for: set).flatMap(NSImage.init(contentsOf:))
+    }
+
+    func ruleImage(for rule: KeyReactionRule) -> NSImage? {
+        keyStore.imageURL(for: rule).flatMap(NSImage.init(contentsOf:))
+    }
 
     func refresh() {
         imageSets = library.imageSets
         activeSetID = library.activeSetID
         rules = keyStore.rules
+        refreshPermissions()
         launchAtLogin = SMAppService.mainApp.status == .enabled
-        positionLocked = currentPositionLock()
+    }
+
+    func packDidChange(reload: Bool = true) {
+        refresh()
+        if reload { reloadPet() }
+    }
+
+    func refreshPermissions(retryConnection: Bool = false) {
+        let granted = inputMonitoringAuthorized()
+        if retryConnection && granted { retryMonitoring() }
+        let connected = granted && monitoringIsRunning()
+        if inputMonitoringGranted != granted { inputMonitoringGranted = granted }
+        if inputMonitoringConnected != connected { inputMonitoringConnected = connected }
     }
 
     func setScale(_ value: Double) {
@@ -125,6 +184,12 @@ final class TypingPetSettingsModel: ObservableObject {
         applyPointerAvoidance(value)
     }
 
+    func setAppearanceMode(_ value: SettingsAppearanceMode) {
+        appearanceMode = value
+        defaults.set(value.rawValue, forKey: SettingsAppearanceMode.defaultsKey)
+        onAppearanceChanged?(value)
+    }
+
     func toggleLaunchAtLogin(_ value: Bool) {
         do {
             if value { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
@@ -146,9 +211,9 @@ final class TypingPetSettingsModel: ObservableObject {
 
     func importImageSet() {
         let panel = NSOpenPanel()
-        panel.title = "添加图像集文件夹"
-        panel.message = "idle.* 或 pet-idle.* 作为待机图像，其余作为反应图像导入。"
-        panel.prompt = "添加至图库"
+        panel.title = L("Add Image Set Folder")
+        panel.message = L("idle.* or pet-idle.* is the idle image. Other files are imported as reaction images.")
+        panel.prompt = L("Add to Gallery")
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         guard panel.runModal() == .OK, let url = panel.url else { return }
@@ -163,10 +228,10 @@ final class TypingPetSettingsModel: ObservableObject {
     func deleteSelectedSet() {
         guard let set = selectedSet, !set.isBuiltIn else { return }
         let alert = NSAlert()
-        alert.messageText = "确定从列表中移除“\(set.name)”吗？"
-        alert.informativeText = "不会影响原始图像文件。"
-        alert.addButton(withTitle: "移除")
-        alert.addButton(withTitle: "取消")
+        alert.messageText = L("Remove “%1$@” from the list?", set.name)
+        alert.informativeText = L("Original images will not be changed.")
+        alert.addButton(withTitle: L("Remove"))
+        alert.addButton(withTitle: L("Cancel"))
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         do {
             try library.deleteSet(id: set.id)
@@ -181,10 +246,10 @@ final class TypingPetSettingsModel: ObservableObject {
         let field = NSTextField(string: set.name)
         field.frame = NSRect(x: 0, y: 0, width: 280, height: 24)
         let alert = NSAlert()
-        alert.messageText = "重命名图像集"
+        alert.messageText = L("Rename Image Set")
         alert.accessoryView = field
-        alert.addButton(withTitle: "更改")
-        alert.addButton(withTitle: "取消")
+        alert.addButton(withTitle: L("Rename"))
+        alert.addButton(withTitle: L("Cancel"))
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         do {
             try library.renameSet(id: set.id, to: field.stringValue)
@@ -194,47 +259,65 @@ final class TypingPetSettingsModel: ObservableObject {
 
     func addRule(stroke: KeyStroke, imageURL: URL) {
         do {
-            if let existing = rules.first(where: { $0.stroke == stroke }),
-               let oldURL = keyStore.imageURL(for: existing) {
-                library.invalidateCache(for: oldURL)
-            }
             try keyStore.setRule(for: stroke, image: imageURL)
             rules = keyStore.rules
         } catch { errorMessage = error.localizedDescription }
     }
 
     func removeRule(_ rule: KeyReactionRule) {
-        if let url = keyStore.imageURL(for: rule) {
-            library.invalidateCache(for: url)
-        }
         do {
             try keyStore.removeRule(id: rule.id)
             rules = keyStore.rules
         } catch { errorMessage = error.localizedDescription }
     }
 
-    func openInputMonitoringSettings() { openInputMonitoringSettingsAction() }
+    func openInputMonitoringSettings() {
+        openInputMonitoringSettingsAction()
+    }
 }
 
 @MainActor
 final class SettingsWindowController: NSWindowController, NSWindowDelegate {
-    init(model: TypingPetSettingsModel) {
-        let root = SettingsRootView(model: model)
-        let window = NSWindow(contentViewController: NSHostingController(rootView: root))
-        window.title = "Typing Pet 设置"
-        window.setContentSize(NSSize(width: 780, height: 600))
-        window.minSize = NSSize(width: 700, height: 540)
+    private var languageSubscription: AnyCancellable?
+
+    init(model: TypingPetSettingsModel, todoStore: TodoStore, updater: UpdateController) {
+        let workspace = SettingsWorkspaceController(model: model, todoStore: todoStore, updater: updater)
+        let window = NSWindow(contentViewController: workspace)
+        window.title = AppEnvironment.displayName + L(" Settings")
+        window.setContentSize(SettingsWindowSizing.contentSize())
+        window.contentMinSize = SettingsWindowSizing.minimumSize()
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
-        window.isReleasedWhenClosed = false
+        window.titleVisibility = .hidden
+        window.titlebarAppearsTransparent = true
+        window.isMovableByWindowBackground = false
+        workspace.installToolbar(on: window)
+        window.appearance = model.appearanceMode.windowAppearance
         window.center()
         super.init(window: window)
         window.delegate = self
+        let applyAppearance = model.onAppearanceChanged
+        model.onAppearanceChanged = { [weak window] mode in
+            applyAppearance?(mode)
+            window?.appearance = mode.windowAppearance
+        }
+        languageSubscription = AppLocalization.shared.$language.sink { [weak window, weak model] _ in
+            // Published values are delivered before storage changes.
+            DispatchQueue.main.async {
+                window?.title = AppEnvironment.displayName + L(" Settings")
+                model?.refresh()
+            }
+        }
         shouldCascadeWindows = false
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
     func show() {
+        if let window {
+            window.contentMinSize = SettingsWindowSizing.minimumSize()
+            let size = window.contentLayoutRect.size
+            window.setContentSize(NSSize(width: max(size.width, window.contentMinSize.width), height: max(size.height, window.contentMinSize.height)))
+        }
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
         window?.makeKeyAndOrderFront(nil)
@@ -245,24 +328,16 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     }
 }
 
-private struct SettingsRootView: View {
-    @ObservedObject var model: TypingPetSettingsModel
+enum SettingsWindowSizing {
+    // Keep the keyboard and grouped sidebar visible together, including at larger text sizes.
+    static func contentSize(fontSize: CGFloat = NSFont.preferredFont(forTextStyle: .body).pointSize) -> NSSize {
+        let scale = max(1, fontSize / 13)
+        return NSSize(width: 1100 * scale, height: 820 * scale)
+    }
 
-    var body: some View {
-        TabView {
-            GeneralSettingsView(model: model)
-                .tabItem { Label("通用", systemImage: "gearshape") }
-            GallerySettingsView(model: model)
-                .tabItem { Label("图库", systemImage: "photo.on.rectangle.angled") }
-            KeyReactionSettingsView(model: model)
-                .tabItem { Label("按键反应", systemImage: "keyboard") }
-        }
-        .padding(SettingsMetrics.space4)
-        .alert("错误", isPresented: Binding(get: { model.errorMessage != nil }, set: { if !$0 { model.errorMessage = nil } })) {
-            Button("好") { model.errorMessage = nil }
-        } message: {
-            Text(model.errorMessage ?? "")
-        }
+    static func minimumSize(fontSize: CGFloat = NSFont.preferredFont(forTextStyle: .body).pointSize) -> NSSize {
+        let size = contentSize(fontSize: fontSize)
+        return NSSize(width: size.width * (900.0 / 1100), height: size.height * (700.0 / 820))
     }
 }
 
@@ -277,6 +352,7 @@ private enum SettingsMetrics {
 }
 
 private struct FlatSettingsSection<Content: View>: View {
+    @ObservedObject private var localization = AppLocalization.shared
     let title: String
     let content: Content
 
@@ -295,6 +371,7 @@ private struct FlatSettingsSection<Content: View>: View {
 }
 
 private struct SettingsRow<Content: View>: View {
+    @ObservedObject private var localization = AppLocalization.shared
     let content: Content
 
     init(@ViewBuilder content: () -> Content) {
@@ -308,6 +385,7 @@ private struct SettingsRow<Content: View>: View {
 }
 
 private struct SettingsSliderRow: View {
+    @ObservedObject private var localization = AppLocalization.shared
     let title: String
     @Binding var value: Double
     let range: ClosedRange<Double>
@@ -327,6 +405,7 @@ private struct SettingsSliderRow: View {
 }
 
 private struct SettingsToggleRow: View {
+    @ObservedObject private var localization = AppLocalization.shared
     let title: String
     @Binding var isOn: Bool
     var isEnabled = true
@@ -345,6 +424,7 @@ private struct SettingsToggleRow: View {
 }
 
 private struct SettingsNote: View {
+    @ObservedObject private var localization = AppLocalization.shared
     let text: String
 
     var body: some View {
@@ -356,75 +436,340 @@ private struct SettingsNote: View {
     }
 }
 
-private struct GeneralSettingsView: View {
+enum GeneralSettingsScope { case all, pet, system }
+
+struct GeneralSettingsView: View {
+    @ObservedObject private var localization = AppLocalization.shared
     @ObservedObject var model: TypingPetSettingsModel
+    @ObservedObject var updater: UpdateController
+    var scope: GeneralSettingsScope = .all
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: SettingsMetrics.space6) {
-                FlatSettingsSection("宠物") {
+                if scope != .system {
+                    FlatSettingsSection(L("Pet")) {
+                        VStack(spacing: 0) {
+                            SettingsSliderRow(
+                                title: L("Size"),
+                                value: Binding(get: { model.scale }, set: model.setScale),
+                                range: 0.35...1.25
+                            )
+                            Divider()
+                            SettingsSliderRow(
+                                title: L("Resting opacity"),
+                                value: Binding(get: { model.restingOpacity }, set: model.setRestingOpacity),
+                                range: 0...1
+                            )
+                            Divider()
+                            SettingsSliderRow(
+                                title: L("Hover opacity"),
+                                value: Binding(get: { model.hoverOpacity }, set: model.setHoverOpacity),
+                                range: 0...1
+                            )
+                            Divider()
+                            SettingsNote(text: L("100% is fully visible. 0% is completely transparent."))
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            Divider()
+                            SettingsRow {
+                                HStack(spacing: SettingsMetrics.space3) {
+                                    Text(L("Bounce strength"))
+                                    Spacer(minLength: SettingsMetrics.space3)
+                                    Picker("", selection: Binding(get: { model.shakeLevel }, set: model.setShakeLevel)) {
+                                        Text(L("Off")).tag(0)
+                                        Text(L("Gentle")).tag(1)
+                                        Text(L("Medium")).tag(2)
+                                        Text(L("Strong")).tag(3)
+                                    }
+                                    .labelsHidden()
+                                    .frame(width: 112)
+                                }
+                            }
+                            Divider()
+                            SettingsToggleRow(
+                                title: L("Always on top"),
+                                isOn: Binding(get: { model.alwaysOnTop }, set: model.setAlwaysOnTop)
+                            )
+                            Divider()
+                            SettingsToggleRow(
+                                title: L("Lock position (click through)"),
+                                isOn: Binding(get: { model.positionLocked }, set: model.setPositionLocked)
+                            )
+                            Divider()
+                            SettingsToggleRow(
+                                title: L("Avoid pointer while locked"),
+                                isOn: Binding(get: { model.avoidsPointerWhenLocked }, set: model.setPointerAvoidance),
+                                isEnabled: model.positionLocked
+                            )
+                            Divider()
+                            SettingsNote(text: L("Your pet smoothly moves aside when the pointer gets close, staying on screen."))
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+
+                }
+                if scope != .pet {
+                    FlatSettingsSection(L("System")) {
+                        VStack(spacing: 0) {
+                            SettingsRow {
+                                HStack(spacing: SettingsMetrics.space3) {
+                                    Text(L("Language"))
+                                    Spacer(minLength: SettingsMetrics.space3)
+                                    Picker(L("Language"), selection: Binding(
+                                        get: { localization.mode },
+                                        set: localization.setMode
+                                    )) {
+                                        Text(L("System")).tag(AppLanguageMode.system)
+                                        Text(L("language.korean")).tag(AppLanguageMode.korean)
+                                        Text(L("language.english")).tag(AppLanguageMode.english)
+                                        Text(L("language.japanese")).tag(AppLanguageMode.japanese)
+                                        Text(L("language.simplifiedChinese")).tag(AppLanguageMode.simplifiedChinese)
+                                        Text(L("language.traditionalChinese")).tag(AppLanguageMode.traditionalChinese)
+                                    }
+                                    .labelsHidden()
+                                    .frame(width: 200)
+                                }
+                            }
+                            Divider()
+                            SettingsRow {
+                                HStack(spacing: SettingsMetrics.space3) {
+                                    Text(L("Appearance"))
+                                    Spacer(minLength: SettingsMetrics.space3)
+                                    Picker(L("Appearance"), selection: Binding(
+                                        get: { model.appearanceMode },
+                                        set: model.setAppearanceMode
+                                    )) {
+                                        Text(L("System")).tag(SettingsAppearanceMode.system)
+                                        Text(L("Light")).tag(SettingsAppearanceMode.light)
+                                        Text(L("Dark")).tag(SettingsAppearanceMode.dark)
+                                    }
+                                    .pickerStyle(.segmented)
+                                    .labelsHidden()
+                                    .frame(width: 252)
+                                }
+                            }
+                            Divider()
+                            SettingsToggleRow(
+                                title: L("Launch at login"),
+                                isOn: Binding(get: { model.launchAtLogin }, set: model.toggleLaunchAtLogin)
+                            )
+                            Divider()
+                            SettingsRow {
+                                VStack(alignment: .leading, spacing: 12) {
+                                    HStack {
+                                        Label(model.inputMonitoringGranted ? L("Input Monitoring allowed") : L("Input Monitoring required"),
+                                              systemImage: model.inputMonitoringGranted ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                                            .foregroundStyle(model.inputMonitoringGranted ? .green : .orange)
+                                        Spacer(minLength: 12)
+                                        Button(L("Check Again")) { model.refreshPermissions(retryConnection: true) }
+                                    }
+                                    HStack {
+                                        Label(model.inputMonitoringConnected ? L("Keyboard monitoring connected") : L("Keyboard monitoring disconnected"),
+                                              systemImage: model.inputMonitoringConnected ? "link" : "link.badge.plus")
+                                            .font(.callout).foregroundStyle(.secondary)
+                                        Spacer(minLength: 12)
+                                        Button(L("Open System Settings")) { model.openInputMonitoringSettings() }
+                                    }
+                                }
+                                .padding(.vertical, 10)
+                            }
+                            Divider()
+                            SettingsNote(text: L("Only physical key codes and modifier keys are used to recognize shortcuts. Typed text is never stored or sent."))
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+
+                    FlatSettingsSection(L("Updates")) {
+                        VStack(spacing: 0) {
+                            SettingsRow {
+                                HStack(spacing: SettingsMetrics.space3) {
+                                    VStack(alignment: .leading, spacing: SettingsMetrics.space1) {
+                                        Text(L("Current version %1$@", updater.currentVersionText))
+                                        Text(updater.statusText)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                            .fixedSize(horizontal: false, vertical: true)
+                                    }
+                                    Spacer(minLength: SettingsMetrics.space3)
+                                    if updater.isBusy { ProgressView().controlSize(.small) }
+                                    Button(updater.menuTitle) { updater.performPrimaryAction() }
+                                        .disabled(updater.isBusy || updater.unavailableReason != nil)
+                                }
+                                .padding(.vertical, SettingsMetrics.space2)
+                            }
+                            Divider()
+                            SettingsToggleRow(
+                                title: L("Check for updates automatically"),
+                                isOn: $updater.automaticChecks,
+                                isEnabled: updater.unavailableReason == nil
+                            )
+                            Divider()
+                            SettingsNote(text: L("Checks pet.miel.ing once a day. Only the app version is sent, and only updates with a verified signature are installed."))
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+                }
+            }
+            .padding(SettingsMetrics.space4)
+        }
+        .onAppear { model.refreshPermissions() }
+        .onReceive(Timer.publish(every: 2, on: .main, in: .common).autoconnect()) { _ in
+            if scope != .pet { model.refreshPermissions() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            if scope != .pet { model.refreshPermissions() }
+        }
+    }
+}
+
+struct TodoSettingsView: View {
+    @ObservedObject private var localization = AppLocalization.shared
+    @ObservedObject var store: TodoStore
+
+    private var enabled: Bool { store.engine.state.featurePreferences.enabled }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: SettingsMetrics.space6) {
+                FlatSettingsSection(L("Todos and Focus Timer")) {
                     VStack(spacing: 0) {
-                        SettingsSliderRow(
-                            title: "尺寸",
-                            value: Binding(get: { model.scale }, set: model.setScale),
-                            range: Double(AppPreferencesDefault.minScale)...Double(AppPreferencesDefault.maxScale)
+                        SettingsToggleRow(
+                            title: L("Enable Todos"),
+                            isOn: Binding(get: { enabled }, set: { value in
+                                store.expanded = true
+                                store.change { $0.setFeature(enabled: value, hidden: false) }
+                            }),
+                            isEnabled: !store.loadBlocked
                         )
                         Divider()
-                        SettingsSliderRow(title: "常驻不透明度", value: Binding(get: { model.restingOpacity }, set: model.setRestingOpacity), range: 0...1)
-                        Divider()
-                        SettingsSliderRow(title: "悬停不透明度", value: Binding(get: { model.hoverOpacity }, set: model.setHoverOpacity), range: 0...1)
-                        Divider()
-                        SettingsNote(text: "100% 为完全不透明，0% 为完全透明。")
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                        SettingsToggleRow(
+                            title: L("Show bubble"),
+                            isOn: Binding(
+                                get: { !store.engine.state.featurePreferences.bubbleHidden },
+                                set: { value in if value { store.show() } else { store.hide() } }
+                            ),
+                            isEnabled: enabled && !store.loadBlocked
+                        )
                         Divider()
                         SettingsRow {
                             HStack(spacing: SettingsMetrics.space3) {
-                                Text("按键弹跳幅度")
+                                Text(L("Detect absence"))
                                 Spacer(minLength: SettingsMetrics.space3)
-                                Picker("", selection: Binding(get: { model.shakeLevel }, set: model.setShakeLevel)) {
-                                    Text("关闭").tag(0)
-                                    Text("轻微").tag(1)
-                                    Text("适中").tag(2)
-                                    Text("强烈").tag(3)
+                                Picker("", selection: Binding(get: { store.idleMinutes }, set: store.setIdleMinutes)) {
+                                    ForEach(TodoStore.idleMinuteChoices, id: \.self) { minutes in
+                                        Text(minutes == 0 ? L("Off") : (minutes < 60 ? L("After %1$@ min", minutes) : L("After %1$@ hr", minutes / 60))).tag(minutes)
+                                    }
                                 }
                                 .labelsHidden()
-                                .frame(width: 112)
+                                .frame(width: 168)
                             }
                         }
+                        .disabled(!enabled || store.loadBlocked)
                         Divider()
-                        SettingsToggleRow(title: "始终置顶显示", isOn: Binding(get: { model.alwaysOnTop }, set: model.setAlwaysOnTop))
-                        Divider()
-                        SettingsToggleRow(title: "锁定位置 (点击穿透)", isOn: Binding(get: { model.positionLocked }, set: model.setPositionLocked))
-                        Divider()
-                        SettingsToggleRow(
-                            title: "位置锁定下避开鼠标",
-                            isOn: Binding(get: { model.avoidsPointerWhenLocked }, set: model.setPointerAvoidance),
-                            isEnabled: model.positionLocked
-                        )
-                        Divider()
-                        SettingsNote(text: "光标靠近时，宠物会在屏幕范围内平滑移动躲避。")
+                        SettingsNote(text: store.idleMinutes == 0
+                            ? L("Hiding the bubble keeps the timer running. Sleep and quitting the app pause it.")
+                            : L("While a timer is running, %1$@ without keyboard or mouse input, locking the screen, or sleep pauses it and excludes time since the last input. On return, choose whether to include that time. Hiding the bubble keeps the timer running.", store.idleMinutes < 60 ? L("%1$@ min", store.idleMinutes) : L("%1$@ hr", store.idleMinutes / 60)))
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
 
-                FlatSettingsSection("系统") {
+                FlatSettingsSection(L("Bubble")) {
                     VStack(spacing: 0) {
-                        SettingsToggleRow(title: "登录时自动启动", isOn: Binding(get: { model.launchAtLogin }, set: model.toggleLaunchAtLogin))
-                        Divider()
                         SettingsRow {
                             HStack(spacing: SettingsMetrics.space3) {
-                                Label(
-                                    model.inputMonitoringGranted ? "已获得输入监控权限" : "需要输入监控权限",
-                                    systemImage: model.inputMonitoringGranted ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"
-                                )
-                                .foregroundStyle(model.inputMonitoringGranted ? .green : .orange)
+                                Text(L("Size"))
+                                    .frame(width: SettingsMetrics.labelWidth, alignment: .leading)
                                 Spacer(minLength: SettingsMetrics.space3)
-                                Button("打开系统设置") { model.openInputMonitoringSettings() }
+                                HStack(spacing: SettingsMetrics.space1) {
+                                    ZoomStepButton(symbol: "minus", label: L("Zoom Out"), enabled: store.canZoomOut) { store.zoomOut() }
+                                    Text("\(store.zoomPercent)%")
+                                        .monospacedDigit()
+                                        .frame(width: 52)
+                                        .accessibilityLabel(L("Bubble size %1$@%", store.zoomPercent))
+                                    ZoomStepButton(symbol: "plus", label: L("Zoom In"), enabled: store.canZoomIn) { store.zoomIn() }
+                                }
+                                Button(L("Reset to 100%")) { store.resetZoom() }
+                                    .disabled(store.zoom == 1)
                             }
                         }
                         Divider()
-                        SettingsNote(text: "按键识别仅使用物理键码和修饰键，不会记录或传输输入的具体字符。")
+                        SettingsNote(text: L("Zoom in steps from 80% to 200%, like a browser. While typing in the bubble, use ⌘+, ⌘−, or ⌘0."))
                             .frame(maxWidth: .infinity, alignment: .leading)
+                        Divider()
+                        SettingsRow {
+                            HStack(spacing: SettingsMetrics.space3) {
+                                Text(L("List view"))
+                                Spacer(minLength: SettingsMetrics.space3)
+                                Picker("", selection: Binding(get: { store.listStyle }, set: store.setListStyle)) {
+                                    Text(L("Full")).tag(TodoListStyle.full)
+                                    Text(L("Compact")).tag(TodoListStyle.compact)
+                                }
+                                .labelsHidden()
+                                .frame(width: 168)
+                            }
+                        }
+                        Divider()
+                        SettingsNote(text: L("Compact view shows up to three Todos on single lines. Check them off directly, or right-click to control timers. To add or edit, hover over the bubble and click ⤢ for the full view."))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Divider()
+                        SettingsRow {
+                            HStack(spacing: SettingsMetrics.space3) {
+                                Text(L("Visibility"))
+                                Spacer(minLength: SettingsMetrics.space3)
+                                Picker("", selection: Binding(get: { store.bubbleVisibility }, set: store.setBubbleVisibility)) {
+                                    Text(L("Always")).tag(TodoBubbleVisibility.always)
+                                    Text(L("On hover")).tag(TodoBubbleVisibility.hover)
+                                }
+                                .labelsHidden()
+                                .frame(width: 168)
+                            }
+                        }
+                        Divider()
+                        SettingsSliderRow(
+                            title: L("Resting opacity"),
+                            value: Binding(get: { store.bubbleRestingOpacity }, set: store.setBubbleRestingOpacity),
+                            range: 0...1
+                        )
+                        .disabled(store.bubbleVisibility == .hover)
+                        Divider()
+                        SettingsSliderRow(
+                            title: L("Hover opacity"),
+                            value: Binding(get: { store.bubbleHoverOpacity }, set: store.setBubbleHoverOpacity),
+                            range: 0...1
+                        )
+                        Divider()
+                        SettingsNote(text: store.bubbleVisibility == .always
+                            ? L("100% is fully visible. 0% is completely transparent. Hovering over the pet or bubble uses the hover opacity. While editing or when a timer finishes, the bubble stays fully visible.")
+                            : L("Hover over the pet to reveal the bubble at its hover opacity. It stays visible while the pointer is over it. While editing or when a timer finishes, it stays fully visible."))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+
+                FlatSettingsSection(L("Records")) {
+                    VStack(spacing: 0) {
+                        SettingsRow {
+                            HStack(spacing: SettingsMetrics.space3) {
+                                Text(L("Record file"))
+                                Spacer(minLength: SettingsMetrics.space3)
+                                Button(L("Show Record Data")) { NSWorkspace.shared.activateFileViewerSelecting([store.storage.url]) }
+                            }
+                        }
+                        Divider()
+                        Text(store.storage.url.path)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.vertical, SettingsMetrics.space2)
+                        SettingsNote(text: L("Todo titles, completion dates, timer preferences, and measured focus time are stored in a JSON file on this Mac."))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        if let error = store.errorMessage {
+                            Text(error)
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                                .textSelection(.enabled)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
                     }
                 }
             }
@@ -433,195 +778,22 @@ private struct GeneralSettingsView: View {
     }
 }
 
-private struct GallerySettingsView: View {
-    @ObservedObject var model: TypingPetSettingsModel
-    private let columns = [GridItem(.adaptive(minimum: 152, maximum: 192), spacing: SettingsMetrics.space4)]
+// Both steps share one frame, so the minus and plus buttons render at the same size.
+private struct ZoomStepButton: View {
+    @ObservedObject private var localization = AppLocalization.shared
+    let symbol: String
+    let label: String
+    let enabled: Bool
+    let action: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: SettingsMetrics.space4) {
-            HStack(spacing: SettingsMetrics.space3) {
-                Text("图像集").font(.title2).bold()
-                Spacer()
-                Button { model.importImageSet() } label: { Label("添加文件夹", systemImage: "plus") }
-            }
-            ScrollView {
-                LazyVGrid(columns: columns, spacing: SettingsMetrics.space4) {
-                    ForEach(model.imageSets) { set in
-                        GalleryCard(set: set, image: model.thumbnail(for: set), active: set.id == model.activeSetID, selected: set.id == model.selectedSetID)
-                            .onTapGesture { model.selectedSetID = set.id }
-                    }
-                }
-                .padding(SettingsMetrics.space1)
-            }
-            Divider()
-            HStack(spacing: SettingsMetrics.space2) {
-                if let set = model.selectedSet {
-                    Text("\(set.name) · 反应图像 \(set.reactionFileNames.count) 张")
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-                Button("重命名") { model.renameSelectedSet() }.disabled(model.selectedSet?.isBuiltIn != false)
-                Button("移除") { model.deleteSelectedSet() }.disabled(model.selectedSet?.isBuiltIn != false)
-                Button("应用") { model.activateSelectedSet() }.buttonStyle(.borderedProminent).disabled(model.selectedSetID == model.activeSetID)
-            }
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 11, weight: .semibold))
+                .frame(width: 16, height: 16)
         }
-        .padding(SettingsMetrics.space4)
-    }
-}
-
-private struct GalleryCard: View {
-    let set: PetImageSet
-    let image: NSImage?
-    let active: Bool
-    let selected: Bool
-
-    var body: some View {
-        VStack(spacing: SettingsMetrics.space2) {
-            ZStack(alignment: .topTrailing) {
-                RoundedRectangle(cornerRadius: SettingsMetrics.space2)
-                    .fill(Color(nsColor: .controlBackgroundColor))
-                    .frame(height: 112)
-                if let image {
-                    Image(nsImage: image)
-                        .resizable()
-                        .scaledToFit()
-                        .padding(SettingsMetrics.space3)
-                        .frame(maxWidth: .infinity, maxHeight: 112)
-                }
-                if active {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
-                        .padding(SettingsMetrics.space2)
-                }
-            }
-            Text(set.name).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .padding(SettingsMetrics.space3)
-        .background(RoundedRectangle(cornerRadius: SettingsMetrics.space3).fill(selected ? Color.accentColor.opacity(0.13) : .clear))
-        .overlay(RoundedRectangle(cornerRadius: SettingsMetrics.space3).stroke(selected ? Color.accentColor : Color.secondary.opacity(0.2), lineWidth: selected ? 2 : 1))
-    }
-}
-
-private struct KeyReactionSettingsView: View {
-    @ObservedObject var model: TypingPetSettingsModel
-    @State private var pendingImageURL: URL?
-    @State private var isCapturing = false
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: SettingsMetrics.space4) {
-            HStack(spacing: SettingsMetrics.space3) {
-                VStack(alignment: .leading, spacing: SettingsMetrics.space1) {
-                    Text("特定按键反应").font(.title2).bold()
-                    Text("已添加的按键或按键组合将优先显示指定的图像。").foregroundStyle(.secondary)
-                }
-                Spacer()
-                Button { chooseImage() } label: { Label("添加规则", systemImage: "plus") }
-            }
-            if model.rules.isEmpty {
-                VStack(spacing: SettingsMetrics.space2) {
-                    Image(systemName: "keyboard").font(.system(size: 40)).foregroundStyle(.secondary)
-                    Text("暂无按键反应规则").font(.headline)
-                    Text("点击“添加规则”以绑定图像与按键组合。").foregroundStyle(.secondary)
-                }.frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                List(model.rules) { rule in
-                    HStack(spacing: SettingsMetrics.space3) {
-                        Group {
-                            if let image = model.ruleImage(for: rule) { Image(nsImage: image).resizable().scaledToFit() }
-                            else { Image(systemName: "photo") }
-                        }.frame(width: 46, height: 46)
-                        Text(rule.stroke.displayName).font(.system(size: 16, weight: .semibold, design: .rounded))
-                        Spacer()
-                        Button(role: .destructive) { model.removeRule(rule) } label: { Image(systemName: "trash") }
-                            .buttonStyle(.borderless)
-                    }
-                    .padding(.vertical, SettingsMetrics.space2)
-                    .listRowInsets(EdgeInsets(top: 0, leading: SettingsMetrics.space1, bottom: 0, trailing: SettingsMetrics.space1))
-                }
-                .listStyle(.plain)
-            }
-        }
-        .padding(SettingsMetrics.space4)
-        .sheet(isPresented: $isCapturing) {
-            KeyCaptureSheet { stroke in
-                if let url = pendingImageURL { model.addRule(stroke: stroke, imageURL: url) }
-                pendingImageURL = nil
-                isCapturing = false
-            } onCancel: {
-                pendingImageURL = nil
-                isCapturing = false
-            }
-        }
-    }
-
-    private func chooseImage() {
-        let panel = NSOpenPanel()
-        panel.title = "选择按键反应图像"
-        panel.canChooseDirectories = false
-        panel.canChooseFiles = true
-        panel.allowedContentTypes = [.image]
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        pendingImageURL = url
-        isCapturing = true
-    }
-}
-
-private struct KeyCaptureSheet: View {
-    let onCapture: (KeyStroke) -> Void
-    let onCancel: () -> Void
-    @State private var captured: KeyStroke?
-
-    var body: some View {
-        ZStack {
-            KeyCaptureView { captured = $0 }
-            VStack(spacing: 20) {
-                Image(systemName: "keyboard.badge.ellipsis").font(.system(size: 42)).foregroundStyle(.tint)
-                Text("请按下要绑定的按键或按键组合").font(.title3).bold()
-                Text(captured?.displayName ?? "例如: K, ⌘K, ⌃⌥Space")
-                    .font(.system(size: 22, weight: .semibold, design: .rounded)).frame(minHeight: 32)
-                HStack {
-                    Button("取消", action: onCancel)
-                    Button("确定") { if let captured { onCapture(captured) } }
-                        .buttonStyle(.borderedProminent).disabled(captured == nil)
-                }
-            }
-            .padding(32)
-        }
-        .frame(width: 420, height: 260)
-    }
-}
-
-private struct KeyCaptureView: NSViewRepresentable {
-    let onCapture: (KeyStroke) -> Void
-
-    func makeNSView(context: Context) -> CaptureNSView {
-        let view = CaptureNSView()
-        view.onCapture = onCapture
-        return view
-    }
-
-    func updateNSView(_ nsView: CaptureNSView, context: Context) { nsView.onCapture = onCapture }
-
-    final class CaptureNSView: NSView {
-        var onCapture: ((KeyStroke) -> Void)?
-        override var acceptsFirstResponder: Bool { true }
-
-        override func viewDidMoveToWindow() {
-            super.viewDidMoveToWindow()
-            DispatchQueue.main.async { [weak self] in
-                guard let self else { return }
-                self.window?.makeFirstResponder(self)
-            }
-        }
-
-        override func mouseDown(with event: NSEvent) {
-            window?.makeFirstResponder(self)
-        }
-
-        override func keyDown(with event: NSEvent) {
-            let flags = event.cgEvent?.flags ?? CGEventFlags(rawValue: UInt64(event.modifierFlags.rawValue))
-            let modifiers = KeyModifiers(eventFlags: flags)
-            onCapture?(KeyStroke(keyCode: event.keyCode, modifiers: modifiers))
-        }
+        .disabled(!enabled)
+        .help(label)
+        .accessibilityLabel(label)
     }
 }

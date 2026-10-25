@@ -8,6 +8,16 @@ import ServiceManagement
 internal final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let imageLibrary = PetImageLibrary()
     private let keyReactionStore = KeyReactionStore()
+    private lazy var packStore = PetPackStore(library: imageLibrary, keyStore: keyReactionStore)
+    private let todoStore: TodoStore = {
+        #if DEBUG
+        if let path = ProcessInfo.processInfo.environment["TYPINGPET_TODO_TEST_PATH"] {
+            return TodoStore(url: URL(fileURLWithPath: path))
+        }
+        #endif
+        return TodoStore()
+    }()
+    private var todoBubble: TodoBubbleWindowController?
     private var statusItem: NSStatusItem!
     private var petController: PetController!
     private var keyMonitor: GlobalKeyMonitor!
@@ -16,32 +26,66 @@ internal final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegat
     private var positionLockedItem: NSMenuItem!
     private var loginItem: NSMenuItem!
     private var monitoringStatusItem: NSMenuItem!
+    private var updateItem: NSMenuItem!
+    private let updater = UpdateController()
     private var permissionRetryTimer: Timer?
-    private var didShowPermissionAlert = false
+    private static let inputMonitoringWelcomeShownKey = "inputMonitoringWelcomeShown-v1"
+    private static let inputMonitoringSetupPendingKey = "inputMonitoringSetupPending-v1"
     private var settingsWindowController: SettingsWindowController?
     private var settingsModel: TypingPetSettingsModel?
     private var inputMonitoringGuideController: InputMonitoringGuideController?
 
-    override init() {
-        super.init()
-    }
-
     func applicationDidFinishLaunching(_ notification: Notification) {
+        TextEditingShortcuts.installEditMenu(appName: AppEnvironment.displayName)
+        BackgroundCursor.enable()
         petController = PetController(
             library: imageLibrary,
-            keyStore: keyReactionStore,
-            onScaleChanged: { [weak self] scale in self?.settingsModel?.syncScale(scale) }
+            packStore: packStore,
+            onScaleChanged: { [weak self] scale in self?.settingsModel?.syncScale(scale) },
+            onOpenSettings: { [weak self] in self?.showSettings() }
         )
+        todoBubble = TodoBubbleWindowController(store: todoStore, pet: petController.todoAnchorWindow)
+        petController.shouldHoldPosition = { [weak self] in self?.todoBubble?.isInteracting == true }
+        petController.onPresentationChanged = { [weak self] in self?.todoBubble?.synchronize() }
         configureStatusItem()
 
-        // 事件源挂在主 RunLoop 上（见 GlobalKeyMonitor.start），回调已在主线程执行。
+        updater.isTimerRunning = { [weak self] in self?.todoStore.engine.activeSession?.status == .running }
+        updater.onChange = { [weak self] in self?.updateUpdateItem() }
+        updater.start()
+
         keyMonitor = GlobalKeyMonitor { [weak self] stroke in
-            MainActor.assumeIsolated {
+            DispatchQueue.main.async {
                 self?.petController.handleKeystroke(stroke)
+                self?.inputMonitoringGuideController?.receivedGlobalKeystroke()
             }
         }
 
-        startMonitoringOrRequestPermission(shouldShowAlert: true)
+        let shouldShowWelcome = !AppEnvironment.isDevelopment
+            && !AppEnvironment.defaults.bool(forKey: Self.inputMonitoringWelcomeShownKey)
+        let shouldResumeSetup = !AppEnvironment.isDevelopment
+            && AppEnvironment.defaults.bool(forKey: Self.inputMonitoringSetupPendingKey)
+
+        #if DEBUG
+        if !ProcessInfo.processInfo.arguments.contains("--todo-preview"),
+           !ProcessInfo.processInfo.arguments.contains("--input-guide-preview") {
+            startMonitoring(showGuideIfNeeded: shouldShowWelcome)
+            if shouldResumeSetup { showInputMonitoringGuide() }
+        }
+        if ProcessInfo.processInfo.arguments.contains("--show-todos") { showTodos() }
+        if ProcessInfo.processInfo.arguments.contains("--install-update-now") { updater.installNowForChecks() }
+        if ProcessInfo.processInfo.arguments.contains("--show-input-guide") { showInputMonitoringGuide() }
+        if let index = ProcessInfo.processInfo.arguments.firstIndex(of: "--input-guide-preview"),
+           ProcessInfo.processInfo.arguments.indices.contains(index + 1),
+           let phase = InputMonitoringGuideModel.Phase(rawValue: ProcessInfo.processInfo.arguments[index + 1]) {
+            inputMonitoringGuideController = .preview(
+                phase: phase, idleURL: packStore.idleURL, reactionURLs: imageLibrary.reactionURLs
+            )
+            inputMonitoringGuideController?.show()
+        }
+        #else
+        startMonitoring(showGuideIfNeeded: shouldShowWelcome)
+        if shouldResumeSetup { showInputMonitoringGuide() }
+        #endif
 
         NSWorkspace.shared.notificationCenter.addObserver(
             self,
@@ -61,11 +105,30 @@ internal final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegat
         }
     }
 
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        todoStore.pauseForSleepOrTermination()
+        guard let error = todoStore.errorMessage, !todoStore.loadBlocked else { return .terminateNow }
+        let alert = NSAlert()
+        alert.messageText = L("Could not save Todo records")
+        alert.informativeText = error
+        alert.addButton(withTitle: L("Save Again"))
+        alert.addButton(withTitle: L("Cancel"))
+        alert.addButton(withTitle: L("Quit Without Saving"))
+        switch alert.runModal() {
+        case .alertFirstButtonReturn:
+            todoStore.persist()
+            return todoStore.errorMessage == nil ? .terminateNow : .terminateCancel
+        case .alertThirdButtonReturn: return .terminateNow
+        default: return .terminateCancel
+        }
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
         NSWorkspace.shared.notificationCenter.removeObserver(self)
         NotificationCenter.default.removeObserver(self)
         permissionRetryTimer?.invalidate()
         keyMonitor.stop()
+        updater.applicationWillTerminate()
     }
 
     func applicationDidBecomeActive(_ notification: Notification) {
@@ -84,10 +147,11 @@ internal final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegat
     }
 
     func menuWillOpen(_ menu: NSMenu) {
-        petVisibilityItem.title = petController.isPetVisible ? "隐藏宠物" : "重新显示宠物"
+        petVisibilityItem.title = petController.isPetVisible ? L("Hide Pet") : L("Show Pet Again")
         positionLockedItem.state = petController.isPositionLocked ? .on : .off
         loginItem.state = SMAppService.mainApp.status == .enabled ? .on : .off
         updateMonitoringStatusItem()
+        updateUpdateItem()
     }
 
     @objc private func togglePetVisibility() {
@@ -101,11 +165,15 @@ internal final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegat
 
     @objc private func resetPosition() {
         petController.resetPosition()
-        settingsModel?.refresh()
     }
 
     @objc private func handleScreenParametersChanged() {
         petController.clampToVisibleScreen()
+    }
+
+    @objc private func showTodos() {
+        petController.showPet()
+        todoBubble?.show()
     }
 
     @objc private func showSettings() {
@@ -113,6 +181,7 @@ internal final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegat
             settingsModel = TypingPetSettingsModel(
                 library: imageLibrary,
                 keyStore: keyReactionStore,
+                packStore: packStore,
                 scale: petController.scale,
                 restingOpacity: petController.restingOpacity,
                 hoverOpacity: petController.hoverOpacity,
@@ -126,27 +195,45 @@ internal final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegat
                 applyShake: { [weak self] in self?.petController.shakeLevel = $0 },
                 applyAlwaysOnTop: { [weak self] in self?.petController.isAlwaysOnTop = $0 },
                 applyPositionLock: { [weak self] in self?.petController.isPositionLocked = $0 },
-                currentPositionLock: { [weak self] in self?.petController.isPositionLocked ?? AppPreferencesDefault.positionLocked },
                 applyPointerAvoidance: { [weak self] in self?.petController.avoidsPointerWhenLocked = $0 },
                 reloadPet: { [weak self] in self?.petController.reloadImages() },
-                openInputMonitoringSettings: { [weak self] in self?.openInputMonitoringSettings() }
+                openInputMonitoringSettings: { [weak self] in self?.openInputMonitoringSettings() },
+                monitoringIsRunning: { [weak self] in self?.keyMonitor?.isRunning == true },
+                retryMonitoring: { [weak self] in _ = self?.connectMonitoring(restart: true) }
             )
         }
         settingsModel?.refresh()
         if settingsWindowController == nil, let settingsModel {
-            settingsWindowController = SettingsWindowController(model: settingsModel)
+            settingsWindowController = SettingsWindowController(model: settingsModel, todoStore: todoStore, updater: updater)
         }
         settingsWindowController?.show()
     }
 
     @objc private func openInputMonitoringSettings() {
-        InputMonitoringSettings.open()
-        guard !CGPreflightListenEventAccess() else { return }
+        if CGPreflightListenEventAccess(), keyMonitor.isRunning {
+            InputMonitoringSettings.open()
+        } else {
+            showInputMonitoringGuide()
+        }
+    }
 
+    private func showInputMonitoringGuide() {
+        AppEnvironment.defaults.set(true, forKey: Self.inputMonitoringWelcomeShownKey)
         if inputMonitoringGuideController == nil {
-            inputMonitoringGuideController = InputMonitoringGuideController { [weak self] in
-                self?.retryMonitoringIfAuthorized()
+            inputMonitoringGuideController = InputMonitoringGuideController(
+                idleURL: packStore.idleURL,
+                reactionURLs: imageLibrary.reactionURLs,
+                resumeSetup: AppEnvironment.defaults.bool(forKey: Self.inputMonitoringSetupPendingKey),
+                onSetupStarted: {
+                    AppEnvironment.defaults.set(true, forKey: Self.inputMonitoringSetupPendingKey)
+                },
+                onDismiss: {
+                    AppEnvironment.defaults.set(false, forKey: Self.inputMonitoringSetupPendingKey)
+                }
+            ) { [weak self] restart in
+                let connected = self?.connectMonitoring(restart: restart) ?? false
                 self?.settingsModel?.refresh()
+                return connected
             }
         }
         inputMonitoringGuideController?.show()
@@ -161,11 +248,15 @@ internal final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegat
             }
         } catch {
             showAlert(
-                title: "设置自动启动失败",
+                title: L("Could not change launch at login"),
                 message: error.localizedDescription,
-                primaryButton: "好"
+                primaryButton: L("OK")
             )
         }
+    }
+
+    @objc private func performUpdateAction() {
+        updater.performPrimaryAction()
     }
 
     @objc private func quit() {
@@ -173,42 +264,51 @@ internal final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegat
     }
 
     private func configureStatusItem() {
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        statusItem = NSStatusBar.system.statusItem(withLength: AppEnvironment.isDevelopment ? NSStatusItem.variableLength : NSStatusItem.squareLength)
         if let button = statusItem.button {
-            let image = NSImage(systemSymbolName: "pawprint.fill", accessibilityDescription: "Typing Pet")
+            let image = NSImage(systemSymbolName: AppEnvironment.isDevelopment ? "flask.fill" : "pawprint.fill", accessibilityDescription: AppEnvironment.displayName)
             image?.isTemplate = true
             button.image = image
+            button.toolTip = AppEnvironment.displayName
+            if AppEnvironment.isDevelopment {
+                button.title = " DEV"
+                button.imagePosition = .imageLeading
+            }
         }
 
         menu = NSMenu()
         menu.delegate = self
         menu.autoenablesItems = false
 
-        menu.addItem(makeMenuItem("设置", action: #selector(showSettings), keyEquivalent: ","))
-        petVisibilityItem = makeMenuItem("隐藏宠物", action: #selector(togglePetVisibility))
+        menu.addItem(makeMenuItem(L("Show Todos"), action: #selector(showTodos)))
+        menu.addItem(makeMenuItem(L("Settings"), action: #selector(showSettings), keyEquivalent: ","))
+        petVisibilityItem = makeMenuItem(L("Hide Pet"), action: #selector(togglePetVisibility))
         menu.addItem(petVisibilityItem)
         menu.addItem(.separator())
 
-        positionLockedItem = makeMenuItem("锁定位置 (点击穿透)", action: #selector(togglePositionLock))
+        positionLockedItem = makeMenuItem(L("Lock position (click through)"), action: #selector(togglePositionLock))
         menu.addItem(positionLockedItem)
-        menu.addItem(makeMenuItem("重置位置", action: #selector(resetPosition)))
+        menu.addItem(makeMenuItem(L("Reset Position"), action: #selector(resetPosition)))
         menu.addItem(.separator())
-        monitoringStatusItem = NSMenuItem(title: "按键监听 (检测中)", action: nil, keyEquivalent: "")
+        monitoringStatusItem = NSMenuItem(title: L("Key detection (checking)"), action: nil, keyEquivalent: "")
         monitoringStatusItem.isEnabled = true
         menu.addItem(monitoringStatusItem)
         updateMonitoringStatusItem()
-        menu.addItem(makeMenuItem("输入监控设置", action: #selector(openInputMonitoringSettings)))
+        menu.addItem(makeMenuItem(L("Input Monitoring Settings"), action: #selector(openInputMonitoringSettings)))
         menu.addItem(.separator())
 
-        loginItem = makeMenuItem("登录时自动启动", action: #selector(toggleLaunchAtLogin))
+        loginItem = makeMenuItem(L("Launch at login"), action: #selector(toggleLaunchAtLogin))
         menu.addItem(loginItem)
-        menu.addItem(makeMenuItem("退出 Typing Pet", action: #selector(quit), keyEquivalent: "q"))
+        updateItem = makeMenuItem(L("Check for Updates…"), action: #selector(performUpdateAction))
+        menu.addItem(updateItem)
+        updateUpdateItem()
+        menu.addItem(makeMenuItem(L("Quit %1$@", AppEnvironment.displayName), action: #selector(quit), keyEquivalent: "q"))
         statusItem.menu = menu
     }
 
     private func updateMonitoringStatusItem() {
         let isAvailable = keyMonitor?.isRunning == true
-        let title = isAvailable ? "按键监听 (正常)" : "按键监听 (未授权/异常)"
+        let title = isAvailable ? L("Key detection (available)") : L("Key detection (unavailable)")
         monitoringStatusItem.attributedTitle = NSAttributedString(
             string: title,
             attributes: [
@@ -216,6 +316,12 @@ internal final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegat
                 .foregroundColor: isAvailable ? NSColor.systemGreen : NSColor.systemRed
             ]
         )
+    }
+
+    private func updateUpdateItem() {
+        guard let updateItem else { return }
+        updateItem.title = updater.menuTitle
+        updateItem.isEnabled = !updater.isBusy
     }
 
     private func makeMenuItem(
@@ -228,52 +334,44 @@ internal final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegat
         return item
     }
 
-    private func startMonitoringOrRequestPermission(shouldShowAlert: Bool) {
-        if CGPreflightListenEventAccess(), keyMonitor.start() {
-            permissionRetryTimer?.invalidate()
-            permissionRetryTimer = nil
-            return
-        }
-
-        startPermissionRetryTimerIfNeeded()
-        guard shouldShowAlert, !didShowPermissionAlert else { return }
-        didShowPermissionAlert = true
-        _ = CGRequestListenEventAccess()
-        showAlert(
-            title: "需要输入监控权限",
-            message: "Typing Pet 不会读取或保存您的输入内容，仅检测是否有按键按下。在系统设置中允许 Typing Pet 的输入监控权限后，应用将自动恢复连接。",
-            primaryButton: "打开系统设置",
-            secondaryButton: "稍后"
-        ) { [weak self] response in
-            if response == .alertFirstButtonReturn {
-                self?.openInputMonitoringSettings()
-            }
-        }
+    private func startMonitoring(showGuideIfNeeded: Bool) {
+        if connectMonitoring() { return }
+        schedulePermissionRetry()
+        if showGuideIfNeeded { showInputMonitoringGuide() }
     }
 
-    private func startPermissionRetryTimerIfNeeded() {
+    @discardableResult
+    private func connectMonitoring(restart: Bool = false) -> Bool {
+        guard CGPreflightListenEventAccess() else { return false }
+        if restart { keyMonitor.stop() }
+        let connected = keyMonitor.isRunning || keyMonitor.start()
+        if connected {
+            permissionRetryTimer?.invalidate()
+            permissionRetryTimer = nil
+        } else {
+            schedulePermissionRetry()
+        }
+        updateMonitoringStatusItem()
+        return connected
+    }
+
+    private func schedulePermissionRetry() {
         guard permissionRetryTimer == nil else { return }
-        let timer = Timer.scheduledTimer(
+        permissionRetryTimer = Timer.scheduledTimer(
             timeInterval: 1,
             target: self,
             selector: #selector(retryMonitoringIfAuthorized),
             userInfo: nil,
             repeats: true
         )
-        timer.tolerance = 0.5
-        permissionRetryTimer = timer
-    }
-
-    private func schedulePermissionRetry() {
-        startPermissionRetryTimerIfNeeded()
     }
 
     @objc private func retryMonitoringIfAuthorized() {
-        guard !keyMonitor.isRunning, CGPreflightListenEventAccess() else { return }
-        if keyMonitor.start() {
-            permissionRetryTimer?.invalidate()
-            permissionRetryTimer = nil
-        }
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--todo-preview")
+            || ProcessInfo.processInfo.arguments.contains("--input-guide-preview") { return }
+        #endif
+        connectMonitoring()
     }
 
     private func showAlert(

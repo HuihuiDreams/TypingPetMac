@@ -1,0 +1,203 @@
+[
+  {
+    "version": "0.18.0",
+    "date": "2026-10-25",
+    "ko": {
+      "title": "네이티브 세트 관리와 키보드 매핑",
+      "items": [
+        "크기를 조절할 수 있는 네이티브 사이드바와 세트별 이미지 프리셋·키보드 매핑 화면으로 설정을 개편했습니다.",
+        "이름을 입력해 빈 세트를 만들고 기존 세트를 독립적으로 복제할 수 있습니다. 변경 사항은 바로 저장되며, 기본 프리셋은 복제해서 수정할 수 있습니다.",
+        "키와 보조키 조합에 여러 프리셋을 지정하고 랜덤 또는 순서대로 표시할 수 있습니다. 입력 중일 때와 쉬고 있을 때도 각각 설정할 수 있습니다.",
+        "프리셋을 고르는 동안 열린 상태를 유지하는 팝오버를 해당 키에 연결하고, 보조키 체크박스와 스페이스·엔터 빠른 설정을 추가했습니다.",
+        "키보드를 가운데 정렬하고 일반 키는 정사각형으로, 방향키는 ㅗ 모양으로 표시합니다. 좁은 창에서는 가로 스크롤로 비율을 유지합니다.",
+        "일반 설정에서 입력 모니터링 권한과 연결 상태를 확인할 수 있습니다."
+      ]
+    },
+    "en": {
+      "title": "Native set management and keyboard mapping",
+      "items": [
+        "Redesigned Settings with a native, resizable sidebar and one page for each set’s image presets and keyboard mappings.",
+        "Create empty named sets and independent duplicates. Edits save automatically; duplicate the built-in set to customize its fixed presets.",
+        "Assign multiple presets to keys and modifier combinations with random or sequential playback, plus separate typing and resting selections.",
+        "Preset popovers stay open while editing and point to the selected key. Added modifier checkboxes and Space/Enter shortcuts.",
+        "Centered the keyboard with square character keys and inverted-T arrows. Horizontal scrolling preserves its proportions in narrow windows.",
+        "General settings now shows Input Monitoring authorization and connection status."
+      ]
+    },
+    "ja": {
+      "title": "ネイティブのセット管理とキーボード割り当て",
+      "items": [
+        "幅を調整できるネイティブのサイドバーを採用し、各セットの画像プリセットとキー割り当てを1つのページにまとめました。",
+        "名前を付けた空のセットの作成や、画像を独立してコピーする複製に対応しました。変更は自動保存されます。標準プリセットはセットを複製して編集できます。",
+        "キーや修飾キーの組み合わせに複数のプリセットを割り当て、ランダムまたは順番に表示できます。入力中と休止中の画像も個別に設定できます。",
+        "プリセットを選んでも閉じないポップオーバーを選択したキーに接続しました。修飾キーのチェックボックスとスペース・Enterのクイック設定を追加しました。",
+        "キーボードを中央に配置し、通常キーを正方形、矢印キーを逆T字型にしました。狭いウインドウでは横スクロールで比率を保ちます。",
+        "一般設定で入力監視の許可状況と接続状態を確認できます。"
+      ]
+    },
+    "zh-Hans": {
+      "title": "原生套组管理与键盘映射",
+      "items": [
+        "设置改用可调整宽度的原生侧边栏，每个套组的图片预设和键盘映射集中在同一页面。",
+        "输入名称即可创建空套组，也可复制现有套组并独立保存图片。更改自动保存；内置预设可在复制套组后修改。",
+        "可为按键及修饰键组合分配多个预设，随机或按顺序显示，并分别设置输入时和休息时的图片。",
+        "选择预设时弹出面板保持打开，并指向对应按键。新增修饰键复选框及空格、回车快捷设置。",
+        "键盘居中显示，普通按键为正方形，方向键呈倒T形。窄窗口通过横向滚动保持比例。",
+        "通用设置中可查看输入监控权限及连接状态。"
+      ]
+    },
+    "zh-Hant": {
+      "title": "原生套組管理與鍵盤對應",
+      "items": [
+        "設定改用可調整寬度的原生側邊欄，每個套組的圖片預設和鍵盤對應集中在同一頁面。",
+        "輸入名稱即可建立空套組，也可複製現有套組並獨立保存圖片。變更自動儲存；內建預設可在複製套組後修改。",
+        "可為按鍵及修飾鍵組合指定多個預設，隨機或依序顯示，並分別設定輸入時和休息時的圖片。",
+        "選擇預設時彈出面板保持開啟，並指向對應按鍵。新增修飾鍵核取方塊及空白鍵、Enter快速設定。",
+        "鍵盤置中顯示，一般按鍵為正方形，方向鍵呈倒T形。窄視窗透過橫向捲動保持比例。",
+        "一般設定中可查看輸入監控權限及連線狀態。"
+      ]
+    }
+  },
+  {
+    "version": "0.17.1",
+    "date": "2026-10-24",
+    "ko": {
+      "title": "문구와 용어 정리",
+      "items": [
+        "앱과 홈페이지의 한국어·영어·일본어·중국어 간체·번체 문구를 다듬었습니다.",
+        "목록 보기와 반응 이미지의 용어를 통일하고, 불투명도 설정과 긴 안내 문구를 더 쉽게 읽을 수 있도록 정리했습니다.",
+        "일시정지 버튼과 상태 표시를 구분하고, 타이머를 끝내는 버튼 이름을 맞췄습니다."
+      ]
+    },
+    "en": {
+      "title": "Clearer copy and consistent terms",
+      "items": [
+        "Revised app and website copy in Korean, English, Japanese, Simplified Chinese, and Traditional Chinese.",
+        "Standardized names for Todo views and reaction images, clarified opacity settings, and split long descriptions.",
+        "Separated the Pause action from the Paused status and standardized timer-ending labels."
+      ]
+    },
+    "ja": {
+      "title": "文言と用語の見直し",
+      "items": [
+        "アプリとWebサイトの韓国語・英語・日本語・簡体字中国語・繁体字中国語の文言を見直しました。",
+        "リスト表示と反応画像の用語を統一し、不透明度設定や長い説明を読みやすくしました。",
+        "一時停止の操作と状態表示を区別し、タイマーを終了するボタンの表記を統一しました。"
+      ]
+    },
+    "zh-Hans": {
+      "title": "优化文案和术语",
+      "items": [
+        "修改了应用和网站的韩语、英语、日语、简体中文和繁体中文文案。",
+        "统一了列表视图和反应图片的术语，说明了不透明度设置，并拆分了较长的说明。",
+        "区分暂停操作与暂停状态，统一了结束计时按钮的名称。"
+      ]
+    },
+    "zh-Hant": {
+      "title": "調整文案與用語",
+      "items": [
+        "修改了 App 和網站的韓文、英文、日文、簡體中文與繁體中文文案。",
+        "統一了清單顯示和反應圖片的用語，說明不透明度設定，並拆分較長的說明。",
+        "區分暫停操作與暫停狀態，統一結束計時按鈕的名稱。"
+      ]
+    }
+  },
+  {
+    "version": "0.17.0",
+    "date": "2026-10-24",
+    "ko": {
+      "title": "일본어·중국어 지원",
+      "items": [
+        "앱과 홈페이지에 일본어·중국어 간체·번체를 추가했습니다.",
+        "시스템 언어의 중국어 문자 체계와 지역을 감지하고, 설정에서 원하는 언어를 직접 선택할 수 있습니다.",
+        "홈페이지의 설치 안내·FAQ·패치 노트·검색 및 공유 메타데이터도 다섯 언어로 제공합니다.",
+        "홈페이지 언어를 바꿔도 현재 페이지를 유지하며, 선택한 언어를 다음 방문에 기억합니다."
+      ]
+    },
+    "en": {
+      "title": "Japanese and Chinese support",
+      "items": [
+        "Added Japanese, Simplified Chinese, and Traditional Chinese to the app and website.",
+        "System language detection recognizes Chinese scripts and regions; choose any supported language in Settings.",
+        "Installation guides, FAQs, release notes, and search and social metadata are available in all five languages.",
+        "Switch website languages without leaving the current page, and keep your choice for the next visit."
+      ]
+    },
+    "ja": {
+      "title": "日本語・中国語に対応",
+      "items": [
+        "アプリとWebサイトに日本語・簡体字中国語・繁体字中国語を追加しました。",
+        "システム言語の中国語の文字体系と地域を判別します。設定から好きな言語を直接選ぶこともできます。",
+        "インストールガイド、FAQ、更新履歴、検索・共有用メタデータを5言語で用意しました。",
+        "Webサイトで言語を切り替えても現在のページを維持し、次回の訪問時にも選択を記憶します。"
+      ]
+    },
+    "zh-Hans": {
+      "title": "新增日语和中文",
+      "items": [
+        "应用和网站新增日语、简体中文及繁体中文。",
+        "系统语言检测可识别中文的文字体系和地区，也可在设置中直接选择支持的语言。",
+        "安装指南、常见问题、更新日志及搜索和分享元数据均提供五种语言。",
+        "切换网站语言时保留当前页面，并记住选择以便下次访问。"
+      ]
+    },
+    "zh-Hant": {
+      "title": "新增日文與中文",
+      "items": [
+        "App 和網站新增日文、簡體中文及繁體中文。",
+        "系統語言偵測可辨識中文的文字體系和地區，也可在設定中直接選擇支援的語言。",
+        "安裝指南、常見問題、更新紀錄及搜尋和分享中繼資料均提供五種語言。",
+        "切換網站語言時保留目前頁面，並記住選擇以便下次造訪。"
+      ]
+    }
+  },
+  {
+    "version": "0.16.0",
+    "date": "2026-10-24",
+    "ko": {
+      "title": "언어와 화면 모드 설정",
+      "items": [
+        "설정에서 시스템·한국어·English 중 앱의 언어를 선택할 수 있습니다.",
+        "설정, 메뉴, 할 일 말풍선, 권한 안내와 업데이트 메시지를 한국어·영어로 제공합니다.",
+        "설정 창은 기본 너비 490pt로 더 간결해지고, 큰 글자와 창 크기 조절도 지원합니다.",
+        "시스템·라이트·다크 화면 모드가 설정 창과 할 일 말풍선에 함께 적용됩니다."
+      ]
+    },
+    "en": {
+      "title": "Language and appearance settings",
+      "items": [
+        "Choose System, Korean, or English as the app language in Settings.",
+        "Settings, menus, Todo bubbles, permission guidance, and update messages now speak both languages.",
+        "Settings starts at a compact 490-point width, with room for larger text and manual resizing.",
+        "Your System, Light, or Dark appearance applies to both Settings and Todo bubbles."
+      ]
+    },
+    "ja": {
+      "title": "言語と外観の設定",
+      "items": [
+        "設定でシステム・韓国語・英語からアプリの言語を選択できます。",
+        "設定、メニュー、タスクの吹き出し、権限ガイド、アップデートのメッセージを韓国語と英語で表示します。",
+        "設定ウインドウの標準幅はコンパクトな490pt。大きな文字や手動でのサイズ変更にも対応します。",
+        "システム・ライト・ダークの外観を、設定とタスクの吹き出しに共通で適用します。"
+      ]
+    },
+    "zh-Hans": {
+      "title": "语言和外观设置",
+      "items": [
+        "可在设置中选择跟随系统、韩语或英语。",
+        "设置、菜单、待办气泡、权限指南和更新消息均支持韩语和英语。",
+        "设置窗口默认宽度为 490pt，更加紧凑，同时支持大字体和手动调整大小。",
+        "系统、浅色和深色外观同时应用于设置窗口和待办气泡。"
+      ]
+    },
+    "zh-Hant": {
+      "title": "語言與外觀設定",
+      "items": [
+        "可在設定中選擇跟隨系統、韓文或英文。",
+        "設定、選單、待辦氣泡、權限指南和更新訊息均支援韓文和英文。",
+        "設定視窗預設寬度為 490pt，更加精簡，同時支援大字體和手動調整大小。",
+        "系統、淺色和深色外觀同時套用於設定視窗和待辦氣泡。"
+      ]
+    }
+  }
+]

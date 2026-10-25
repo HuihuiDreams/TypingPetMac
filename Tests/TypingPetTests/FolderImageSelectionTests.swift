@@ -133,7 +133,7 @@ import Testing
 
         let library = PetImageLibrary(fileManager: fileManager, defaults: defaults, imagesDirectory: root)
         #expect(library.imageSets.count == 2)
-        #expect(library.activeSet.name == "现有用户图集")
+        #expect(library.activeSet.name == L("Existing Custom Set"))
         #expect(library.idleURL?.path == legacyImage.path)
 
         try library.replaceIdle(with: resource)

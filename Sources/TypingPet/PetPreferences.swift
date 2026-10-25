@@ -40,6 +40,9 @@ enum AppPreferencesKey {
     /// Legacy custom reaction image file names (`[String]`).
     static let legacyReactionFiles = "customReactionImageFiles"
 
+    /// Custom image pack order (`[String]`).
+    static let imagePackOrder = "imagePackOrder-v1"
+
     /// JSON encoded key reaction rules mapping key strokes to custom images (`Data`).
     static let keyReactionRules = "keyReactionRules-v1"
 }

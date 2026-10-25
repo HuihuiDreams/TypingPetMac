@@ -51,9 +51,9 @@ enum KeyReactionError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .unreadableImage(let name): "无法读取图像: \(name)"
-        case .unsupportedFormat(let name): "不支持的图像格式: \(name)"
-        case .invalidStoragePath: "按键反应图像路径无效，无法安全清理文件。"
+        case .unreadableImage(let name): L("Cannot read image: %1$@", name)
+        case .unsupportedFormat(let name): L("Unsupported image format: %1$@", name)
+        case .invalidStoragePath: L("Cannot read image: %1$@", "invalid path")
         }
     }
 }
@@ -66,13 +66,10 @@ final class KeyReactionStore {
     private(set) var rules: [KeyReactionRule]
     private var ruleURLsByStroke: [KeyStroke: URL] = [:]
 
-    init(fileManager: FileManager = .default, defaults: UserDefaults = .standard, directory: URL? = nil) {
+    init(fileManager: FileManager = .default, defaults: UserDefaults = AppEnvironment.defaults, directory: URL? = nil) {
         self.fileManager = fileManager
         self.defaults = defaults
-        let baseDirectory = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
-            ?? fileManager.temporaryDirectory
-        self.directory = directory ?? baseDirectory
-            .appendingPathComponent("TypingPet", isDirectory: true)
+        self.directory = directory ?? AppEnvironment.supportDirectory
             .appendingPathComponent("KeyReactions", isDirectory: true)
         if let data = defaults.data(forKey: AppPreferencesKey.keyReactionRules),
            let decoded = try? JSONDecoder().decode([KeyReactionRule].self, from: data) {
@@ -89,8 +86,12 @@ final class KeyReactionStore {
     }
 
     func imageURL(for rule: KeyReactionRule) -> URL? {
-        guard StoredFileName.isSafe(rule.imageFileName) else { return nil }
-        let url = directory.appendingPathComponent(rule.imageFileName)
+        imageURL(fileName: rule.imageFileName)
+    }
+
+    func imageURL(fileName: String) -> URL? {
+        guard StoredFileName.isSafe(fileName) else { return nil }
+        let url = directory.appendingPathComponent(fileName)
         return fileManager.fileExists(atPath: url.path) ? url : nil
     }
 
@@ -179,5 +180,5 @@ enum KeyCodeNames {
         118: "F4", 119: "End", 120: "F2", 121: "Page Down", 122: "F1", 123: "←", 124: "→", 125: "↓", 126: "↑"
     ]
 
-    static func name(for keyCode: UInt16) -> String { names[keyCode] ?? "按键 \(keyCode)" }
+    static func name(for keyCode: UInt16) -> String { names[keyCode] ?? L("Key %1$@", keyCode) }
 }

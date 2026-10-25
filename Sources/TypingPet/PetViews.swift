@@ -34,14 +34,14 @@ internal final class PetResizeHandleView: NSView {
         let configuration = NSImage.SymbolConfiguration(pointSize: 16, weight: .semibold)
         imageView.image = NSImage(
             systemSymbolName: "arrow.up.left.and.arrow.down.right",
-            accessibilityDescription: "调整尺寸"
+            accessibilityDescription: L("Resize")
         )?.withSymbolConfiguration(configuration)
         imageView.contentTintColor = .white
         imageView.imageScaling = .scaleProportionallyDown
         addSubview(imageView)
-        toolTip = "拖拽调整尺寸"
-        setAccessibilityLabel("调整宠物尺寸")
-        setAccessibilityHelp("拖拽调整宠物尺寸。")
+        toolTip = L("Drag to resize")
+        setAccessibilityLabel(L("Resize pet"))
+        setAccessibilityHelp(L("Drag to resize your pet."))
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -109,6 +109,7 @@ internal final class PetResizeHandleView: NSView {
 
 internal final class PetContentView: NSView {
     var onClose: (() -> Void)?
+    var onOpenSettings: (() -> Void)?
     var onResizeBegan: ((NSPoint) -> Void)?
     var onResizeDragged: ((NSPoint) -> Void)?
     var onResizeEnded: (() -> Void)?
@@ -118,6 +119,7 @@ internal final class PetContentView: NSView {
     weak var petImageView: NSView?
 
     private let closeButton: NSButton
+    private let settingsButton: NSButton
     private let resizeHandle: PetResizeHandleView
     private var hoverTrackingArea: NSTrackingArea?
     private var controlsVisible = false
@@ -132,6 +134,7 @@ internal final class PetContentView: NSView {
 
     override init(frame frameRect: NSRect) {
         closeButton = NSButton(frame: .zero)
+        settingsButton = NSButton(frame: .zero)
         resizeHandle = PetResizeHandleView(frame: .zero)
         super.init(frame: frameRect)
         wantsLayer = true
@@ -140,7 +143,7 @@ internal final class PetContentView: NSView {
         closeButton.isBordered = false
         closeButton.image = NSImage(
             systemSymbolName: "xmark",
-            accessibilityDescription: "隐藏宠物"
+            accessibilityDescription: L("Hide Pet")
         )?.withSymbolConfiguration(.init(pointSize: 18, weight: .semibold))
         closeButton.imagePosition = .imageOnly
         closeButton.contentTintColor = .white
@@ -148,13 +151,28 @@ internal final class PetContentView: NSView {
         closeButton.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.62).cgColor
         closeButton.target = self
         closeButton.action = #selector(closePet)
-        closeButton.setAccessibilityLabel("隐藏宠物")
+        closeButton.setAccessibilityLabel(L("Hide Pet"))
+
+        settingsButton.isBordered = false
+        settingsButton.image = NSImage(
+            systemSymbolName: "gearshape",
+            accessibilityDescription: L("Open Settings")
+        )?.withSymbolConfiguration(.init(pointSize: 18, weight: .semibold))
+        settingsButton.imagePosition = .imageOnly
+        settingsButton.contentTintColor = .white
+        settingsButton.wantsLayer = true
+        settingsButton.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.62).cgColor
+        settingsButton.target = self
+        settingsButton.action = #selector(openSettings)
+        settingsButton.toolTip = L("Open Settings")
+        settingsButton.setAccessibilityLabel(L("Open Pet Settings"))
 
         resizeHandle.onResizeBegan = { [weak self] in self?.onResizeBegan?($0) }
         resizeHandle.onResizeDragged = { [weak self] in self?.onResizeDragged?($0) }
         resizeHandle.onResizeEnded = { [weak self] in self?.onResizeEnded?() }
 
         addSubview(closeButton)
+        addSubview(settingsButton)
         addSubview(resizeHandle)
         setControlsVisible(false, animated: false)
     }
@@ -194,6 +212,8 @@ internal final class PetContentView: NSView {
             width: controlSize,
             height: controlSize
         )
+        settingsButton.frame = resizeHandle.frame.offsetBy(dx: -controlSize - 6, dy: 0)
+        settingsButton.layer?.cornerRadius = controlSize / 2
     }
 
     override func updateTrackingAreas() {
@@ -248,6 +268,7 @@ internal final class PetContentView: NSView {
 
     override func hitTest(_ point: NSPoint) -> NSView? {
         if controlsVisible, closeButton.frame.contains(point) { return closeButton }
+        if controlsVisible, settingsButton.frame.contains(point) { return settingsButton }
         if controlsVisible, resizeHandle.frame.contains(point) { return resizeHandle }
         return self
     }
@@ -264,23 +285,30 @@ internal final class PetContentView: NSView {
         onClose?()
     }
 
+    @objc private func openSettings() {
+        onOpenSettings?()
+    }
+
     private func setControlsVisible(_ visible: Bool, animated: Bool = true) {
         guard controlsVisible != visible || !animated else { return }
         controlsVisible = visible
 
         if visible {
             closeButton.isHidden = false
+            settingsButton.isHidden = false
             resizeHandle.isHidden = false
             window?.invalidateCursorRects(for: resizeHandle)
         }
 
         let changes = { [weak self] in
             self?.closeButton.alphaValue = visible ? 1 : 0
+            self?.settingsButton.alphaValue = visible ? 1 : 0
             self?.resizeHandle.alphaValue = visible ? 1 : 0
         }
         let completion = { [weak self] in
             guard let self, !self.controlsVisible else { return }
             self.closeButton.isHidden = true
+            self.settingsButton.isHidden = true
             self.resizeHandle.isHidden = true
         }
 
@@ -293,6 +321,7 @@ internal final class PetContentView: NSView {
             context.duration = 0.12
             context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
             closeButton.animator().alphaValue = visible ? 1 : 0
+            settingsButton.animator().alphaValue = visible ? 1 : 0
             resizeHandle.animator().alphaValue = visible ? 1 : 0
         } completionHandler: {
             completion()

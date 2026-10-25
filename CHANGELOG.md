@@ -92,6 +92,84 @@
 - 架构解耦与重构：集中收敛 UserDefaults 配置键 (`PetPreferences`)，彻底消除 `PetImageLibrary` 与 `KeyReactionStore` 的本地重复键；在 `GlobalKeyMonitor` 销毁与注销时显式失效 MachPort；为按键弹跳动画添加安全越界守卫；将 1397 行的巨石 `main.swift` 拆解为 `PetViews`, `GlobalKeyMonitor`, `PetController`, `AppDelegate` 与 11 行极简启动入口，并新增 ADR-001 决策记录。
 - 现代测试迁移：将单元测试全面迁移至原生 Swift Testing 框架，新增磁盘物理清理、缓存失效生命周期以及首选项存储契约 (`PetPreferencesContractTests`) 测试套件。
 
+## 0.18.0 - 2026-10-25
+
+- Redesign Settings with a native, resizable sidebar and a single page for each set's image presets and keyboard mappings.
+- Create empty named sets, duplicate existing sets with independent image copies, and save edits automatically. Keep built-in image presets fixed; duplicate the set to customize them.
+- Assign multiple presets to individual keys and modifier combinations, with random or sequential playback and separate typing and resting selections.
+- Keep preset selection popovers open while editing and anchor their tails to the selected key. Add modifier checkboxes and Space/Enter shortcuts.
+- Center the keyboard with square character keys, hover feedback, and an inverted-T arrow cluster; preserve its proportions in narrow windows with horizontal scrolling.
+- Show Input Monitoring authorization and connection status in General settings.
+
+## 0.17.1 - 2026-10-24
+
+- Clarify app and website copy in Korean, English, Japanese, Simplified Chinese, and Traditional Chinese.
+- Use consistent names for Todo views and reaction images, clarify opacity settings, and split long setup descriptions.
+- Distinguish the Pause action from the Paused status and use consistent timer-ending labels.
+
+## 0.17.0 - 2026-10-24
+
+- Add Japanese, Simplified Chinese, and Traditional Chinese throughout the app, alongside Korean and English.
+- Detect Japanese and Chinese system languages, honoring explicit Chinese scripts and regional defaults, and allow a saved language override in Settings.
+- Localize the website, installation guides, FAQs, release notes, accessibility labels, and search and social metadata in all five languages.
+- Keep the current website page and anchor when switching languages, and remember the choice for future visits.
+
+## 0.16.0 - 2026-10-24
+
+- Keep Settings at a compact 490-point default width, with room to grow for larger accessibility text and manual resizing.
+- Add System, Korean, and English language choices in Settings. Follow the first system language by default, using English for languages other than Korean.
+- Maintain Korean and English interface strings in separate localization files, including Settings, menus, Todo bubbles, Input Monitoring guidance, and update messages.
+- Apply the saved System, Light, or Dark appearance to both Settings and Todo bubbles, including the collapsed entry button.
+
+## 0.15.0 - 2026-10-24
+
+- Let users try pet key reactions inside the welcome window before requesting Input Monitoring permission.
+- Guide users through enabling the permission switch, with optional drag-and-drop help when the app is missing from the list.
+- Confirm a real global key event before completing setup, and resume verification after a required app relaunch.
+- Add a gear button immediately to the left of the pet's resize handle on hover to open Settings.
+- Publish the signed and notarized Apple Silicon app through the ynifamily3/tap Homebrew cask alongside GitHub and automatic updates.
+- Add guarded release automation for testing, signing, notarization, update-server deployment, and Homebrew publication.
+
+## 0.14.3 - 2026-10-24
+
+- Add System, Light, and Dark appearance choices for the Settings window, with an immediate preview and a saved preference.
+- Keep the pet and Todo bubble appearance independent of the Settings window choice.
+
+## 0.14.2 - 2026-10-24
+
+- Publish the production update feed and verify release archives with the app's Ed25519 key, Developer ID signature, and Apple notarization.
+- Replace the lost update signing key. Builds through 0.14.1 cannot update automatically to 0.14.2; install this release manually once. Later releases can use automatic update checks.
+- Add a single-command, guarded update deployment that publishes the archive before atomically replacing the feed.
+
+## 0.14.1 - 2026-10-24
+
+- Release the existing 0.14.0 features with an Apple-issued Developer ID Application signature and Apple notarization.
+- Keep the production update public key from 0.14.0 so existing installations continue to trust future updates signed with the original private key.
+- Existing ad-hoc installations may need Input Monitoring permission granted again when switching to this Developer ID-signed build.
+
+## 0.14.0 - 2026-10-23
+
+- Add a compact view for a Todo bubble that stays open: up to three open Todos, one line each with checkboxes, and `+N 个更多` to open the full view.
+- Switch views from the bubble header, the hover button, the context menu, or Settings > `待办事项` > `列表视图`. The choice persists across relaunches.
+- Right-click a compact row to pause, resume, or stop its timer, or start it with its saved setting, count-up, or 20 minutes.
+- Keep the compact view when a timer starts from it. Endings and absences show their own bubble until answered, then the compact view returns.
+
+## 0.13.0 - 2026-10-23
+
+- Check for updates once a day and from the menu bar or the General settings tab.
+- Install an update after you accept it, then restart. A later quit installs an accepted update.
+- Verify each update with SHA-256, an Ed25519 signature, the bundle identity, and the Developer ID Team ID.
+- Restore the previous app when the swap fails, and report the result on the next launch.
+- Ad-hoc builds update with the Ed25519 signature alone. Grant Input Monitoring again after each update until builds are Developer ID signed.
+
+## 0.12.0 - 2026-10-21
+
+- Add a Todo speech bubble beside the pet with a per-Todo countdown or count-up focus timer and measured session time.
+- Edit Todo titles in place, zoom the bubble from 80% to 200%, and show it always or only on hover.
+- Pause a running timer after a configurable idle period, on screen lock, or on sleep, then ask how to treat the time away.
+- Bounce the bubble like a Dock icon when a countdown ends or a missed notice is waiting.
+- Build local development copies as a separate TypingPet Dev app with its own settings, images, and Todo records.
+
 ## 0.11.2 - 2026-09-27
 
 - 将权限引导窗口中的 Finder 快捷方式替换为重新打开“输入监控”设置的醒目按钮。

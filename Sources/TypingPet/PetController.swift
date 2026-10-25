@@ -27,22 +27,18 @@ enum PetConstants {
 // MARK: - PetController
 
 @MainActor
-internal final class PetController: NSObject {
+internal final class PetController: NSObject, NSWindowDelegate {
     private let library: PetImageLibrary
-    private let keyStore: KeyReactionStore
+    private let packStore: PetPackStore
+    private var playback = PresetPlaybackCursor()
     private let panel: PetPanel
+    var todoAnchorWindow: NSWindow { panel }
+    var shouldHoldPosition: (() -> Bool)?
+    var onPresentationChanged: (() -> Void)?
     private let contentView: PetContentView
     private let imageView: NSImageView
     private let onScaleChanged: (CGFloat) -> Void
     private var baseSize: NSSize
-    private var currentImageKey = ""
-    private var reactionPicker = ImagePicker(names: [])
-    private var reactionURLsByPath: [String: URL] = [:]
-    private var cachedScale: CGFloat = PetController.savedScale
-    private var cachedRestingOpacity: CGFloat = PetController.savedRestingOpacity
-    private var cachedHoverOpacity: CGFloat = PetController.savedHoverOpacity
-    private var cachedAvoidsPointerWhenLocked: Bool = PetController.savedAvoidsPointerWhenLocked
-    private var cachedShakeLevel: Int = PetController.savedShakeLevel
     private var idleWorkItem: DispatchWorkItem?
     private var resizeInitialMouseLocation: NSPoint?
     private var resizeInitialFrame: NSRect?
@@ -64,18 +60,19 @@ internal final class PetController: NSObject {
 
     init(
         library: PetImageLibrary,
-        keyStore: KeyReactionStore,
-        onScaleChanged: @escaping (CGFloat) -> Void = { _ in }
+        packStore: PetPackStore,
+        onScaleChanged: @escaping (CGFloat) -> Void = { _ in },
+        onOpenSettings: @escaping () -> Void = {}
     ) {
         self.library = library
-        self.keyStore = keyStore
+        self.packStore = packStore
         self.onScaleChanged = onScaleChanged
-        let initialImage = library.idleURL.flatMap { library.image(for: $0) }
+        let initialImage = packStore.idleURL.flatMap { library.image(for: $0) }
         baseSize = Self.normalizedBaseSize(for: initialImage?.size ?? PetConstants.fallbackBaseSize)
         panel = PetPanel(
             contentRect: NSRect(
                 origin: .zero,
-                size: Self.scaledSize(baseSize: baseSize, scale: cachedScale)
+                size: Self.scaledSize(baseSize: baseSize, scale: Self.savedScale)
             ),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
@@ -93,6 +90,7 @@ internal final class PetController: NSObject {
         contentView.petImageView = imageView
         contentView.addSubview(imageView, positioned: .below, relativeTo: nil)
         contentView.onClose = { [weak self] in self?.hidePet() }
+        contentView.onOpenSettings = onOpenSettings
         contentView.onResizeBegan = { [weak self] in self?.beginResize(at: $0) }
         contentView.onResizeDragged = { [weak self] in self?.continueResize(at: $0) }
         contentView.onResizeEnded = { [weak self] in self?.endResize() }
@@ -100,7 +98,9 @@ internal final class PetController: NSObject {
         contentView.onMoveDragged = { [weak self] in self?.continueMove(with: $0) }
         contentView.onMoveEnded = { [weak self] in self?.endMove(with: $0) }
 
+        panel.title = AppEnvironment.displayName + L(" · Pet")
         panel.contentView = contentView
+        panel.delegate = self
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = false
@@ -112,13 +112,12 @@ internal final class PetController: NSObject {
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         contentView.controlsEnabled = !Self.savedPositionLocked
 
-        let restoredPosition = panel.setFrameUsingName(AppPreferencesKey.windowFrame)
+        let restoredPosition = panel.setFrameUsingName(AppEnvironment.frameAutosaveName)
         resizePanelForCurrentCanvas(animate: false)
         if !restoredPosition {
             resetPosition()
         }
 
-        updateReactionImages()
         showIdleImage()
         panel.orderFrontRegardless()
         updateMouseMonitoringState()
@@ -138,7 +137,8 @@ internal final class PetController: NSObject {
         get { panel.level == .floating }
         set {
             panel.level = newValue ? .floating : .normal
-            UserDefaults.standard.set(newValue, forKey: AppPreferencesKey.alwaysOnTop)
+            onPresentationChanged?()
+            AppEnvironment.defaults.set(newValue, forKey: AppPreferencesKey.alwaysOnTop)
         }
     }
 
@@ -148,7 +148,7 @@ internal final class PetController: NSObject {
             if newValue { stopInertia(savePosition: true) }
             panel.ignoresMouseEvents = newValue
             contentView.controlsEnabled = !newValue
-            UserDefaults.standard.set(newValue, forKey: AppPreferencesKey.positionLocked)
+            AppEnvironment.defaults.set(newValue, forKey: AppPreferencesKey.positionLocked)
             updateMouseMonitoringState()
             if newValue {
                 updatePointerAvoidance()
@@ -161,44 +161,38 @@ internal final class PetController: NSObject {
     var isPetVisible: Bool { panel.isVisible }
 
     var scale: CGFloat {
-        get { cachedScale }
+        get { Self.savedScale }
         set {
-            cachedScale = applyScale(newValue, anchorOrigin: nil, animate: false)
-            UserDefaults.standard.set(Double(cachedScale), forKey: AppPreferencesKey.petScale)
-            panel.saveFrame(usingName: AppPreferencesKey.windowFrame)
+            let clamped = applyScale(newValue, anchorOrigin: nil, animate: false)
+            AppEnvironment.defaults.set(Double(clamped), forKey: AppPreferencesKey.petScale)
+            panel.saveFrame(usingName: AppEnvironment.frameAutosaveName)
         }
     }
 
     var restingOpacity: CGFloat {
-        get { cachedRestingOpacity }
+        get { Self.savedRestingOpacity }
         set {
             let clamped = min(max(newValue, 0), 1)
-            guard clamped != cachedRestingOpacity else { return }
-            cachedRestingOpacity = clamped
-            UserDefaults.standard.set(Double(clamped), forKey: AppPreferencesKey.restingOpacity)
+            AppEnvironment.defaults.set(Double(clamped), forKey: AppPreferencesKey.restingOpacity)
             updateMouseMonitoringState()
             updatePetOpacity()
         }
     }
 
     var hoverOpacity: CGFloat {
-        get { cachedHoverOpacity }
+        get { Self.savedHoverOpacity }
         set {
             let clamped = min(max(newValue, 0), 1)
-            guard clamped != cachedHoverOpacity else { return }
-            cachedHoverOpacity = clamped
-            UserDefaults.standard.set(Double(clamped), forKey: AppPreferencesKey.hoverOpacity)
+            AppEnvironment.defaults.set(Double(clamped), forKey: AppPreferencesKey.hoverOpacity)
             updateMouseMonitoringState()
             updatePetOpacity()
         }
     }
 
     var avoidsPointerWhenLocked: Bool {
-        get { cachedAvoidsPointerWhenLocked }
+        get { Self.savedAvoidsPointerWhenLocked }
         set {
-            guard newValue != cachedAvoidsPointerWhenLocked else { return }
-            cachedAvoidsPointerWhenLocked = newValue
-            UserDefaults.standard.set(newValue, forKey: AppPreferencesKey.avoidsPointerWhenLocked)
+            AppEnvironment.defaults.set(newValue, forKey: AppPreferencesKey.avoidsPointerWhenLocked)
             updateMouseMonitoringState()
             if newValue {
                 updatePointerAvoidance()
@@ -209,23 +203,17 @@ internal final class PetController: NSObject {
     }
 
     var shakeLevel: Int {
-        get { cachedShakeLevel }
+        get { Self.savedShakeLevel }
         set {
             let clamped = max(AppPreferencesDefault.minShakeLevel, min(newValue, AppPreferencesDefault.maxShakeLevel))
-            guard clamped != cachedShakeLevel else { return }
-            cachedShakeLevel = clamped
-            UserDefaults.standard.set(clamped, forKey: AppPreferencesKey.shakeLevel)
+            AppEnvironment.defaults.set(clamped, forKey: AppPreferencesKey.shakeLevel)
         }
     }
 
     func handleKeystroke(_ stroke: KeyStroke? = nil) {
-        let chosenURL: URL?
-        if let stroke, let exactMatch = keyStore.imageURL(matching: stroke) {
-            chosenURL = exactMatch
-        } else {
-            chosenURL = reactionPicker.next(excluding: currentImageKey).flatMap { reactionURLsByPath[$0] }
-        }
-        guard let chosenURL else { return }
+        let pack = packStore.activeConfiguration
+        guard let id = playback.reaction(for: stroke, in: pack),
+              let chosenURL = packStore.imageURL(id: id, in: pack, set: library.activeSet) else { return }
 
         idleWorkItem?.cancel()
         showImage(at: chosenURL)
@@ -240,8 +228,8 @@ internal final class PetController: NSObject {
 
     func reloadImages() {
         idleWorkItem?.cancel()
-        updateReactionImages()
-        if let idleImage = library.idleURL.flatMap({ library.image(for: $0) }) {
+        playback = PresetPlaybackCursor()
+        if let idleImage = packStore.idleURL.flatMap({ library.image(for: $0) }) {
             baseSize = Self.normalizedBaseSize(for: idleImage.size)
         } else {
             baseSize = PetConstants.fallbackBaseSize
@@ -250,23 +238,19 @@ internal final class PetController: NSObject {
         showIdleImage()
     }
 
-    private func updateReactionImages() {
-        let urls = library.reactionURLs
-        reactionURLsByPath = urls.reduce(into: [:]) { $0[$1.path] = $1 }
-        reactionPicker = ImagePicker(names: urls.map(\.path))
-    }
-
     func hidePet() {
         stopInertia(savePosition: true)
         stopPointerAvoidance(savePosition: true)
         contentView.hideControls()
         panel.orderOut(nil)
+        onPresentationChanged?()
         updateMouseMonitoringState()
     }
 
     func showPet() {
         contentView.hideControls()
         panel.orderFrontRegardless()
+        onPresentationChanged?()
         updateMouseMonitoringState()
         updatePetOpacity()
         updatePointerAvoidance()
@@ -283,11 +267,10 @@ internal final class PetController: NSObject {
         let size = panel.frame.size
         let visible = screen.visibleFrame
         panel.setFrameOrigin(NSPoint(x: visible.maxX - size.width - 24, y: visible.minY + 24))
-        panel.saveFrame(usingName: AppPreferencesKey.windowFrame)
+        panel.saveFrame(usingName: AppEnvironment.frameAutosaveName)
     }
 
     func clampToVisibleScreen() {
-        // Motion bounds belong to the previous screen configuration.
         stopInertia(savePosition: false)
         stopPointerAvoidance(savePosition: false)
         guard let screen = panel.screen ?? NSScreen.main ?? NSScreen.screens.first else { return }
@@ -295,27 +278,32 @@ internal final class PetController: NSObject {
         let origin = PetPointerAvoidance.clampedOrigin(panel.frame.origin, size: panel.frame.size, bounds: bounds)
         guard origin != panel.frame.origin else { return }
         panel.setFrameOrigin(origin)
-        panel.saveFrame(usingName: AppPreferencesKey.windowFrame)
+        panel.saveFrame(usingName: AppEnvironment.frameAutosaveName)
+    }
+
+    func windowDidMove(_ notification: Notification) {
+        panel.saveFrame(usingName: AppEnvironment.frameAutosaveName)
     }
 
     private func showIdleImage() {
-        guard let idleURL = library.idleURL else { return }
+        let pack = packStore.activeConfiguration
+        guard let id = playback.idle(in: pack),
+              let idleURL = packStore.imageURL(id: id, in: pack, set: library.activeSet) else { return }
         showImage(at: idleURL)
     }
 
     private func showImage(at url: URL) {
-        if currentImageKey == url.path, imageView.image != nil { return }
         guard let image = library.image(for: url) else { return }
-        currentImageKey = url.path
+        imageView.image = nil
         imageView.image = image
     }
 
     private func resizePanelForCurrentCanvas(animate: Bool) {
         let oldFrame = panel.frame
-        let newSize = Self.scaledSize(baseSize: baseSize, scale: cachedScale)
+        let newSize = Self.scaledSize(baseSize: baseSize, scale: Self.savedScale)
         let newOrigin = NSPoint(x: oldFrame.midX - newSize.width / 2, y: oldFrame.minY)
         panel.setFrame(NSRect(origin: newOrigin, size: newSize), display: true, animate: animate)
-        panel.saveFrame(usingName: AppPreferencesKey.windowFrame)
+        panel.saveFrame(usingName: AppEnvironment.frameAutosaveName)
     }
 
     private func beginResize(at mouseLocation: NSPoint) {
@@ -360,7 +348,7 @@ internal final class PetController: NSObject {
     private func startInertia(with velocity: CGVector) {
         let speed = hypot(velocity.dx, velocity.dy)
         guard speed >= PetConstants.inertiaStartSpeed else {
-            panel.saveFrame(usingName: AppPreferencesKey.windowFrame)
+            panel.saveFrame(usingName: AppEnvironment.frameAutosaveName)
             return
         }
         inertiaVelocity = velocity
@@ -400,13 +388,13 @@ internal final class PetController: NSObject {
         inertiaVelocity = .zero
         inertiaLastTimestamp = nil
         inertiaBounds = nil
-        if savePosition { panel.saveFrame(usingName: AppPreferencesKey.windowFrame) }
+        if savePosition { panel.saveFrame(usingName: AppEnvironment.frameAutosaveName) }
     }
 
     private func updateMouseMonitoringState() {
         let needsMonitoring = panel.isVisible && (
-            abs(cachedRestingOpacity - cachedHoverOpacity) > 0.001 ||
-            (isPositionLocked && cachedAvoidsPointerWhenLocked)
+            abs(Self.savedRestingOpacity - Self.savedHoverOpacity) > 0.001 ||
+            (isPositionLocked && Self.savedAvoidsPointerWhenLocked)
         )
         needsMonitoring ? startMouseHoverMonitoring() : stopMouseHoverMonitoring()
     }
@@ -439,8 +427,8 @@ internal final class PetController: NSObject {
         guard panel.isVisible, let imageLayer = imageView.layer else { return }
         let targetOpacity = PetOpacityBehavior.opacity(
             isHovering: panel.frame.contains(NSEvent.mouseLocation),
-            restingOpacity: cachedRestingOpacity,
-            hoverOpacity: cachedHoverOpacity
+            restingOpacity: Self.savedRestingOpacity,
+            hoverOpacity: Self.savedHoverOpacity
         )
         guard abs(CGFloat(imageLayer.opacity) - targetOpacity) > 0.001 else { return }
         CATransaction.begin()
@@ -450,6 +438,10 @@ internal final class PetController: NSObject {
     }
 
     private func updatePointerAvoidance() {
+        if shouldHoldPosition?() == true {
+            stopPointerAvoidance(savePosition: true)
+            return
+        }
         guard avoidanceTimer == nil, panel.isVisible, isPositionLocked, avoidsPointerWhenLocked else { return }
         let bounds = avoidanceBounds ?? (panel.screen ?? NSScreen.main ?? NSScreen.screens.first)?.visibleFrame ?? panel.frame
         guard PetPointerAvoidance.targetOrigin(
@@ -472,6 +464,10 @@ internal final class PetController: NSObject {
     }
 
     private func advancePointerAvoidance() {
+        if shouldHoldPosition?() == true {
+            stopPointerAvoidance(savePosition: true)
+            return
+        }
         guard panel.isVisible, isPositionLocked, avoidsPointerWhenLocked,
               let lastTimestamp = avoidanceLastTimestamp else {
             stopPointerAvoidance(savePosition: true)
@@ -527,7 +523,7 @@ internal final class PetController: NSObject {
         avoidanceVelocity = .zero
         avoidanceLastTimestamp = nil
         avoidanceBounds = nil
-        if savePosition { panel.saveFrame(usingName: AppPreferencesKey.windowFrame) }
+        if savePosition { panel.saveFrame(usingName: AppEnvironment.frameAutosaveName) }
     }
 
     private func continueResize(at mouseLocation: NSPoint) {
@@ -548,17 +544,15 @@ internal final class PetController: NSObject {
 
     private func endResize() {
         if let resizeLatestScale {
-            cachedScale = resizeLatestScale
-            UserDefaults.standard.set(Double(resizeLatestScale), forKey: AppPreferencesKey.petScale)
+            AppEnvironment.defaults.set(Double(resizeLatestScale), forKey: AppPreferencesKey.petScale)
         }
         resizeInitialMouseLocation = nil
         resizeInitialFrame = nil
         resizeInitialScale = nil
         resizeLatestScale = nil
-        panel.saveFrame(usingName: AppPreferencesKey.windowFrame)
+        panel.saveFrame(usingName: AppEnvironment.frameAutosaveName)
     }
 
-    /// 拖拽缩放（`animate == false`）时只更新窗口，由 `endResize()` 统一持久化，避免每个鼠标事件都写 UserDefaults。
     @discardableResult
     private func applyScale(_ value: CGFloat, anchorOrigin: NSPoint?, animate: Bool) -> CGFloat {
         let clamped = max(AppPreferencesDefault.minScale, min(value, AppPreferencesDefault.maxScale))
@@ -569,10 +563,10 @@ internal final class PetController: NSObject {
             y: oldFrame.minY
         )
         panel.setFrame(NSRect(origin: newOrigin, size: newSize), display: true, animate: animate)
+        AppEnvironment.defaults.set(Double(clamped), forKey: AppPreferencesKey.petScale)
         onScaleChanged(clamped)
         if animate {
-            UserDefaults.standard.set(Double(clamped), forKey: AppPreferencesKey.petScale)
-            panel.saveFrame(usingName: AppPreferencesKey.windowFrame)
+            panel.saveFrame(usingName: AppEnvironment.frameAutosaveName)
         }
         return clamped
     }
@@ -604,36 +598,36 @@ internal final class PetController: NSObject {
     }
 
     private static var savedScale: CGFloat {
-        let value = UserDefaults.standard.double(forKey: AppPreferencesKey.petScale)
+        let value = AppEnvironment.defaults.double(forKey: AppPreferencesKey.petScale)
         return value > 0 ? CGFloat(value) : AppPreferencesDefault.petScale
     }
 
     private static var savedRestingOpacity: CGFloat {
-        let value = UserDefaults.standard.object(forKey: AppPreferencesKey.restingOpacity) as? Double
+        let value = AppEnvironment.defaults.object(forKey: AppPreferencesKey.restingOpacity) as? Double
         return min(max(CGFloat(value ?? AppPreferencesDefault.restingOpacity), 0), 1)
     }
 
     private static var savedHoverOpacity: CGFloat {
-        let value = UserDefaults.standard.object(forKey: AppPreferencesKey.hoverOpacity) as? Double
+        let value = AppEnvironment.defaults.object(forKey: AppPreferencesKey.hoverOpacity) as? Double
         return min(max(CGFloat(value ?? AppPreferencesDefault.hoverOpacity), 0), 1)
     }
 
     private static var savedAvoidsPointerWhenLocked: Bool {
-        UserDefaults.standard.bool(forKey: AppPreferencesKey.avoidsPointerWhenLocked)
+        AppEnvironment.defaults.bool(forKey: AppPreferencesKey.avoidsPointerWhenLocked)
     }
 
     private static var savedAlwaysOnTop: Bool {
-        UserDefaults.standard.object(forKey: AppPreferencesKey.alwaysOnTop) == nil
+        AppEnvironment.defaults.object(forKey: AppPreferencesKey.alwaysOnTop) == nil
             ? AppPreferencesDefault.alwaysOnTop
-            : UserDefaults.standard.bool(forKey: AppPreferencesKey.alwaysOnTop)
+            : AppEnvironment.defaults.bool(forKey: AppPreferencesKey.alwaysOnTop)
     }
 
     private static var savedPositionLocked: Bool {
-        UserDefaults.standard.bool(forKey: AppPreferencesKey.positionLocked)
+        AppEnvironment.defaults.bool(forKey: AppPreferencesKey.positionLocked)
     }
 
     private static var savedShakeLevel: Int {
-        let stored = UserDefaults.standard.object(forKey: AppPreferencesKey.shakeLevel) as? Int
+        let stored = AppEnvironment.defaults.object(forKey: AppPreferencesKey.shakeLevel) as? Int
         return max(AppPreferencesDefault.minShakeLevel, min(stored ?? AppPreferencesDefault.shakeLevel, AppPreferencesDefault.maxShakeLevel))
     }
 }
