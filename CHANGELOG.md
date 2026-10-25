@@ -31,6 +31,11 @@
 
 ### Security
 
+- 修复 `PetImageLibrary.presetImageURL` 回退分支与 `storageDirectory(for:)` 缺失 `StoredFileName.isSafe` 校验的问题，防止被篡改的图集配置越出存储目录读写文件。
+- 加固待办与文本输入边界：`TodoTitlePolicy` 在切分换行与空白前先做 $O(1)$ 长度截断，并在自定义倒计时、新建图集及重命名预设输入框统一接入长度与换行限制，防止超大剪贴板粘贴造成主线程卡顿。
+- 加固 `TodoFileStorage` 与 `TodoState.validate()`：落盘 `todo-state.json` 时显式设置 `0600` 权限，加载时拦截符号链接与超大文件，并校验待办标题不含换行符且不超过长度上限。
+- 加固 `TodoBubbleWindowController` 非激活悬浮面板焦点释放：在窗口失去 Key 状态、全局外部鼠标点击、系统休眠或锁屏时主动释放 `firstResponder`，防止用户在其他应用或解锁时的输入误落入待办输入框。
+- 将 `AppDelegate` 中的 `--show-settings` 启动参数收敛至 `#if DEBUG` 编译块内。
 - 强化图库与规则导入安全：`PetImageLibrary.addSet`、`copyImage` 与 `KeyReactionStore.setRule` 统一采用 Fail-Closed 校验（要求 `isSymbolicLink == false && isRegularFile == true`），过滤并拦截符号链接及非普通文件，防御跨目录软链接穿透风险。
 - 完善分发安全指引：在 `README.md` 与 `README.txt` 中增加基于 `shasum -a 256` 的文件完整性校验指引，提供源码本地构建指引，并将“绝对安全”文案优化为诚实、可技术验证的零网络离线运行与纯按键码响应承诺。
 - 建立威胁模型分析文档（`docs/TypingPetMac-threat-model.md`），系统梳理 macOS `ListenEvent` 权限、无网络离线边界与分发安全加固策略。

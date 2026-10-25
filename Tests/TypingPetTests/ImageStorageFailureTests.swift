@@ -327,6 +327,10 @@ struct ImageStorageFailureTests {
         for set in [escapingNames, escapingFolder] {
             #expect(library.idleURL(for: set) == nil)
             #expect(library.reactionURLs(for: set).isEmpty)
+            #expect(library.presetImageURL(fileName: set.idleFileName, in: set) == nil)
+        }
+        #expect(throws: PetImageLibraryError.self) {
+            try library.importPresetImage(from: fixture.input.appendingPathComponent("idle.png"), into: escapingFolder)
         }
     }
 

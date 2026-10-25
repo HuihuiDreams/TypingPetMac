@@ -1259,6 +1259,10 @@ private struct TimerOptions: View {
                     .frame(width: z(64))
                     .background(RoundedRectangle(cornerRadius: z(6), style: .continuous).fill(BubbleColor.well))
                     .focused($fieldFocused)
+                    .onChange(of: minutes) { value in
+                        let limited = TodoTitlePolicy.limitedDraft(value)
+                        if limited != value { minutes = limited }
+                    }
                     .onSubmit(apply)
                 Text(L("min")).font(z.font(13)).foregroundStyle(BubbleColor.muted)
             }

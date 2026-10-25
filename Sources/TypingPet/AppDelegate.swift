@@ -100,9 +100,11 @@ internal final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegat
             object: nil
         )
 
+        #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("--show-settings") {
             DispatchQueue.main.async { [weak self] in self?.showSettings() }
         }
+        #endif
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {

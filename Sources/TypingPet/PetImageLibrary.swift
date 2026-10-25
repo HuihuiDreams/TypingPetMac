@@ -150,7 +150,9 @@ final class PetImageLibrary {
 
     func presetImageURL(fileName: String, in set: PetImageSet) -> URL? {
         if let existing = resolvedURL(fileName: fileName, set: set) { return existing }
-        let imported = setsDirectory.appendingPathComponent(set.storageFolder ?? set.id.uuidString)
+        let folder = set.storageFolder ?? set.id.uuidString
+        guard !set.isBuiltIn, StoredFileName.isSafe(fileName), StoredFileName.isSafe(folder) else { return nil }
+        let imported = setsDirectory.appendingPathComponent(folder)
             .appendingPathComponent(fileName)
         return fileManager.fileExists(atPath: imported.path) ? imported : nil
     }
@@ -374,6 +376,9 @@ final class PetImageLibrary {
 
     private func storageDirectory(for set: PetImageSet) throws -> URL {
         let folder = set.storageFolder ?? set.id.uuidString
+        guard StoredFileName.isSafe(folder) else {
+            throw PetImageLibraryError.invalidStoragePath
+        }
         let url = setsDirectory.appendingPathComponent(folder, isDirectory: true)
         try fileManager.createDirectory(at: url, withIntermediateDirectories: true)
         return url

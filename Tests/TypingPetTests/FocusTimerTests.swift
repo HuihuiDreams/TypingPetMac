@@ -391,4 +391,32 @@ private final class TestClock {
         try Data(text.utf8).write(to: storage.url)
         #expect(throws: (any Error).self) { try storage.load() }
     }
+
+    @Test func inputHardeningBoundsTitlesRejectsSymlinksAndSecuresPermissions() throws {
+        let huge = String(repeating: "a\nb ", count: 20_000)
+        let draft = TodoTitlePolicy.limitedDraft(huge)
+        #expect(draft.count == TodoTitlePolicy.maxLength)
+        #expect(!draft.contains("\n"))
+        let normalized = TodoTitlePolicy.normalized(huge)
+        #expect(normalized.count <= TodoTitlePolicy.maxLength)
+        #expect(!normalized.contains("\n"))
+
+        var multilineState = TodoState(todos: [TodoItem(title: "Line 1\nLine 2", createdAt: Date())])
+        #expect(throws: TodoDataError.self) { try multilineState.validate() }
+        multilineState.todos[0].title = String(repeating: "x", count: TodoTitlePolicy.maxRecordLength + 1)
+        #expect(throws: TodoDataError.self) { try multilineState.validate() }
+
+        let (file, folder) = try temporaryFile()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let storage = TodoFileStorage(url: file)
+        var e = TestClock().engine()
+        _ = e.addTodo("Private task")
+        try storage.save(e.state)
+        let perms = try FileManager.default.attributesOfItem(atPath: file.path)[.posixPermissions] as? Int
+        #expect(perms == 0o600)
+
+        let link = folder.appendingPathComponent("symlink.json")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: file)
+        #expect(throws: TodoDataError.self) { _ = try TodoFileStorage(url: link).load() }
+    }
 }

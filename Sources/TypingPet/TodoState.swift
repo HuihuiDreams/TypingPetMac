@@ -21,15 +21,19 @@ struct TimerPreference: Codable, Equatable {
 // One place for title rules, so typing, adding, and renaming agree.
 enum TodoTitlePolicy {
     static let maxLength = 120
+    // Generous upper bound for persisted records so legacy titles remain valid while preventing oversized payloads.
+    static let maxRecordLength = 1000
     // Show a counter from here on while typing.
     static let warningLength = 100
     // Line breaks and runs of whitespace become one space; the result is trimmed and capped.
     static func normalized(_ title: String) -> String {
-        String(title.split(whereSeparator: \.isWhitespace).joined(separator: " ").prefix(maxLength))
+        let bounded = title.prefix(maxRecordLength * 4)
+        return String(bounded.split(whereSeparator: \.isWhitespace).joined(separator: " ").prefix(maxLength))
     }
     // While typing, keep the user's spacing but drop line breaks and stop at the cap.
     static func limitedDraft(_ text: String) -> String {
-        let flat = text.contains(where: \.isNewline) ? text.components(separatedBy: .newlines).joined(separator: " ") : text
+        let bounded = text.prefix(maxLength * 2)
+        let flat = bounded.contains(where: \.isNewline) ? bounded.components(separatedBy: .newlines).joined(separator: " ") : String(bounded)
         return flat.count > maxLength ? String(flat.prefix(maxLength)) : flat
     }
 }
@@ -115,7 +119,12 @@ struct TodoState: Codable, Equatable {
         guard schemaVersion == 1 else { throw TodoDataError.unsupportedSchema }
         let todoIDs = Set(todos.map(\.id))
         guard todoIDs.count == todos.count, Set(sessions.map(\.id)).count == sessions.count,
-              todos.allSatisfy({ !$0.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && $0.timerPreference.isValid })
+              todos.allSatisfy({
+                  !$0.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                      && !$0.title.contains(where: \.isNewline)
+                      && $0.title.count <= TodoTitlePolicy.maxRecordLength
+                      && $0.timerPreference.isValid
+              })
         else { throw TodoDataError.invalidState }
         let active = sessions.filter { $0.status != .finished }
         guard active.count <= 1, active.first?.id == activeSessionId else { throw TodoDataError.invalidState }
