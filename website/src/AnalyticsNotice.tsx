@@ -4,7 +4,7 @@ import type { Locale } from './localization';
 import { analyticsEnabled, browserRejectsAnalytics, setAnalyticsEnabled } from './analytics';
 
 const text = {
-  ko: { notice: '이 웹사이트는 PostHog로 방문과 설치 버튼 이용을 분석합니다. 입력 내용과 화면은 수집하지 않습니다.', label: '방문 통계', blocked: '브라우저 설정으로 통계 꺼짐' },
+  ko: { notice: '이 웹사이트는 PostHog로 이용 패턴을 분석합니다. 입력 내용과 화면은 수집하지 않습니다.', label: '방문 통계', blocked: '브라우저 설정으로 통계 꺼짐' },
   en: { notice: 'This website uses PostHog to measure visits and install actions. Typed content and screen recordings are never collected.', label: 'Visit analytics', blocked: 'Analytics disabled by your browser' },
   ja: { notice: 'このサイトではPostHogで訪問とインストール操作を分析します。入力内容や画面録画は収集しません。', label: 'アクセス解析', blocked: 'ブラウザの設定で解析はオフです' },
   'zh-Hans': { notice: '本网站使用PostHog分析访问和安装操作，不收集输入内容或录制屏幕。', label: '访问统计', blocked: '浏览器设置已关闭统计' },

@@ -4,6 +4,6 @@ import { content, type Locale } from './content';
 
 export { content };
 export { locales, localeMetadata, resolveLocale } from './localization';
-export function render(locale: Locale, page: 'home' | 'changelog') {
+export function render(locale: Locale, page: 'home' | 'changelog' | 'unsubscribe') {
   return renderToString(<App locale={locale} page={page} />);
 }

@@ -12,7 +12,7 @@ import time
 import unicodedata
 
 LOCALES = {"ko", "en", "ja", "zh-Hans", "zh-Hant"}
-CONSENT_VERSION = "2026-10-24-v1"
+CONSENT_VERSION = "2026-10-25-v4"
 DAY = 86400
 
 
