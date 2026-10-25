@@ -1113,9 +1113,11 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         if shouldResumeSetup { showInputMonitoringGuide() }
         #endif
 
+        #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("--show-settings") {
             DispatchQueue.main.async { [weak self] in self?.showSettings() }
         }
+        #endif
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {

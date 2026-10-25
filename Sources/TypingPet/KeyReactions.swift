@@ -89,6 +89,7 @@ final class KeyReactionStore {
     }
 
     func imageURL(fileName: String) -> URL? {
+        guard StoredFileName.isSafe(fileName) else { return nil }
         let url = directory.appendingPathComponent(fileName)
         return fileManager.fileExists(atPath: url.path) ? url : nil
     }
@@ -98,6 +99,10 @@ final class KeyReactionStore {
         let ext = sourceURL.pathExtension.lowercased()
         guard FolderImageSelection.supportedExtensions.contains(ext) else {
             throw KeyReactionError.unsupportedFormat(sourceURL.lastPathComponent)
+        }
+        let values = try? sourceURL.resourceValues(forKeys: [.isSymbolicLinkKey, .isRegularFileKey])
+        guard values?.isSymbolicLink == false, values?.isRegularFile == true else {
+            throw KeyReactionError.unreadableImage(sourceURL.lastPathComponent)
         }
         guard NSImage(contentsOf: sourceURL) != nil else {
             throw KeyReactionError.unreadableImage(sourceURL.lastPathComponent)

@@ -9,6 +9,10 @@ struct TodoFileStorage {
     }
     func load() throws -> TodoState {
         guard FileManager.default.fileExists(atPath: url.path) else { return TodoState() }
+        let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey])
+        guard values?.isRegularFile == true, values?.isSymbolicLink != true, (values?.fileSize ?? 0) <= 10 * 1024 * 1024 else {
+            throw TodoDataError.invalidState
+        }
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         let state = try decoder.decode(TodoState.self, from: Data(contentsOf: url))
@@ -23,6 +27,7 @@ struct TodoFileStorage {
         let data = try encoder.encode(state)
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try data.write(to: url, options: .atomic)
+        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
     }
 }
 

@@ -1,6 +1,13 @@
 import AppKit
 import Foundation
 
+/// Validates that a file or folder name is a single path component to prevent directory traversal.
+enum StoredFileName {
+    static func isSafe(_ name: String) -> Bool {
+        !name.isEmpty && name != "." && name != ".." && !name.contains("/")
+    }
+}
+
 struct FolderImageSelection {
     let idleURL: URL?
     let reactionURLs: [URL]
@@ -44,6 +51,7 @@ enum PetImageLibraryError: LocalizedError {
     case noReactionImages
     case imageSetNotFound
     case cannotDeleteBuiltInSet
+    case invalidStoragePath
 
     var errorDescription: String? {
         switch self {
@@ -53,6 +61,7 @@ enum PetImageLibraryError: LocalizedError {
         case .noReactionImages: L("Select at least one reaction image.")
         case .imageSetNotFound: L("Image set not found.")
         case .cannotDeleteBuiltInSet: L("The built-in image set cannot be removed.")
+        case .invalidStoragePath: L("Cannot read image: %1$@", "invalid path")
         }
     }
 }
@@ -139,7 +148,9 @@ final class PetImageLibrary {
 
     func presetImageURL(fileName: String, in set: PetImageSet) -> URL? {
         if let existing = resolvedURL(fileName: fileName, set: set) { return existing }
-        let imported = setsDirectory.appendingPathComponent(set.storageFolder ?? set.id.uuidString)
+        let folder = set.storageFolder ?? set.id.uuidString
+        guard !set.isBuiltIn, StoredFileName.isSafe(fileName), StoredFileName.isSafe(folder) else { return nil }
+        let imported = setsDirectory.appendingPathComponent(folder)
             .appendingPathComponent(fileName)
         return fileManager.fileExists(atPath: imported.path) ? imported : nil
     }
@@ -308,6 +319,9 @@ final class PetImageLibrary {
 
     private func storageDirectory(for set: PetImageSet) throws -> URL {
         let folder = set.storageFolder ?? set.id.uuidString
+        guard StoredFileName.isSafe(folder) else {
+            throw PetImageLibraryError.invalidStoragePath
+        }
         let url = setsDirectory.appendingPathComponent(folder, isDirectory: true)
         try fileManager.createDirectory(at: url, withIntermediateDirectories: true)
         return url
@@ -317,6 +331,10 @@ final class PetImageLibrary {
         let ext = sourceURL.pathExtension.lowercased()
         guard FolderImageSelection.supportedExtensions.contains(ext) else {
             throw PetImageLibraryError.unsupportedFormat(sourceURL.lastPathComponent)
+        }
+        let values = try? sourceURL.resourceValues(forKeys: [.isSymbolicLinkKey, .isRegularFileKey])
+        guard values?.isSymbolicLink == false, values?.isRegularFile == true else {
+            throw PetImageLibraryError.unreadableImage(sourceURL.lastPathComponent)
         }
         guard NSImage(contentsOf: sourceURL) != nil else {
             throw PetImageLibraryError.unreadableImage(sourceURL.lastPathComponent)

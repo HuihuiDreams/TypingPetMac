@@ -40,4 +40,29 @@ final class KeyReactionTests: XCTestCase {
         XCTAssertEqual(restored.rules.count, 1)
         XCTAssertNotNil(restored.imageURL(matching: stroke))
     }
+
+    @MainActor
+    func testKeyReactionStoreRejectsUnsafeFileNamesAndSymlinks() throws {
+        XCTAssertFalse(StoredFileName.isSafe("../outside.png"))
+        XCTAssertFalse(StoredFileName.isSafe("/etc/passwd"))
+        XCTAssertFalse(StoredFileName.isSafe(""))
+        XCTAssertFalse(StoredFileName.isSafe("."))
+        XCTAssertFalse(StoredFileName.isSafe(".."))
+        XCTAssertTrue(StoredFileName.isSafe("valid-image.png"))
+
+        let fileManager = FileManager.default
+        let root = fileManager.temporaryDirectory.appendingPathComponent("TypingPetKeys-\(UUID())", isDirectory: true)
+        let stored = root.appendingPathComponent("Rules", isDirectory: true)
+        try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: root) }
+
+        let packageRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let realImage = packageRoot.appendingPathComponent("Sources/TypingPet/Resources/pet-left.png")
+        let symlink = root.appendingPathComponent("symlink.png")
+        try fileManager.createSymbolicLink(at: symlink, withDestinationURL: realImage)
+
+        let store = KeyReactionStore(fileManager: fileManager, defaults: UserDefaults.standard, directory: stored)
+        XCTAssertNil(store.imageURL(fileName: "../evil.png"))
+        XCTAssertThrowsError(try store.setRule(for: KeyStroke(keyCode: 1, modifiers: []), image: symlink))
+    }
 }

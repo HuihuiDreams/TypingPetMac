@@ -123,9 +123,18 @@ final class TodoBubbleWindowController {
         notificationTokens.append(NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.synchronize() }
         })
+        notificationTokens.append(NotificationCenter.default.addObserver(forName: NSWindow.didResignKeyNotification, object: panel, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { _ = self?.panel.makeFirstResponder(nil) }
+        })
         // The canvas is mostly transparent. Let clicks outside the bubble reach the windows below.
-        if let monitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged, .leftMouseDown, .rightMouseDown], handler: { [weak self] _ in
-            MainActor.assumeIsolated { self?.updatePointerState() }
+        if let monitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged, .leftMouseDown, .rightMouseDown], handler: { [weak self] event in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                if event.type == .leftMouseDown || event.type == .rightMouseDown {
+                    self.panel.makeFirstResponder(nil)
+                }
+                self.updatePointerState()
+            }
         }) { mouseMonitors.append(monitor) }
         if let monitor = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged], handler: { [weak self] event in
             MainActor.assumeIsolated { self?.updatePointerState() }
@@ -141,12 +150,22 @@ final class TodoBubbleWindowController {
             })
         }
         notificationTokens.append(NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.willSleepNotification, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.store.pauseForSleep() }
+            MainActor.assumeIsolated {
+                self?.panel.makeFirstResponder(nil)
+                self?.store.pauseForSleep()
+            }
         })
         // Locking the screen is the clearest sign of leaving. The display can sleep without it, which idle time covers.
         for (name, locked) in [("com.apple.screenIsLocked", true), ("com.apple.screenIsUnlocked", false)] {
             notificationTokens.append(DistributedNotificationCenter.default().addObserver(forName: Notification.Name(name), object: nil, queue: .main) { [weak self] _ in
-                MainActor.assumeIsolated { if locked { self?.store.screenDidLock() } else { self?.store.screenDidUnlock() } }
+                MainActor.assumeIsolated {
+                    if locked {
+                        self?.panel.makeFirstResponder(nil)
+                        self?.store.screenDidLock()
+                    } else {
+                        self?.store.screenDidUnlock()
+                    }
+                }
             })
         }
         let timer = Timer(timeInterval: 0.2, repeats: true) { [weak self] _ in

@@ -362,4 +362,31 @@ final class TodoPersistenceTests: XCTestCase {
         try Data(text.utf8).write(to: storage.url)
         XCTAssertThrowsError(try storage.load())
     }
+
+    func testInputHardeningBoundsTitlesRejectsSymlinksAndSecuresPermissions() throws {
+        let huge = String(repeating: "a\nb ", count: 20_000)
+        let draft = TodoTitlePolicy.limitedDraft(huge)
+        XCTAssertEqual(draft.count, TodoTitlePolicy.maxLength)
+        XCTAssertFalse(draft.contains("\n"))
+        let normalized = TodoTitlePolicy.normalized(huge)
+        XCTAssertLessThanOrEqual(normalized.count, TodoTitlePolicy.maxLength)
+        XCTAssertFalse(normalized.contains("\n"))
+
+        var multilineState = TodoState(todos: [TodoItem(title: "Line 1\nLine 2", createdAt: Date())])
+        XCTAssertThrowsError(try multilineState.validate())
+        multilineState.todos[0].title = String(repeating: "x", count: 1001)
+        XCTAssertThrowsError(try multilineState.validate())
+
+        let file = try temporaryFile()
+        let storage = TodoFileStorage(url: file)
+        var e = TestClock().engine()
+        _ = e.addTodo("Private task")
+        try storage.save(e.state)
+        let perms = try FileManager.default.attributesOfItem(atPath: file.path)[.posixPermissions] as? Int
+        XCTAssertEqual(perms, 0o600)
+
+        let link = file.deletingLastPathComponent().appendingPathComponent("symlink.json")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: file)
+        XCTAssertThrowsError(try TodoFileStorage(url: link).load())
+    }
 }
