@@ -49,9 +49,12 @@ sha256="$(shasum -a 256 "$archive" | cut -d ' ' -f 1)"
 signature="$(swift "$project_dir/scripts/update_keys.swift" sign "$channel" "$archive")"
 notes="${UPDATE_NOTES:-$(awk -v v="## $version " 'index($0, v) == 1 { found = 1; next } /^## / && found { exit } found && NF' "$project_dir/CHANGELOG.md")}"
 
-python3 - "$staging/latest.json" "$version" "$build" "$minimum" "$base_url/$channel/$archive_name" "$size" "$sha256" "$signature" "$notes" <<'PYJSON'
+python3 - "$staging/latest.json" "$version" "$build" "$minimum" "$base_url/$channel/$archive_name" "$size" "$sha256" "$signature" "$notes" "$project_dir" "$channel" <<'PYJSON'
 import json, sys
-path, version, build, minimum, url, size, sha256, signature, notes = sys.argv[1:]
+from pathlib import Path
+path, version, build, minimum, url, size, sha256, signature, notes, project, channel = sys.argv[1:]
+sys.path.insert(0, str(Path(project) / "scripts"))
+from release_notes import localized_release_notes
 manifest = {
     "version": version,
     "build": int(build),
@@ -63,6 +66,9 @@ manifest = {
 }
 if notes.strip():
     manifest["notes"] = notes.strip()
+translations = localized_release_notes(Path(project), version, required=channel == "production")
+if translations:
+    manifest["localizedNotes"] = translations
 with open(path, "w") as file:
     json.dump(manifest, file, ensure_ascii=False, indent=2)
     file.write("\n")

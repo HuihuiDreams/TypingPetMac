@@ -1,5 +1,59 @@
 [
   {
+    "version": "0.19.0",
+    "date": "2026-10-26",
+    "ko": {
+      "title": "더 매끄러운 설정과 다국어 업데이트 안내",
+      "items": [
+        "설정 사이드바를 항상 표시하고, 뒤로·앞으로 이동과 스크롤해도 유지되는 제목을 추가했습니다.",
+        "설정을 스위치와 그룹으로 정리하고 선택 메뉴·버튼의 정렬과 높이를 맞췄습니다. 새 세트 팝오버의 꼬리 위치도 수정했습니다.",
+        "선택 표시와 키보드 강조에 macOS의 시스템 강조 색상을 적용합니다.",
+        "기본 세트와 다섯 프리셋의 이름을 선택한 앱 언어로 표시합니다. 직접 지은 이름은 유지하고 불필요한 안내 문구는 줄였습니다.",
+        "업데이트 변경 내역을 한국어·영어·일본어·중국어 간체·번체로 지원합니다."
+      ]
+    },
+    "en": {
+      "title": "Smoother Settings and multilingual update notes",
+      "items": [
+        "Keep the Settings sidebar visible and add Back/Forward navigation with a title that stays in place while scrolling.",
+        "Organize settings into groups with native switches. Align selection controls and button heights, and fix the New Set popover arrow.",
+        "Use the macOS accent color for selections and keyboard highlights.",
+        "Display the built-in set and its five preset names in the selected app language. Preserve custom names and remove redundant hints.",
+        "Support update release notes in Korean, English, Japanese, Simplified Chinese, and Traditional Chinese."
+      ]
+    },
+    "ja": {
+      "title": "より使いやすい設定と多言語のアップデート案内",
+      "items": [
+        "設定のサイドバーを常に表示し、戻る・進む操作と、スクロールしても固定されるタイトルを追加しました。",
+        "設定をグループに整理し、標準のスイッチを採用しました。選択メニューやボタンの位置と高さを揃え、新規セットのポップオーバーの矢印を修正しました。",
+        "選択状態やキーボードの強調表示にmacOSのアクセントカラーを使用します。",
+        "標準セットと5つのプリセットの名前を、選択したアプリの言語で表示します。自分で付けた名前はそのままに、不要な案内を減らしました。",
+        "アップデートの変更内容を韓国語・英語・日本語・簡体字中国語・繁体字中国語で表示できます。"
+      ]
+    },
+    "zh-Hans": {
+      "title": "更流畅的设置与多语言更新说明",
+      "items": [
+        "设置侧边栏始终显示，并新增后退、前进操作和滚动时保持固定的标题。",
+        "将设置分组并改用原生开关，统一选择菜单与按钮的对齐和高度，修正新建套组弹出框的箭头位置。",
+        "选择状态和键盘高亮跟随macOS系统强调色。",
+        "内置套组及其五个预设的名称跟随所选应用语言显示。保留自定义名称，并减少多余提示。",
+        "更新说明支持韩语、英语、日语、简体中文和繁体中文。"
+      ]
+    },
+    "zh-Hant": {
+      "title": "更流暢的設定與多語言更新說明",
+      "items": [
+        "設定側邊欄永遠顯示，並新增返回、前進操作及捲動時保持固定的標題。",
+        "將設定分組並改用原生開關，統一選擇選單與按鈕的對齊和高度，修正新增套組彈出框的箭頭位置。",
+        "選取狀態和鍵盤反白顯示跟隨macOS系統輔助色。",
+        "內建套組及其五個預設的名稱跟隨所選應用程式語言顯示。保留自訂名稱，並減少多餘提示。",
+        "更新說明支援韓文、英文、日文、簡體中文與繁體中文。"
+      ]
+    }
+  },
+  {
     "version": "0.18.2",
     "date": "2026-10-26",
     "ko": {

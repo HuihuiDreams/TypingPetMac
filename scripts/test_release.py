@@ -15,6 +15,7 @@ import zipfile
 
 from release import Release, digest, inspect_archive, inspect_bytes, version_tuple
 from homebrew_cask import render_cask, validate_cask_update
+from release_notes import LANGUAGES, localized_release_notes
 
 
 class ReleaseTests(unittest.TestCase):
@@ -24,6 +25,10 @@ class ReleaseTests(unittest.TestCase):
         self.root = Path(self.temp.name)
         (self.root / "version.json").write_text('{"version":"0.14.4","build":24}')
         (self.root / "CHANGELOG.md").write_text("# Changelog\n\n## 0.14.4 - 2026-10-24\n\n- A release fixture.\n")
+        (self.root / "website/src").mkdir(parents=True)
+        self.translations = {language: {"title": f"{language} title", "items": [f"{language} change"]} for language in LANGUAGES}
+        self.notes_path = self.root / "website/src/releases.json"
+        self.notes_path.write_text(json.dumps([{"version": "0.14.4", **self.translations}]))
         self.previous = {"version": "0.14.3", "build": 23, "url": "https://pet.miel.ing/update/production/old.zip", "signature": "fixture"}
         self.server = self.root / "server"
         (self.server / "production").mkdir(parents=True)
@@ -55,7 +60,7 @@ class ReleaseTests(unittest.TestCase):
         if command == ("git", "rev-parse", "HEAD"):
             return "a" * 40
         if command[:2] == ("git", "ls-files"):
-            return "version.json\0CHANGELOG.md\0"
+            return "version.json\0CHANGELOG.md\0website/src/releases.json\0"
         if command[0] == "security":
             return '1) 012345 "Developer ID Application: Fixture (AAAAAAAAAA)"'
         if command[0] == "curl":
@@ -184,7 +189,7 @@ class ReleaseTests(unittest.TestCase):
 
     def test_website_requires_all_languages_before_publication(self):
         directory = self.root / "website/src"
-        directory.mkdir(parents=True)
+        directory.mkdir(parents=True, exist_ok=True)
         languages = ["ko", "en", "ja", "zh-Hans", "zh-Hant"]
         (directory / "locales.json").write_text(json.dumps(dict.fromkeys(languages, {})))
         notes = [{"version": "0.14.4", "ko": {"title": "Fixture", "items": ["Fixture"]}}]
@@ -201,11 +206,38 @@ class ReleaseTests(unittest.TestCase):
 
     def test_website_rejects_notes_for_another_version(self):
         directory = self.root / "website/src"
-        directory.mkdir(parents=True)
+        directory.mkdir(parents=True, exist_ok=True)
         (directory / "locales.json").write_text('{"ko":{}}')
         (directory / "releases.json").write_text('[{"version":"0.14.3"}]')
         with self.assertRaisesRegex(RuntimeError, "ko website notes for 0.14.4"):
             self.make_release().check_website_notes()
+
+    def test_update_notes_select_matching_version_and_keep_all_translations(self):
+        self.notes_path.write_text(json.dumps([
+            {"version": "0.14.5", **{language: {"title": "Future", "items": ["Future"]} for language in LANGUAGES}},
+            {"version": "0.14.4", **self.translations},
+        ]))
+        notes = localized_release_notes(self.root, "0.14.4", required=True)
+        self.assertEqual(set(notes), set(LANGUAGES))
+        for language in LANGUAGES:
+            self.assertEqual(notes[language], f"{language} title\n\n• {language} change")
+
+    def test_missing_update_notes_remain_optional_for_old_development_versions(self):
+        self.assertEqual(localized_release_notes(self.root, "0.13.0"), {})
+        with self.assertRaisesRegex(RuntimeError, "ko website notes for 0.13.0"):
+            localized_release_notes(self.root, "0.13.0", required=True)
+
+    def test_blank_update_translation_stops_even_without_github_or_website_deployment(self):
+        self.translations["ja"]["items"] = [" "]
+        self.notes_path.write_text(json.dumps([{"version": "0.14.4", **self.translations}]))
+        with self.assertRaisesRegex(RuntimeError, "ja website notes"):
+            self.make_release(github=False).preflight()
+        self.assertFalse((self.root / "dist").exists())
+
+    def test_update_notes_preserve_unicode_and_literal_format_tokens(self):
+        self.translations["ko"] = {"title": "업데이트", "items": ["할 일 %1$@", "이미지 🐈"]}
+        self.notes_path.write_text(json.dumps([{"version": "0.14.4", **self.translations}]))
+        self.assertEqual(localized_release_notes(self.root, "0.14.4")["ko"], "업데이트\n\n• 할 일 %1$@\n• 이미지 🐈")
 
     def test_homebrew_refuses_draft_before_mutating_tap(self):
         release = self.make_release(homebrew=True)

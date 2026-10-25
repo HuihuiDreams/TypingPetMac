@@ -384,7 +384,6 @@
 "Enter a name for the pack and each preset." = "팩과 각 프리셋의 이름을 입력해 주세요.";
 "Give presets any name and reuse them across keys and reactions." = "프리셋 이름을 자유롭게 지정하고 여러 키와 반응에 사용하세요.";
 "Image Presets" = "이미지 프리셋";
-"Drop image files here or choose Add Images." = "이미지 파일을 여기로 끌어오거나 ‘이미지 추가’를 선택하세요.";
 "No supported image files were dropped." = "지원하는 이미지 파일을 놓아 주세요.";
 "Image Presets · Select Multiple" = "이미지 프리셋 · 여러 개 선택 가능";
 "Import Image Pack" = "이미지 팩 불러오기";
@@ -472,3 +471,8 @@
 "Enter" = "엔터";
 "Click a key to edit its presets." = "키를 클릭하면 프리셋 설정이 열립니다.";
 "Edit %1$@" = "%1$@ 프리셋 수정";
+
+/* Settings navigation */
+"Back" = "뒤로";
+"Forward" = "앞으로";
+"Navigate Settings" = "설정 탐색";

@@ -66,8 +66,28 @@ import json
 import sys
 
 with open(sys.argv[1]) as file:
-    assert json.load(file)["build"] == 19
+    manifest = json.load(file)
+assert manifest["build"] == 19
+assert "localizedNotes" not in manifest  # Legacy development fixtures remain compatible.
 PYCHECK
+
+# The publisher includes the matching website translations without replacing legacy notes.
+localized_version="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))[0]["version"])' "$project_dir/website/src/releases.json")"
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $localized_version" "$app/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c 'Set :CFBundleVersion 20' "$app/Contents/Info.plist"
+UPDATE_NOTES='Legacy release notes' "$project_dir/scripts/publish_update.sh" development "$app" "$test_root/localized" >/dev/null
+python3 - "$test_root/localized/development/latest.json" "$project_dir/website/src/releases.json" <<'PYLOCALIZED'
+import json, sys
+with open(sys.argv[1]) as file:
+    manifest = json.load(file)
+with open(sys.argv[2]) as file:
+    note = next(note for note in json.load(file) if note['version'] == manifest['version'])
+assert manifest['notes'] == 'Legacy release notes'
+assert set(manifest['localizedNotes']) == {'ko', 'en', 'ja', 'zh-Hans', 'zh-Hant'}
+for language, text in manifest['localizedNotes'].items():
+    assert text.startswith(note[language]['title'])
+    assert '• ' + note[language]['items'][0] in text
+PYLOCALIZED
 
 swift "$project_dir/scripts/update_keys.swift" generate production >/dev/null
 cp "$TYPINGPET_UPDATE_KEY_DIR/production.key" "$TYPINGPET_UPDATE_KEY_DIR/development.key"

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.19.0 - 2026-10-26
+
+- Keep the Settings sidebar visible and add Back/Forward navigation with a title that stays in place while scrolling.
+- Use native switches and grouped settings rows. Align selection controls and action buttons, match Duplicate and set-menu button heights, and fix the New Set popover arrow.
+- Follow the macOS accent color for controls, preset selections, active-set indicators, and keyboard highlights.
+- Display the built-in set and preset names in the selected app language without rewriting saved data or translating custom names. Remove redundant image-import and modifier-selection hints.
+- Support update release notes in Korean, English, Japanese, Simplified Chinese, and Traditional Chinese, with English and legacy-feed fallbacks. Validate all translations before publishing.
+
 ## 0.18.2 - 2026-10-26
 
 - Validate stored image filenames and set folders across preset, resting, and typing-reaction lookups; reject symbolic links and non-regular files when importing images.
