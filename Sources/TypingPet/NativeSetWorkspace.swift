@@ -611,7 +611,13 @@ private struct GalleryPresetPopover: View {
                 Spacer()
                 Button { controller.close() } label: { Image(systemName: "xmark") }.buttonStyle(.plain).accessibilityLabel(L("Close"))
             }
-            TextField(L("Preset Name"), text: $name).textFieldStyle(.roundedBorder).onSubmit(apply)
+            TextField(L("Preset Name"), text: $name)
+                .textFieldStyle(.roundedBorder)
+                .onChange(of: name) { value in
+                    let limited = TodoTitlePolicy.limitedDraft(value)
+                    if limited != value { name = limited }
+                }
+                .onSubmit(apply)
             HStack {
                 Button(L("Replace Image…")) { editor.selectedPresetID = presetID; controller.close(); editor.replacePresetImage() }
                 Button(L("Delete Image")) { editor.selectedPresetID = presetID; controller.close(); editor.removeSelectedPreset() }

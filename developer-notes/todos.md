@@ -171,6 +171,10 @@ The engine measures monotonic elapsed time. It does not count timer callbacks.
 Countdown segments clamp at their configured duration. Paused time and expired waiting time do not count.
 The app saves each state change and checkpoints running time about every five seconds.
 Writes use atomic replacement. A damaged or unsupported file blocks changes and remains unchanged.
+Only regular record files are read; symbolic links and files larger than 10 MiB are rejected.
+The same size limit applies before saving so the app cannot write records it would refuse to reopen.
+Each save creates a private temporary file, applies `0600` permissions before writing personal data,
+and atomically replaces the destination. A permission or write failure preserves the previous file.
 Save errors appear in the panel. A failed save during normal quit offers retry, cancel, or quit without saving.
 
 Sleep pauses and saves the active timer. Wake does not resume it.

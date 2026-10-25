@@ -587,7 +587,14 @@ private struct CreateSetPopover: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text(L("New Set")).font(.headline)
-            TextField(L("Pack Name"), text: $name).textFieldStyle(.roundedBorder).focused($focused).onSubmit(create)
+            TextField(L("Pack Name"), text: $name)
+                .textFieldStyle(.roundedBorder)
+                .focused($focused)
+                .onChange(of: name) { value in
+                    let limited = TodoTitlePolicy.limitedDraft(value)
+                    if limited != value { name = limited }
+                }
+                .onSubmit(create)
             Text(L("Create an empty pack, then add your images.")).font(.callout).foregroundStyle(.secondary)
             if let error { Text(error).foregroundStyle(.red).font(.callout) }
             HStack {

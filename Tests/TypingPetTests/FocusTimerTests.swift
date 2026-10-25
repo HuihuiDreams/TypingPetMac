@@ -1,4 +1,5 @@
 import XCTest
+import Darwin
 @testable import TypingPet
 
 private final class TestClock {
@@ -361,5 +362,107 @@ final class TodoPersistenceTests: XCTestCase {
         text = text.replacingOccurrences(of: "\"totalActiveSeconds\" : 60", with: "\"totalActiveSeconds\" : 600")
         try Data(text.utf8).write(to: storage.url)
         XCTAssertThrowsError(try storage.load())
+    }
+
+    func testInputHardeningBoundsTitlesRejectsSymlinksAndSecuresPermissions() throws {
+        let huge = String(repeating: "a\nb ", count: 20_000)
+        let draft = TodoTitlePolicy.limitedDraft(huge)
+        XCTAssertEqual(draft.count, TodoTitlePolicy.maxLength)
+        XCTAssertFalse(draft.contains("\n"))
+        let normalized = TodoTitlePolicy.normalized(huge)
+        XCTAssertLessThanOrEqual(normalized.count, TodoTitlePolicy.maxLength)
+        XCTAssertFalse(normalized.contains("\n"))
+
+        var multilineState = TodoState(todos: [TodoItem(title: "Line 1\nLine 2", createdAt: Date())])
+        XCTAssertThrowsError(try multilineState.validate())
+        multilineState.todos[0].title = String(repeating: "x", count: 1001)
+        XCTAssertThrowsError(try multilineState.validate())
+
+        let file = try temporaryFile()
+        let storage = TodoFileStorage(url: file)
+        var e = TestClock().engine()
+        _ = e.addTodo("Private task")
+        try storage.save(e.state)
+        let perms = try FileManager.default.attributesOfItem(atPath: file.path)[.posixPermissions] as? Int
+        XCTAssertEqual(perms, 0o600)
+
+        let link = file.deletingLastPathComponent().appendingPathComponent("symlink.json")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: file)
+        XCTAssertThrowsError(try TodoFileStorage(url: link).load())
+    }
+
+    func testSaveCreatesAndReplacesWithOwnerOnlyPermissions() throws {
+        let file = try temporaryFile()
+        let storage = TodoFileStorage(url: file)
+        var state = TodoState(todos: [TodoItem(title: "First", createdAt: Date())])
+        try storage.save(state)
+        XCTAssertEqual(try FileManager.default.attributesOfItem(atPath: file.path)[.posixPermissions] as? Int, 0o600)
+
+        try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: file.path)
+        state.todos[0].title = "Replacement"
+        try storage.save(state)
+        XCTAssertEqual(try FileManager.default.attributesOfItem(atPath: file.path)[.posixPermissions] as? Int, 0o600)
+        XCTAssertEqual(try storage.load().todos[0].title, "Replacement")
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: file.deletingLastPathComponent().path), [file.lastPathComponent])
+    }
+
+    func testPermissionFailurePreservesOriginalAndRemovesTemporaryFile() throws {
+        let file = try temporaryFile()
+        let original = TodoState(todos: [TodoItem(title: "Keep me", createdAt: Date())])
+        try TodoFileStorage(url: file).save(original)
+        let bytes = try Data(contentsOf: file)
+        let storage = TodoFileStorage(url: file, setPrivatePermissions: { descriptor in
+            var attributes = stat()
+            XCTAssertEqual(fstat(descriptor, &attributes), 0)
+            XCTAssertEqual(attributes.st_size, 0, "Personal data was written before its permissions were secured")
+            throw POSIXError(.EPERM)
+        })
+        XCTAssertThrowsError(try storage.save(TodoState()))
+        XCTAssertEqual(try Data(contentsOf: file), bytes)
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: file.deletingLastPathComponent().path), [file.lastPathComponent])
+    }
+
+    func testOversizedSaveDoesNotReplaceReadableRecords() throws {
+        let file = try temporaryFile()
+        let storage = TodoFileStorage(url: file)
+        try storage.save(TodoState())
+        let original = try Data(contentsOf: file)
+        let title = String(repeating: "🔒", count: 1000)
+        let oversized = TodoState(todos: (0..<3000).map { _ in TodoItem(title: title, createdAt: Date()) })
+        XCTAssertThrowsError(try storage.save(oversized))
+        XCTAssertEqual(try Data(contentsOf: file), original)
+        XCTAssertEqual(try storage.load(), TodoState())
+    }
+
+    @MainActor
+    func testUnsafeRecordFilesBlockLoadingWithoutOverwritingThem() throws {
+        let file = try temporaryFile()
+        let fifo = file.deletingLastPathComponent().appendingPathComponent("fifo.json")
+        XCTAssertEqual(mkfifo(fifo.path, 0o600), 0)
+        XCTAssertThrowsError(try TodoFileStorage(url: fifo).load())
+
+        let dangling = file.deletingLastPathComponent().appendingPathComponent("dangling.json")
+        try FileManager.default.createSymbolicLink(at: dangling, withDestinationURL: file)
+        XCTAssertThrowsError(try TodoFileStorage(url: dangling).load())
+
+        XCTAssertTrue(FileManager.default.createFile(atPath: file.path, contents: nil))
+        let handle = try FileHandle(forWritingTo: file)
+        try handle.truncate(atOffset: UInt64(TodoFileStorage.maximumFileSize + 1))
+        try handle.close()
+        let suite = "TypingPetOversizedRecords.\(UUID())"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = TodoStore(url: file, defaults: defaults)
+        XCTAssertTrue(store.loadBlocked)
+        store.change { _ = $0.addTodo("Must not overwrite") }
+        store.persist()
+        XCTAssertEqual(try FileManager.default.attributesOfItem(atPath: file.path)[.size] as? Int, TodoFileStorage.maximumFileSize + 1)
+    }
+
+    func testPersistedTitlesRejectEveryNewlineKind() {
+        for newline in ["\n", "\r", "\r\n", "\u{0085}", "\u{2028}", "\u{2029}"] {
+            let state = TodoState(todos: [TodoItem(title: "First\(newline)Second", createdAt: Date())])
+            XCTAssertThrowsError(try state.validate())
+        }
     }
 }
