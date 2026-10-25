@@ -85,24 +85,24 @@ final class TodoStore: ObservableObject {
     private var screenLocked = false
     private var attentionOnReturn: Date?
     private let defaults: UserDefaults
-    private static let zoomKey = "todoBubbleZoom"
-    private static let visibilityKey = "todoBubbleVisibility"
-    private static let restingOpacityKey = "todoBubbleRestingOpacity"
-    private static let hoverOpacityKey = "todoBubbleHoverOpacity"
-    private static let listStyleKey = "todoListStyle"
-    private static let idleMinutesKey = "todoIdleMinutes"
+    private static let zoomKey = AppPreferencesKey.todoBubbleZoom
+    private static let visibilityKey = AppPreferencesKey.todoBubbleVisibility
+    private static let restingOpacityKey = AppPreferencesKey.todoBubbleRestingOpacity
+    private static let hoverOpacityKey = AppPreferencesKey.todoBubbleHoverOpacity
+    private static let listStyleKey = AppPreferencesKey.todoListStyle
+    private static let idleMinutesKey = AppPreferencesKey.todoIdleMinutes
 
     init(url: URL = TodoFileStorage.defaultURL, defaults: UserDefaults = AppEnvironment.defaults, monotonicNow: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }, wallNow: @escaping () -> Date = Date.init, idleSeconds: @escaping () -> Double = SystemIdle.seconds) {
         storage = TodoFileStorage(url: url)
         self.defaults = defaults
         self.wallNow = wallNow
         self.idleSeconds = idleSeconds
-        idleMinutes = (defaults.object(forKey: Self.idleMinutesKey) as? Int).flatMap { Self.idleMinuteChoices.contains($0) ? $0 : nil } ?? 15
-        zoom = (defaults.object(forKey: Self.zoomKey) as? Double).map(TodoBubbleZoom.normalized) ?? 1
-        bubbleVisibility = defaults.string(forKey: Self.visibilityKey).flatMap(TodoBubbleVisibility.init(rawValue:)) ?? .always
-        bubbleRestingOpacity = (defaults.object(forKey: Self.restingOpacityKey) as? Double).map(Self.clampedOpacity) ?? 1
-        bubbleHoverOpacity = (defaults.object(forKey: Self.hoverOpacityKey) as? Double).map(Self.clampedOpacity) ?? 1
-        listStyle = defaults.string(forKey: Self.listStyleKey).flatMap(TodoListStyle.init(rawValue:)) ?? .full
+        idleMinutes = (defaults.object(forKey: Self.idleMinutesKey) as? Int).flatMap { Self.idleMinuteChoices.contains($0) ? $0 : nil } ?? AppPreferencesDefault.todoIdleMinutes
+        zoom = (defaults.object(forKey: Self.zoomKey) as? Double).map(TodoBubbleZoom.normalized) ?? AppPreferencesDefault.todoBubbleZoom
+        bubbleVisibility = TodoBubbleVisibility(rawValue: defaults.string(forKey: Self.visibilityKey) ?? AppPreferencesDefault.todoBubbleVisibility) ?? .always
+        bubbleRestingOpacity = (defaults.object(forKey: Self.restingOpacityKey) as? Double).map(Self.clampedOpacity) ?? AppPreferencesDefault.todoBubbleRestingOpacity
+        bubbleHoverOpacity = (defaults.object(forKey: Self.hoverOpacityKey) as? Double).map(Self.clampedOpacity) ?? AppPreferencesDefault.todoBubbleHoverOpacity
+        listStyle = TodoListStyle(rawValue: defaults.string(forKey: Self.listStyleKey) ?? AppPreferencesDefault.todoListStyle) ?? .full
         self.monotonicNow = monotonicNow
         lastCheckpoint = monotonicNow()
         do {

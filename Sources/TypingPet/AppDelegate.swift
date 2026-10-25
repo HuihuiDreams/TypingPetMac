@@ -29,8 +29,8 @@ internal final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegat
     private var updateItem: NSMenuItem!
     private let updater = UpdateController()
     private var permissionRetryTimer: Timer?
-    private static let inputMonitoringWelcomeShownKey = "inputMonitoringWelcomeShown-v1"
-    private static let inputMonitoringSetupPendingKey = "inputMonitoringSetupPending-v1"
+    private static let inputMonitoringWelcomeShownKey = AppPreferencesKey.inputMonitoringWelcomeShown
+    private static let inputMonitoringSetupPendingKey = AppPreferencesKey.inputMonitoringSetupPending
     private var settingsWindowController: SettingsWindowController?
     private var settingsModel: TypingPetSettingsModel?
     private var inputMonitoringGuideController: InputMonitoringGuideController?
@@ -61,9 +61,9 @@ internal final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegat
         }
 
         let shouldShowWelcome = !AppEnvironment.isDevelopment
-            && !AppEnvironment.defaults.bool(forKey: Self.inputMonitoringWelcomeShownKey)
+            && !(AppEnvironment.defaults.object(forKey: Self.inputMonitoringWelcomeShownKey) as? Bool ?? AppPreferencesDefault.inputMonitoringWelcomeShown)
         let shouldResumeSetup = !AppEnvironment.isDevelopment
-            && AppEnvironment.defaults.bool(forKey: Self.inputMonitoringSetupPendingKey)
+            && (AppEnvironment.defaults.object(forKey: Self.inputMonitoringSetupPendingKey) as? Bool ?? AppPreferencesDefault.inputMonitoringSetupPending)
 
         #if DEBUG
         if !ProcessInfo.processInfo.arguments.contains("--todo-preview"),
@@ -195,6 +195,7 @@ internal final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegat
                 applyShake: { [weak self] in self?.petController.shakeLevel = $0 },
                 applyAlwaysOnTop: { [weak self] in self?.petController.isAlwaysOnTop = $0 },
                 applyPositionLock: { [weak self] in self?.petController.isPositionLocked = $0 },
+                currentPositionLock: { [weak self] in self?.petController.isPositionLocked == true },
                 applyPointerAvoidance: { [weak self] in self?.petController.avoidsPointerWhenLocked = $0 },
                 reloadPet: { [weak self] in self?.petController.reloadImages() },
                 openInputMonitoringSettings: { [weak self] in self?.openInputMonitoringSettings() },
@@ -223,7 +224,7 @@ internal final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegat
             inputMonitoringGuideController = InputMonitoringGuideController(
                 idleURL: packStore.idleURL,
                 reactionURLs: imageLibrary.reactionURLs,
-                resumeSetup: AppEnvironment.defaults.bool(forKey: Self.inputMonitoringSetupPendingKey),
+                resumeSetup: AppEnvironment.defaults.object(forKey: Self.inputMonitoringSetupPendingKey) as? Bool ?? AppPreferencesDefault.inputMonitoringSetupPending,
                 onSetupStarted: {
                     AppEnvironment.defaults.set(true, forKey: Self.inputMonitoringSetupPendingKey)
                 },

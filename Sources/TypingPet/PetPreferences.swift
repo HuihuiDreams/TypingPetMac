@@ -45,6 +45,57 @@ enum AppPreferencesKey {
 
     /// JSON encoded key reaction rules mapping key strokes to custom images (`Data`).
     static let keyReactionRules = "keyReactionRules-v1"
+
+    // MARK: - Todo Bubble & Focus Timer
+    /// Todo bubble zoom scale factor (`Double`).
+    static let todoBubbleZoom = "todoBubbleZoom"
+
+    /// Todo bubble visibility mode (`String`).
+    static let todoBubbleVisibility = "todoBubbleVisibility"
+
+    /// Todo bubble resting opacity (`Double`).
+    static let todoBubbleRestingOpacity = "todoBubbleRestingOpacity"
+
+    /// Todo bubble hover opacity (`Double`).
+    static let todoBubbleHoverOpacity = "todoBubbleHoverOpacity"
+
+    /// Todo list display style (`String`).
+    static let todoListStyle = "todoListStyle"
+
+    /// System idle minutes threshold before timer pauses (`Int`).
+    static let todoIdleMinutes = "todoIdleMinutes"
+
+    // MARK: - Appearance & Localization
+    /// Settings window appearance theme mode (`String`).
+    static let settingsAppearanceMode = "SettingsAppearanceMode"
+
+    /// Application interface language preference mode (`String`).
+    static let appLanguageMode = "AppLanguageMode"
+
+    // MARK: - Updates & Onboarding
+    /// Whether automatic update checks are enabled (`Bool`).
+    static let automaticUpdateChecks = "AutomaticUpdateChecks"
+
+    /// Timestamp of the last automatic update check (`Date`).
+    static let lastUpdateCheck = "LastUpdateCheck"
+
+    /// Build number of the last notified update (`Int`).
+    static let notifiedUpdateBuild = "NotifiedUpdateBuild"
+
+    /// Build number of a staged pending update waiting to install (`Int`).
+    static let pendingUpdateBuild = "PendingUpdateBuild"
+
+    /// Temporary folder path of a staged pending update (`String`).
+    static let pendingUpdateFolder = "PendingUpdateFolder"
+
+    /// Custom update feed URL override for development builds (`String`).
+    static let updateFeedURL = "UpdateFeedURL"
+
+    /// Whether the input monitoring welcome panel has been shown (`Bool`).
+    static let inputMonitoringWelcomeShown = "inputMonitoringWelcomeShown-v1"
+
+    /// Whether input monitoring permission authorization is pending user completion (`Bool`).
+    static let inputMonitoringSetupPending = "inputMonitoringSetupPending-v1"
 }
 
 /// Standard fallback defaults and bounds for configuration options.
@@ -76,4 +127,21 @@ enum AppPreferencesDefault {
     // MARK: - Timing & Dimensions
     static let idleDelay: TimeInterval = 0.75
     static let fallbackBaseSize = NSSize(width: 453, height: 354)
+
+    // MARK: - Todo Bubble Defaults
+    static let todoBubbleZoom: Double = 1.0
+    static let todoBubbleVisibility: String = "always"
+    static let todoBubbleRestingOpacity: Double = 1.0
+    static let todoBubbleHoverOpacity: Double = 1.0
+    static let todoListStyle: String = "full"
+    static let todoIdleMinutes: Int = 15
+
+    // MARK: - Appearance & Localization Defaults
+    static let settingsAppearanceMode: String = "system"
+    static let appLanguageMode: String = "simplifiedChinese"
+
+    // MARK: - Updates & Onboarding Defaults
+    static let automaticUpdateChecks: Bool = true
+    static let inputMonitoringWelcomeShown: Bool = false
+    static let inputMonitoringSetupPending: Bool = false
 }

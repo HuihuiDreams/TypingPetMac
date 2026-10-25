@@ -30,7 +30,7 @@ struct UpdateManifest: Codable, Equatable {
 // Values the running bundle carries. Info.plist is covered by the code signature.
 struct UpdateConfiguration {
     static let productionFeedURL = URL(string: "https://pet.miel.ing/update/production/latest.json")!
-    static let feedOverrideKey = "UpdateFeedURL"
+    static let feedOverrideKey = AppPreferencesKey.updateFeedURL
 
     let profile: AppProfile
     let bundleIdentifier: String

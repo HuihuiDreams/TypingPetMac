@@ -18,9 +18,14 @@
 - 指针躲避算法预计算与短路防抖：`PetPointerAvoidance` 预计算旋转方向常量避免重复三角函数计算；避让定时器运行期间短路重复的 `targetOrigin` 冗余重算。
 - 设置面板缩放滑块流畅度优化：调整缩放时直接应用无动画平滑重设，消除连续拖拽滑块时的 AppKit 阻塞式窗口动画卡顿。
 - 图集切换内存卫生加固：`PetImageLibrary.activateSet` 切换不同图集时主动释放上一图集的反应图像内存缓存，防止大图集残留占用内存。
+- 偏好键与默认值集中管理：在 `PetPreferences.swift` 中统一集中定义全部 30 个 `AppPreferencesKey` 常量与 `AppPreferencesDefault` 默认值，全面消除待办气泡、专注计时器、语言模式、设置外观与更新检查中的字符串字面量，由 `PetPreferencesContractTests` 全量契约守卫。
+- 测试框架现代化升级：将全部 8 个遗留 `XCTest` 测试套件迁移至 Swift Testing 框架（`import Testing`、`@Suite`、`@Test`、`#expect`、`#require`），消除对命令行工具中缺失的 `XCTest.framework` 依赖，使 17 个测试套件（137 个测试）在 macOS CLT 环境下全数通过。
 
 ### Fixed
 
+- 修复 `PetImageLibrary.repairActiveSelection` 误将基于动作包（Pet Packs）动态管理的独立图集重置回内置图集的问题，增加 `!activeSet.idleFileName.isEmpty` 守卫保护。
+- 修复 `TypingPetSettingsModel` 丢失 `currentPositionLock` 闭包导致设置面板与主窗口锁定状态同步断裂的问题。
+- 修复 `PetPackTests` 仍引用不存在的旧版 `pet-left.png`/`pet-idle.png` 文件名及预设 5 个表情数量导致测试失败的问题。
 - 屏幕配置变化时先停止惯性滑动和指针避让，再将宠物窗口限制到当前可视区，防止运动定时器继续使用旧屏幕边界覆盖归位结果。
 - 按键规则索引保留安全的图像路径，文件暂时缺失时仅返回未命中；文件恢复后无需重启或修改规则即可重新响应。
 

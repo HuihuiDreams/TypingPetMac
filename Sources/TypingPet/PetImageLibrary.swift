@@ -426,7 +426,7 @@ final class PetImageLibrary {
     }
 
     private func repairActiveSelection() {
-        if !imageSets.contains(where: { $0.id == activeSetID }) || (activeSetID != Self.builtInID && idleURL(for: activeSet) == nil) {
+        if !imageSets.contains(where: { $0.id == activeSetID }) || (activeSetID != Self.builtInID && !activeSet.idleFileName.isEmpty && idleURL(for: activeSet) == nil) {
             activeSetID = Self.builtInID
         }
     }

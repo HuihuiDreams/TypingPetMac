@@ -14,11 +14,11 @@ final class UpdateController: ObservableObject {
     }
 
     static let checkInterval: TimeInterval = 24 * 60 * 60
-    private static let automaticKey = "AutomaticUpdateChecks"
-    private static let lastCheckKey = "LastUpdateCheck"
-    private static let notifiedBuildKey = "NotifiedUpdateBuild"
-    private static let pendingBuildKey = "PendingUpdateBuild"
-    private static let pendingFolderKey = "PendingUpdateFolder"
+    private static let automaticKey = AppPreferencesKey.automaticUpdateChecks
+    private static let lastCheckKey = AppPreferencesKey.lastUpdateCheck
+    private static let notifiedBuildKey = AppPreferencesKey.notifiedUpdateBuild
+    private static let pendingBuildKey = AppPreferencesKey.pendingUpdateBuild
+    private static let pendingFolderKey = AppPreferencesKey.pendingUpdateFolder
 
     @Published private(set) var phase: Phase = .idle
     @Published private(set) var lastChecked: Date?
@@ -45,7 +45,7 @@ final class UpdateController: ObservableObject {
     init(defaults: UserDefaults = AppEnvironment.defaults, bundle: Bundle = .main) {
         self.defaults = defaults
         self.bundle = bundle
-        automaticChecks = defaults.object(forKey: Self.automaticKey) as? Bool ?? true
+        automaticChecks = defaults.object(forKey: Self.automaticKey) as? Bool ?? AppPreferencesDefault.automaticUpdateChecks
         lastChecked = defaults.object(forKey: Self.lastCheckKey) as? Date
     }
 

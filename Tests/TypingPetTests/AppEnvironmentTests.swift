@@ -1,35 +1,38 @@
 import Foundation
-import XCTest
+import Testing
 @testable import TypingPet
 
-final class AppEnvironmentTests: XCTestCase {
-    func testRawRuntimeAndUnknownBundlesDefaultToDevelopment() {
-        XCTAssertEqual(AppProfile.resolve(channel: nil, bundleIdentifier: nil), .development)
-        XCTAssertEqual(AppProfile.resolve(channel: "production", bundleIdentifier: "unknown"), .development)
-        XCTAssertEqual(AppProfile.resolve(channel: "production", bundleIdentifier: "ing.miel.typingpet"), .production)
+@Suite struct AppEnvironmentTests {
+    @Test func rawRuntimeAndUnknownBundlesDefaultToDevelopment() {
+        #expect(AppProfile.resolve(channel: nil, bundleIdentifier: nil) == .development)
+        #expect(AppProfile.resolve(channel: "production", bundleIdentifier: "unknown") == .development)
+        #expect(AppProfile.resolve(channel: "production", bundleIdentifier: "ing.miel.typingpet") == .production)
     }
 
-    func testAllDevelopmentNamespacesDifferFromProduction() {
+    @Test func allDevelopmentNamespacesDifferFromProduction() {
         let dev = AppProfile.development
         let prod = AppProfile.production
         let base = URL(fileURLWithPath: "/tmp/profile-tests")
-        XCTAssertNotEqual(dev.bundleIdentifier, prod.bundleIdentifier)
-        XCTAssertNotEqual(dev.preferencesDomain, prod.preferencesDomain)
-        XCTAssertNotEqual(dev.preferencesDomain, dev.bundleIdentifier)
-        XCTAssertNotEqual(dev.supportDirectory(in: base), prod.supportDirectory(in: base))
-        XCTAssertNotEqual(dev.frameAutosaveName, prod.frameAutosaveName)
-        XCTAssertEqual(dev.displayName, "TypingPet Dev")
+        #expect(dev.bundleIdentifier != prod.bundleIdentifier)
+        #expect(dev.preferencesDomain != prod.preferencesDomain)
+        #expect(dev.preferencesDomain != dev.bundleIdentifier)
+        #expect(dev.supportDirectory(in: base) != prod.supportDirectory(in: base))
+        #expect(dev.frameAutosaveName != prod.frameAutosaveName)
+        #expect(dev.displayName == "TypingPet Dev")
     }
 
-    func testDuplicateDevelopmentRuntimeIsBlockedAndExitReleasesLock() throws {
+    @Test func duplicateDevelopmentRuntimeIsBlockedAndExitReleasesLock() throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: folder) }
         let file = folder.appendingPathComponent(".runtime.lock")
         var first: DevelopmentRunLock? = DevelopmentRunLock()
-        XCTAssertTrue(try first!.acquire(at: file))
+        let firstAcquired = try first?.acquire(at: file) == true
+        #expect(firstAcquired)
         let second = DevelopmentRunLock()
-        XCTAssertFalse(try second.acquire(at: file))
+        let secondBlocked = try second.acquire(at: file)
+        #expect(!secondBlocked)
         first = nil
-        XCTAssertTrue(try second.acquire(at: file))
+        let secondAcquired = try second.acquire(at: file)
+        #expect(secondAcquired)
     }
 }

@@ -1,60 +1,61 @@
 import Foundation
-import XCTest
+import Testing
 @testable import TypingPet
 
-final class LocalizationTests: XCTestCase {
-    func testSystemUsesFirstLanguageAndFallsBackToEnglish() {
+@Suite struct LocalizationTests {
+    @Test func systemUsesFirstLanguageAndFallsBackToChinese() {
         for language in ["ko", "ko-KR", "ko_KR"] {
-            XCTAssertEqual(AppLanguageMode.system.resolvedLanguage(preferredLanguages: [language]), "ko")
+            #expect(AppLanguageMode.system.resolvedLanguage(preferredLanguages: [language]) == "ko")
         }
-        for languages in [["en-US", "ko-KR"], ["fr"], [], ["kok-IN"], ["jaq"]] {
-            XCTAssertEqual(AppLanguageMode.system.resolvedLanguage(preferredLanguages: languages), "en")
+        #expect(AppLanguageMode.system.resolvedLanguage(preferredLanguages: ["en-US", "ko-KR"]) == "en")
+        for languages in [["fr"], [], ["kok-IN"], ["jaq"]] {
+            #expect(AppLanguageMode.system.resolvedLanguage(preferredLanguages: languages) == "zh-Hans")
         }
         for language in ["ja", "ja-JP", "ja_JP"] {
-            XCTAssertEqual(AppLanguageMode.system.resolvedLanguage(preferredLanguages: [language, "ko"]), "ja")
+            #expect(AppLanguageMode.system.resolvedLanguage(preferredLanguages: [language, "ko"]) == "ja")
         }
         for language in ["zh", "zh-CN", "zh-SG", "zh-Hans", "zh_Hans_CN", "zh-Hans-HK"] {
-            XCTAssertEqual(AppLanguageMode.system.resolvedLanguage(preferredLanguages: [language]), "zh-Hans")
+            #expect(AppLanguageMode.system.resolvedLanguage(preferredLanguages: [language]) == "zh-Hans")
         }
         for language in ["zh-TW", "zh-HK", "zh-MO", "zh-Hant", "zh_Hant_TW", "zh-Hant-CN"] {
-            XCTAssertEqual(AppLanguageMode.system.resolvedLanguage(preferredLanguages: [language]), "zh-Hant")
+            #expect(AppLanguageMode.system.resolvedLanguage(preferredLanguages: [language]) == "zh-Hant")
         }
-        XCTAssertEqual(AppLanguageMode.korean.resolvedLanguage(preferredLanguages: ["ja"]), "ko")
-        XCTAssertEqual(AppLanguageMode.english.resolvedLanguage(preferredLanguages: ["ko"]), "en")
-        XCTAssertEqual(AppLanguageMode.japanese.resolvedLanguage(preferredLanguages: ["en"]), "ja")
-        XCTAssertEqual(AppLanguageMode.simplifiedChinese.resolvedLanguage(preferredLanguages: ["zh-TW"]), "zh-Hans")
-        XCTAssertEqual(AppLanguageMode.traditionalChinese.resolvedLanguage(preferredLanguages: ["zh-CN"]), "zh-Hant")
+        #expect(AppLanguageMode.korean.resolvedLanguage(preferredLanguages: ["ja"]) == "ko")
+        #expect(AppLanguageMode.english.resolvedLanguage(preferredLanguages: ["ko"]) == "en")
+        #expect(AppLanguageMode.japanese.resolvedLanguage(preferredLanguages: ["en"]) == "ja")
+        #expect(AppLanguageMode.simplifiedChinese.resolvedLanguage(preferredLanguages: ["zh-TW"]) == "zh-Hans")
+        #expect(AppLanguageMode.traditionalChinese.resolvedLanguage(preferredLanguages: ["zh-CN"]) == "zh-Hant")
     }
 
-    func testPreferencePersistsAndInvalidPreferenceUsesSystem() throws {
+    @Test func preferencePersistsAndInvalidPreferenceUsesDefault() throws {
         let suite = "TypingPetLocalizationTests.\(UUID())"
-        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
-        XCTAssertEqual(AppLanguageMode.load(from: defaults), .system)
+        #expect(AppLanguageMode.load(from: defaults) == .simplifiedChinese)
         let localization = AppLocalization(defaults: defaults)
         localization.setMode(.english)
-        XCTAssertEqual(localization.language, "en")
-        XCTAssertEqual(AppLocalization(defaults: defaults).mode, .english)
+        #expect(localization.language == "en")
+        #expect(AppLocalization(defaults: defaults).mode == .english)
         localization.setMode(.korean)
-        XCTAssertEqual(localization.language, "ko")
+        #expect(localization.language == "ko")
         for mode in [AppLanguageMode.japanese, .simplifiedChinese, .traditionalChinese] {
             localization.setMode(mode)
-            XCTAssertEqual(AppLocalization(defaults: defaults).mode, mode)
-            XCTAssertEqual(localization.language, mode.resolvedLanguage())
-            XCTAssertEqual(localization.locale.language.languageCode?.identifier, mode == .japanese ? "ja" : "zh")
+            #expect(AppLocalization(defaults: defaults).mode == mode)
+            #expect(localization.language == mode.resolvedLanguage())
+            #expect(localization.locale.language.languageCode?.identifier == (mode == .japanese ? "ja" : "zh"))
         }
         defaults.set("unknown", forKey: AppLanguageMode.defaultsKey)
-        XCTAssertEqual(AppLanguageMode.load(from: defaults), .system)
+        #expect(AppLanguageMode.load(from: defaults) == .simplifiedChinese)
     }
 
-    func testAllResourcesHaveIdenticalKeysAndPlaceholders() throws {
+    @Test func allResourcesHaveIdenticalKeysAndPlaceholders() throws {
         func strings(_ language: String) throws -> [String: String] {
-            let bundle = try XCTUnwrap(AppLocalization.bundle(for: language))
-            let url = try XCTUnwrap(bundle.url(forResource: "Localizable", withExtension: "strings"))
-            return try XCTUnwrap(NSDictionary(contentsOf: url) as? [String: String])
+            let bundle = try #require(AppLocalization.bundle(for: language))
+            let url = try #require(bundle.url(forResource: "Localizable", withExtension: "strings"))
+            return try #require(NSDictionary(contentsOf: url) as? [String: String])
         }
         let english = try strings("en")
-        XCTAssertGreaterThan(english.count, 300)
+        #expect(english.count > 300)
         let regex = try NSRegularExpression(pattern: #"%[1-9][0-9]*\$@|%0?\d*d"#)
         func placeholders(_ text: String) -> [String] {
             regex.matches(in: text, range: NSRange(text.startIndex..., in: text))
@@ -62,28 +63,28 @@ final class LocalizationTests: XCTestCase {
         }
         for language in AppLanguageMode.supportedLanguages {
             let translated = try strings(language)
-            XCTAssertEqual(Set(translated.keys), Set(english.keys), language)
+            #expect(Set(translated.keys) == Set(english.keys))
             for key in english.keys {
-                let value = try XCTUnwrap(translated[key], "\(language): \(key)")
-                XCTAssertEqual(placeholders(value), placeholders(english[key]!), "\(language): \(key)")
-                if !key.hasPrefix("object.particle.") { XCTAssertFalse(value.isEmpty, "\(language): \(key)") }
+                let value = try #require(translated[key])
+                #expect(placeholders(value) == placeholders(english[key]!))
+                if !key.hasPrefix("object.particle.") { #expect(!value.isEmpty) }
             }
         }
-        XCTAssertEqual(AppLocalization.string("General", language: "ko"), "일반")
-        XCTAssertEqual(AppLocalization.string("General", language: "en"), "General")
-        XCTAssertEqual(AppLocalization.string("General", language: "ja"), "一般")
-        XCTAssertEqual(AppLocalization.string("General", language: "zh-Hans"), "通用")
-        XCTAssertEqual(AppLocalization.string("General", language: "zh-Hant"), "一般")
-        XCTAssertEqual(AppLocalization.string("General", language: "fr"), "General")
-        XCTAssertEqual(AppLocalization.string("object.particle.vowel", language: "en"), "")
+        #expect(AppLocalization.string("General", language: "ko") == "일반")
+        #expect(AppLocalization.string("General", language: "en") == "General")
+        #expect(AppLocalization.string("General", language: "ja") == "一般")
+        #expect(AppLocalization.string("General", language: "zh-Hans") == "通用")
+        #expect(AppLocalization.string("General", language: "zh-Hant") == "一般")
+        #expect(AppLocalization.string("General", language: "fr") == "通用")
+        #expect(AppLocalization.string("object.particle.vowel", language: "en") == "")
     }
 
-    func testArgumentsReorderAndUserTextStaysVerbatim() {
-        XCTAssertEqual(AppLocalization.string("%2$@ of %1$@ characters", language: "en", arguments: ["100", "3"]), "3 of 100 characters")
+    @Test func argumentsReorderAndUserTextStaysVerbatim() {
+        #expect(AppLocalization.string("%2$@ of %1$@ characters", language: "en", arguments: ["100", "3"]) == "3 of 100 characters")
         let title = "我的待办 %@ %2$@ 🐈"
-        XCTAssertEqual(AppLocalization.string("Complete %1$@", language: "en", arguments: [title]), "Complete " + title)
-        XCTAssertEqual(AppLocalization.string("%1$@\nClick to edit title", language: "en", arguments: [title]), title + "\nClick to edit title")
-        XCTAssertEqual(AppLocalization.string("Complete %1$@", language: "ja", arguments: [title]), title + "を完了にする")
-        XCTAssertEqual(AppLocalization.string("Complete %1$@", language: "zh-Hant", arguments: [title]), "完成 " + title)
+        #expect(AppLocalization.string("Complete %1$@", language: "en", arguments: [title]) == "Complete " + title)
+        #expect(AppLocalization.string("%1$@\nClick to edit title", language: "en", arguments: [title]) == title + "\nClick to edit title")
+        #expect(AppLocalization.string("Complete %1$@", language: "ja", arguments: [title]) == title + "を完了にする")
+        #expect(AppLocalization.string("Complete %1$@", language: "zh-Hant", arguments: [title]) == "完成 " + title)
     }
 }

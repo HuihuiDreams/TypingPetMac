@@ -1,10 +1,10 @@
 import AppKit
-import XCTest
+import Testing
 @testable import TypingPet
 
-@MainActor
-final class InputMonitoringGuideTests: XCTestCase {
-    func testWelcomeAndLocalPreviewDoNotRequestPermissionOrConnect() {
+@Suite @MainActor
+struct InputMonitoringGuideTests {
+    @Test func welcomeAndLocalPreviewDoNotRequestPermissionOrConnect() {
         var requests = 0
         var connections = 0
         var settings = 0
@@ -21,21 +21,21 @@ final class InputMonitoringGuideTests: XCTestCase {
 
         model.refresh()
         model.previewKeystroke()
-        XCTAssertTrue(model.hasTriedPreview)
-        XCTAssertTrue(model.previewImage === reaction)
-        XCTAssertFalse(model.receivedGlobalKeystroke())
-        XCTAssertEqual(model.phase, .preview)
-        XCTAssertEqual(requests, 0)
-        XCTAssertEqual(connections, 0)
-        XCTAssertEqual(settings, 0)
+        #expect(model.hasTriedPreview)
+        #expect(model.previewImage === reaction)
+        #expect(!model.receivedGlobalKeystroke())
+        #expect(model.phase == .preview)
+        #expect(requests == 0)
+        #expect(connections == 0)
+        #expect(settings == 0)
     }
 
-    func testOnlyExplicitSetupRequestsPermissionAndPollingDoesNotRepeatIt() {
+    @Test func onlyExplicitSetupRequestsPermissionAndPollingDoesNotRepeatIt() {
         var requests = 0
         var settings = 0
         let model = InputMonitoringGuideModel(
             isPermissionGranted: { false },
-            connectMonitoring: { _ in XCTFail("Cannot connect without permission"); return false },
+            connectMonitoring: { _ in Issue.record("Cannot connect without permission"); return false },
             requestPermission: { requests += 1 },
             openSettings: { settings += 1 }
         )
@@ -44,16 +44,16 @@ final class InputMonitoringGuideTests: XCTestCase {
         model.beginSetup()
         model.refresh()
         model.refresh(restart: true)
-        XCTAssertFalse(model.receivedGlobalKeystroke())
-        XCTAssertEqual(model.phase, .permission)
-        XCTAssertEqual(requests, 1)
-        XCTAssertEqual(settings, 1)
+        #expect(!model.receivedGlobalKeystroke())
+        #expect(model.phase == .permission)
+        #expect(requests == 1)
+        #expect(settings == 1)
         model.showSettings()
-        XCTAssertEqual(settings, 2)
-        XCTAssertEqual(requests, 1)
+        #expect(settings == 2)
+        #expect(requests == 1)
     }
 
-    func testPermissionAndConnectionAreInsufficientUntilRealGlobalEvent() {
+    @Test func permissionAndConnectionAreInsufficientUntilRealGlobalEvent() {
         var granted = false
         var connected = false
         let model = InputMonitoringGuideModel(
@@ -66,54 +66,54 @@ final class InputMonitoringGuideTests: XCTestCase {
         model.beginSetup()
         granted = true
         model.refresh()
-        XCTAssertEqual(model.phase, .connectionFailed)
-        XCTAssertFalse(model.receivedGlobalKeystroke())
+        #expect(model.phase == .connectionFailed)
+        #expect(!model.receivedGlobalKeystroke())
 
         connected = true
         model.refresh()
-        XCTAssertEqual(model.phase, .verifying)
+        #expect(model.phase == .verifying)
         model.previewKeystroke()
-        XCTAssertEqual(model.phase, .verifying)
-        XCTAssertFalse(model.hasTriedPreview)
+        #expect(model.phase == .verifying)
+        #expect(!model.hasTriedPreview)
 
-        XCTAssertTrue(model.receivedGlobalKeystroke())
-        XCTAssertEqual(model.phase, .complete)
+        #expect(model.receivedGlobalKeystroke())
+        #expect(model.phase == .complete)
         model.refresh()
-        XCTAssertEqual(model.phase, .complete)
-        XCTAssertFalse(model.receivedGlobalKeystroke(), "Completion should be reported only once")
+        #expect(model.phase == .complete)
+        #expect(!model.receivedGlobalKeystroke())
     }
 
-    func testAlreadyGrantedPermissionSkipsSystemSettingsAndRequest() {
+    @Test func alreadyGrantedPermissionSkipsSystemSettingsAndRequest() {
         let model = InputMonitoringGuideModel(
             isPermissionGranted: { true },
             connectMonitoring: { _ in true },
-            requestPermission: { XCTFail("Already authorized") },
-            openSettings: { XCTFail("No settings visit needed") }
+            requestPermission: { Issue.record("Already authorized") },
+            openSettings: { Issue.record("No settings visit needed") }
         )
         model.beginSetup()
-        XCTAssertEqual(model.phase, .verifying)
-        XCTAssertTrue(model.receivedGlobalKeystroke())
+        #expect(model.phase == .verifying)
+        #expect(model.receivedGlobalKeystroke())
     }
 
-    func testRelaunchResumesVerificationWithoutRequestingAgain() {
+    @Test func relaunchResumesVerificationWithoutRequestingAgain() {
         var granted = false
         let model = InputMonitoringGuideModel(
             resumeSetup: true,
             isPermissionGranted: { granted },
             connectMonitoring: { _ in true },
-            requestPermission: { XCTFail("Resuming must not request again") },
-            openSettings: { XCTFail("Resuming must not steal focus") }
+            requestPermission: { Issue.record("Resuming must not request again") },
+            openSettings: { Issue.record("Resuming must not steal focus") }
         )
-        XCTAssertEqual(model.phase, .permission)
+        #expect(model.phase == .permission)
         model.refresh()
-        XCTAssertEqual(model.phase, .permission)
+        #expect(model.phase == .permission)
         granted = true
         model.refresh()
-        XCTAssertEqual(model.phase, .verifying)
-        XCTAssertTrue(model.receivedGlobalKeystroke())
+        #expect(model.phase == .verifying)
+        #expect(model.receivedGlobalKeystroke())
     }
 
-    func testRevocationAndReconnectRequireVerificationAgain() {
+    @Test func revocationAndReconnectRequireVerificationAgain() {
         var granted = true
         var restartRequests: [Bool] = []
         let model = InputMonitoringGuideModel(
@@ -123,17 +123,17 @@ final class InputMonitoringGuideTests: XCTestCase {
             openSettings: {}
         )
         model.beginSetup()
-        XCTAssertTrue(model.receivedGlobalKeystroke())
+        #expect(model.receivedGlobalKeystroke())
         model.refresh(restart: true)
-        XCTAssertEqual(restartRequests.last, true)
-        XCTAssertEqual(model.phase, .verifying)
+        #expect(restartRequests.last == true)
+        #expect(model.phase == .verifying)
 
         granted = false
         model.refresh()
-        XCTAssertEqual(model.phase, .permission)
-        XCTAssertFalse(model.receivedGlobalKeystroke())
+        #expect(model.phase == .permission)
+        #expect(!model.receivedGlobalKeystroke())
         granted = true
-        XCTAssertTrue(model.receivedGlobalKeystroke(), "A key can arrive before the permission poll")
-        XCTAssertEqual(model.phase, .complete)
+        #expect(model.receivedGlobalKeystroke())
+        #expect(model.phase == .complete)
     }
 }

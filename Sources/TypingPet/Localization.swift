@@ -4,11 +4,11 @@ import Combine
 enum AppLanguageMode: String, CaseIterable {
     case system, korean, english, japanese, simplifiedChinese, traditionalChinese
 
-    static let defaultsKey = "AppLanguageMode"
+    static let defaultsKey = AppPreferencesKey.appLanguageMode
     static let supportedLanguages = ["zh-Hans", "zh-Hant", "en", "ja", "ko"]
 
     static func load(from defaults: UserDefaults) -> Self {
-        Self(rawValue: defaults.string(forKey: defaultsKey) ?? "") ?? .simplifiedChinese
+        Self(rawValue: defaults.string(forKey: defaultsKey) ?? AppPreferencesDefault.appLanguageMode) ?? .simplifiedChinese
     }
 
     func resolvedLanguage(preferredLanguages: [String] = Locale.preferredLanguages) -> String {

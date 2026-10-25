@@ -1,43 +1,44 @@
 import AppKit
-import XCTest
+import Testing
 @testable import TypingPet
 
-final class SettingsAppearanceTests: XCTestCase {
-    func testSettingsWidthMatchesReferenceAndGrowsWithText() {
-        XCTAssertEqual(SettingsWindowSizing.contentSize(fontSize: 13).width, 1100)
-        XCTAssertEqual(SettingsWindowSizing.contentSize(fontSize: 26).width, 2200)
+@Suite struct SettingsAppearanceTests {
+    @Test func settingsWidthMatchesReferenceAndGrowsWithText() {
+        #expect(SettingsWindowSizing.contentSize(fontSize: 13).width == 1100)
+        #expect(SettingsWindowSizing.contentSize(fontSize: 26).width == 2200)
     }
 
-    @MainActor
-    func testBubbleAppearanceUpdatesAndSystemClearsOverride() throws {
+    @Test @MainActor
+    func bubbleAppearanceUpdatesAndSystemClearsOverride() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("BubbleAppearance-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }
         let store = TodoStore(url: root.appendingPathComponent("todos.json"))
         let controller = TodoBubbleWindowController(store: store, pet: NSWindow())
         controller.setAppearanceMode(.dark)
-        XCTAssertEqual(controller.panel.appearance?.name, .darkAqua)
+        #expect(controller.panel.appearance?.name == .darkAqua)
         controller.setAppearanceMode(.light)
-        XCTAssertEqual(controller.panel.appearance?.name, .aqua)
+        #expect(controller.panel.appearance?.name == .aqua)
         controller.setAppearanceMode(.system)
-        XCTAssertNil(controller.panel.appearance)
+        #expect(controller.panel.appearance == nil)
     }
-    func testStoredAppearanceAndInvalidValue() throws {
+
+    @Test func storedAppearanceAndInvalidValue() throws {
         let suite = "TypingPetAppearanceTests.\(UUID())"
-        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
 
-        XCTAssertEqual(SettingsAppearanceMode.load(from: defaults), .system)
+        #expect(SettingsAppearanceMode.load(from: defaults) == .system)
         defaults.set("dark", forKey: SettingsAppearanceMode.defaultsKey)
-        XCTAssertEqual(SettingsAppearanceMode.load(from: defaults), .dark)
+        #expect(SettingsAppearanceMode.load(from: defaults) == .dark)
         defaults.set("unknown", forKey: SettingsAppearanceMode.defaultsKey)
-        XCTAssertEqual(SettingsAppearanceMode.load(from: defaults), .system)
+        #expect(SettingsAppearanceMode.load(from: defaults) == .system)
     }
 
-    @MainActor
-    func testPermissionGrantAndEventTapConnectionAreReportedSeparately() throws {
+    @Test @MainActor
+    func permissionGrantAndEventTapConnectionAreReportedSeparately() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("PermissionStatus-\(UUID())")
         let suite = "TypingPetPermissionTests.\(UUID())"
-        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        let defaults = try #require(UserDefaults(suiteName: suite))
         defer {
             try? FileManager.default.removeItem(at: root)
             defaults.removePersistentDomain(forName: suite)
@@ -56,28 +57,28 @@ final class SettingsAppearanceTests: XCTestCase {
             monitoringIsRunning: { connected }, retryMonitoring: { retryCount += 1; connected = true },
             inputMonitoringAuthorized: { granted }, defaults: defaults)
         model.refreshPermissions(retryConnection: true)
-        XCTAssertFalse(model.inputMonitoringGranted)
-        XCTAssertFalse(model.inputMonitoringConnected)
-        XCTAssertEqual(retryCount, 0, "Checking status must not prompt for or bypass permission")
+        #expect(!model.inputMonitoringGranted)
+        #expect(!model.inputMonitoringConnected)
+        #expect(retryCount == 0)
         granted = true
         model.refreshPermissions()
-        XCTAssertTrue(model.inputMonitoringGranted)
-        XCTAssertFalse(model.inputMonitoringConnected)
+        #expect(model.inputMonitoringGranted)
+        #expect(!model.inputMonitoringConnected)
         model.refreshPermissions(retryConnection: true)
-        XCTAssertEqual(retryCount, 1)
-        XCTAssertTrue(model.inputMonitoringConnected)
+        #expect(retryCount == 1)
+        #expect(model.inputMonitoringConnected)
         granted = false
         model.refreshPermissions()
-        XCTAssertFalse(model.inputMonitoringConnected, "Revoking permission disconnects the reported state")
+        #expect(!model.inputMonitoringConnected)
     }
 
-    @MainActor
-    func testChangingModePersistsAndUpdatesWindowAppearance() throws {
+    @Test @MainActor
+    func changingModePersistsAndUpdatesWindowAppearance() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("TypingPetAppearance-\(UUID())")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
         let suite = "TypingPetAppearanceTests.\(UUID())"
-        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
 
         let model = TypingPetSettingsModel(
@@ -109,32 +110,31 @@ final class SettingsAppearanceTests: XCTestCase {
             updater: UpdateController(defaults: defaults)
         )
 
-        XCTAssertTrue(settings.window?.contentViewController is NSSplitViewController)
-        XCTAssertFalse(try XCTUnwrap(settings.window).styleMask.contains(.fullSizeContentView))
-        let split = try XCTUnwrap(settings.window?.contentViewController as? NSSplitViewController)
+        #expect(settings.window?.contentViewController is NSSplitViewController)
+        #expect(try !#require(settings.window).styleMask.contains(.fullSizeContentView))
+        let split = try #require(settings.window?.contentViewController as? NSSplitViewController)
         split.view.layoutSubtreeIfNeeded()
         split.splitView.setPosition(270, ofDividerAt: 0)
         split.view.layoutSubtreeIfNeeded()
-        XCTAssertEqual(split.splitViewItems[0].viewController.view.frame.width, 270, accuracy: 2)
+        #expect(abs(split.splitViewItems[0].viewController.view.frame.width - 270) <= 2)
         let divider = NSRect(x: split.splitViewItems[0].viewController.view.frame.maxX, y: 0,
                              width: split.splitView.dividerThickness, height: split.splitView.bounds.height)
         let hitArea = split.splitView(split.splitView, effectiveRect: divider, forDrawnRect: divider, ofDividerAt: 0)
-        XCTAssertFalse(hitArea.isEmpty, "The visible divider must accept mouse dragging")
-        XCTAssertTrue(hitArea.contains(NSPoint(x: divider.midX, y: divider.midY)))
+        #expect(!hitArea.isEmpty)
+        #expect(hitArea.contains(NSPoint(x: divider.midX, y: divider.midY)))
 
         model.setAppearanceMode(.dark)
-        XCTAssertEqual(defaults.string(forKey: SettingsAppearanceMode.defaultsKey), "dark")
-        XCTAssertEqual(window.appearance?.name, .darkAqua)
-        XCTAssertEqual(settings.window?.appearance?.name, .darkAqua)
-        XCTAssertEqual(SettingsAppearanceMode.load(from: defaults), .dark)
+        #expect(defaults.string(forKey: SettingsAppearanceMode.defaultsKey) == "dark")
+        #expect(window.appearance?.name == .darkAqua)
+        #expect(settings.window?.appearance?.name == .darkAqua)
+        #expect(SettingsAppearanceMode.load(from: defaults) == .dark)
 
         model.setAppearanceMode(.light)
-        XCTAssertEqual(window.appearance?.name, .aqua)
-        XCTAssertEqual(settings.window?.appearance?.name, .aqua)
+        #expect(window.appearance?.name == .aqua)
+        #expect(settings.window?.appearance?.name == .aqua)
 
         model.setAppearanceMode(.system)
-        XCTAssertNil(window.appearance)
-        XCTAssertNil(settings.window?.appearance)
-
+        #expect(window.appearance == nil)
+        #expect(settings.window?.appearance == nil)
     }
 }

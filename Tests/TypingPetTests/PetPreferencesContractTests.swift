@@ -91,10 +91,27 @@ struct PetPreferencesContractTests {
             AppPreferencesKey.activeSetID,
             AppPreferencesKey.legacyIdleFile,
             AppPreferencesKey.legacyReactionFiles,
+            AppPreferencesKey.imagePackOrder,
             AppPreferencesKey.keyReactionRules,
+            AppPreferencesKey.todoBubbleZoom,
+            AppPreferencesKey.todoBubbleVisibility,
+            AppPreferencesKey.todoBubbleRestingOpacity,
+            AppPreferencesKey.todoBubbleHoverOpacity,
+            AppPreferencesKey.todoListStyle,
+            AppPreferencesKey.todoIdleMinutes,
+            AppPreferencesKey.settingsAppearanceMode,
+            AppPreferencesKey.appLanguageMode,
+            AppPreferencesKey.automaticUpdateChecks,
+            AppPreferencesKey.lastUpdateCheck,
+            AppPreferencesKey.notifiedUpdateBuild,
+            AppPreferencesKey.pendingUpdateBuild,
+            AppPreferencesKey.pendingUpdateFolder,
+            AppPreferencesKey.updateFeedURL,
+            AppPreferencesKey.inputMonitoringWelcomeShown,
+            AppPreferencesKey.inputMonitoringSetupPending,
         ]
 
-        #expect(allKeys.count == 13)
+        #expect(allKeys.count == 30)
         let uniqueKeys = Set(allKeys)
         #expect(uniqueKeys.count == allKeys.count)
         for key in allKeys {
@@ -113,5 +130,11 @@ struct PetPreferencesContractTests {
         // Opacity bounds
         #expect((0.0...1.0).contains(AppPreferencesDefault.restingOpacity))
         #expect((0.0...1.0).contains(AppPreferencesDefault.hoverOpacity))
+
+        // Todo bubble defaults
+        #expect(AppPreferencesDefault.todoBubbleZoom > 0)
+        #expect((0.0...1.0).contains(AppPreferencesDefault.todoBubbleRestingOpacity))
+        #expect((0.0...1.0).contains(AppPreferencesDefault.todoBubbleHoverOpacity))
+        #expect(AppPreferencesDefault.todoIdleMinutes >= 0)
     }
 }

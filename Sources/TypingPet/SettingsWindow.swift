@@ -7,10 +7,10 @@ import UniformTypeIdentifiers
 enum SettingsAppearanceMode: String, CaseIterable {
     case system, light, dark
 
-    static let defaultsKey = "SettingsAppearanceMode"
+    static let defaultsKey = AppPreferencesKey.settingsAppearanceMode
 
     static func load(from defaults: UserDefaults) -> Self {
-        Self(rawValue: defaults.string(forKey: defaultsKey) ?? "") ?? .system
+        Self(rawValue: defaults.string(forKey: defaultsKey) ?? AppPreferencesDefault.settingsAppearanceMode) ?? .system
     }
 
     var windowAppearance: NSAppearance? {
@@ -52,6 +52,7 @@ final class TypingPetSettingsModel: ObservableObject {
     private let applyShake: (Int) -> Void
     private let applyAlwaysOnTop: (Bool) -> Void
     private let applyPositionLock: (Bool) -> Void
+    private let currentPositionLock: (() -> Bool)?
     private let applyPointerAvoidance: (Bool) -> Void
     private let reloadPet: () -> Void
     private let openInputMonitoringSettingsAction: () -> Void
@@ -76,6 +77,7 @@ final class TypingPetSettingsModel: ObservableObject {
         applyShake: @escaping (Int) -> Void,
         applyAlwaysOnTop: @escaping (Bool) -> Void,
         applyPositionLock: @escaping (Bool) -> Void,
+        currentPositionLock: (() -> Bool)? = nil,
         applyPointerAvoidance: @escaping (Bool) -> Void,
         reloadPet: @escaping () -> Void,
         openInputMonitoringSettings: @escaping () -> Void,
@@ -101,6 +103,7 @@ final class TypingPetSettingsModel: ObservableObject {
         self.applyShake = applyShake
         self.applyAlwaysOnTop = applyAlwaysOnTop
         self.applyPositionLock = applyPositionLock
+        self.currentPositionLock = currentPositionLock
         self.applyPointerAvoidance = applyPointerAvoidance
         self.reloadPet = reloadPet
         openInputMonitoringSettingsAction = openInputMonitoringSettings
@@ -125,6 +128,10 @@ final class TypingPetSettingsModel: ObservableObject {
     }
 
     func refresh() {
+        if let currentPositionLock {
+            let current = currentPositionLock()
+            if positionLocked != current { positionLocked = current }
+        }
         imageSets = library.imageSets
         activeSetID = library.activeSetID
         rules = keyStore.rules
