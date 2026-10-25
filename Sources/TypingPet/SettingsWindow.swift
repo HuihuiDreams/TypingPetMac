@@ -612,7 +612,6 @@ struct GeneralSettingsView: View {
                                 isOn: $updater.automaticChecks,
                                 isEnabled: updater.unavailableReason == nil
                             )
-                            Divider()
                         }
                     }
 

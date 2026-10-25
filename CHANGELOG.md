@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.19.1 - 2026-10-26
+
+- Remove the extra divider below the automatic update switch in Settings.
+
 ## 0.19.0 - 2026-10-26
 
 - Keep the Settings sidebar visible and add Back/Forward navigation with a title that stays in place while scrolling.

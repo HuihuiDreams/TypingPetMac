@@ -1,5 +1,39 @@
 [
   {
+    "version": "0.19.1",
+    "date": "2026-10-26",
+    "ko": {
+      "title": "업데이트 설정 구분선 정리",
+      "items": [
+        "설정의 자동 업데이트 확인 스위치 아래에 있던 불필요한 구분선을 제거했습니다."
+      ]
+    },
+    "en": {
+      "title": "Cleaner update settings",
+      "items": [
+        "Remove the extra divider below the automatic update switch in Settings."
+      ]
+    },
+    "ja": {
+      "title": "アップデート設定の区切り線を整理",
+      "items": [
+        "設定の自動アップデート確認スイッチの下にあった不要な区切り線を削除しました。"
+      ]
+    },
+    "zh-Hans": {
+      "title": "精简更新设置",
+      "items": [
+        "移除设置中自动检查更新开关下方多余的分隔线。"
+      ]
+    },
+    "zh-Hant": {
+      "title": "精簡更新設定",
+      "items": [
+        "移除設定中自動檢查更新開關下方多餘的分隔線。"
+      ]
+    }
+  },
+  {
     "version": "0.19.0",
     "date": "2026-10-26",
     "ko": {
