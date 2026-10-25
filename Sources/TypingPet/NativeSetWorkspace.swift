@@ -223,13 +223,15 @@ struct NativeSetWorkspace: View {
                     HStack(spacing: 7) { quickKey(49, name: L("Space"), symbol: "space"); quickKey(36, name: L("Enter"), symbol: "return") }
                 }
             }
-            ScrollView(.horizontal) { keyboard.padding(.bottom, 5) }
+            GeometryReader { geometry in
+                ScrollView(.horizontal) {
+                    keyboard
+                        .frame(minWidth: geometry.size.width, alignment: .center)
+                        .padding(.bottom, 16)
+                }
                 .accessibilityLabel(L("Keyboard Mapping"))
-            HStack {
-                Text(L("Mac · ANSI Layout"))
-                Spacer()
-                Text(L("Click a key to edit its presets."))
-            }.font(.caption).foregroundStyle(.secondary)
+            }
+            .frame(height: KeyboardMetrics.height + 16)
         }
     }
     private func modifier(_ key: KeyModifiers, symbol: String, name: String) -> some View {
@@ -275,36 +277,45 @@ struct NativeSetWorkspace: View {
         .background(PopoverAnchor(id: anchor, controller: popovers))
     }
     private var keyboard: some View {
-        VStack(spacing: 5) {
+        VStack(spacing: KeyboardMetrics.rowSpacing) {
             ForEach(KeyboardLayoutKey.rows.indices, id: \.self) { index in
                 if index == KeyboardLayoutKey.rows.count - 1 { keyboardBottomRow }
                 else { keyboardRow(KeyboardLayoutKey.rows[index], function: index == 0) }
             }
         }
-        .padding(8).frame(width: 760)
+        .padding(KeyboardMetrics.padding).frame(width: KeyboardMetrics.width)
         .background(RoundedRectangle(cornerRadius: 14).fill(Color.primary.opacity(0.055)))
     }
     private func keyboardRow(_ row: [KeyboardLayoutKey], function: Bool) -> some View {
-        let unit = (744 - CGFloat(row.count - 1) * 4) / row.reduce(0) { $0 + $1.width }
-        return HStack(spacing: 4) {
-            ForEach(row) { key in framedKey(key, width: unit * key.width, height: function ? 42 : 52, function: function) }
+        let flexibleID = row.last(where: { $0.width > 1 })?.id
+        let extra = KeyboardMetrics.innerWidth - CGFloat(row.count - 1) * KeyboardMetrics.gap - row.reduce(0) { $0 + $1.width } * KeyboardMetrics.keySize
+        let functionWidth = (KeyboardMetrics.innerWidth - CGFloat(row.count - 1) * KeyboardMetrics.gap) / CGFloat(row.count)
+        return HStack(spacing: KeyboardMetrics.gap) {
+            ForEach(row) { key in
+                framedKey(key,
+                          width: function ? functionWidth : KeyboardMetrics.keySize * key.width + (key.id == flexibleID ? extra : 0),
+                          height: function ? KeyboardMetrics.functionHeight : KeyboardMetrics.keySize,
+                          function: function)
+            }
         }
     }
     private var keyboardBottomRow: some View {
         let row = KeyboardLayoutKey.rows.last ?? []
         let regular = row.filter { ![123, 124, 125, 126].contains($0.code) }
         let arrows = row.filter { [123, 124, 125, 126].contains($0.code) }
-        let unit = (744 - CGFloat(regular.count + 2) * 4) / (regular.reduce(0) { $0 + $1.width } + 3)
-        return HStack(alignment: .bottom, spacing: 4) {
-            ForEach(regular) { key in framedKey(key, width: unit * key.width, height: 52) }
+        let unit = KeyboardMetrics.keySize
+        let extra = KeyboardMetrics.innerWidth - CGFloat(regular.count + 2) * KeyboardMetrics.gap - (regular.reduce(0) { $0 + $1.width } + 3) * unit
+        let halfHeight = (unit - KeyboardMetrics.gap) / 2
+        return HStack(alignment: .bottom, spacing: KeyboardMetrics.gap) {
+            ForEach(regular) { key in framedKey(key, width: unit * key.width + (key.code == 49 ? extra : 0), height: unit) }
             if let left = arrows.first(where: { $0.code == 123 }), let up = arrows.first(where: { $0.code == 126 }),
                let down = arrows.first(where: { $0.code == 125 }), let right = arrows.first(where: { $0.code == 124 }) {
-                framedKey(left, width: unit, height: 24, compact: true)
-                VStack(spacing: 4) {
-                    framedKey(up, width: unit, height: 24, compact: true)
-                    framedKey(down, width: unit, height: 24, compact: true)
+                framedKey(left, width: unit, height: halfHeight, compact: true)
+                VStack(spacing: KeyboardMetrics.gap) {
+                    framedKey(up, width: unit, height: halfHeight, compact: true)
+                    framedKey(down, width: unit, height: halfHeight, compact: true)
                 }
-                framedKey(right, width: unit, height: 24, compact: true)
+                framedKey(right, width: unit, height: halfHeight, compact: true)
             }
         }
     }
@@ -324,7 +335,7 @@ struct NativeSetWorkspace: View {
                     HStack(spacing: 2) {
                         Text(key.label).font(.system(size: 11)).foregroundStyle(.secondary)
                         Spacer(minLength: 0)
-                        if let id = value?.presetIDs.first { SetArtwork(image: editor.image(id: id)).frame(width: 17, height: 17) }
+                        if let id = value?.presetIDs.first { SetArtwork(image: editor.image(id: id)).frame(width: 14, height: 14) }
                         else { Text("·").font(.system(size: 11)).foregroundStyle(.tertiary) }
                     }
                 } else {
@@ -332,17 +343,15 @@ struct NativeSetWorkspace: View {
                         Text(key.code == nil ? key.label.replacingOccurrences(of: "L", with: "").replacingOccurrences(of: "R", with: "") : key.label)
                             .font(.system(size: 11)).foregroundStyle(key.code == nil ? .tertiary : .secondary).lineLimit(1)
                         Spacer(minLength: 0)
-                        if let id = value?.presetIDs.first { SetArtwork(image: editor.image(id: id)).frame(maxWidth: .infinity).frame(height: function ? 19 : 27) }
+                        if let id = value?.presetIDs.first { SetArtwork(image: editor.image(id: id)).frame(maxWidth: .infinity).frame(height: function ? 14 : 24) }
                         else if key.code != nil { Text("·").foregroundStyle(.tertiary).frame(maxWidth: .infinity) }
                     }
                 }
             }
             .padding(4).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .background(RoundedRectangle(cornerRadius: 6).fill(selected ? Color.teal.opacity(0.12) : Color(nsColor: .controlBackgroundColor).opacity(key.code == nil ? 0.4 : 1)))
-            .overlay(RoundedRectangle(cornerRadius: 6).stroke(selected ? Color.teal : Color.primary.opacity(0.10), lineWidth: selected ? 1.5 : 0.6))
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain).disabled(target == nil || !editor.canEdit || editor.draft.presets.isEmpty)
+        .buttonStyle(KeycapButtonStyle(selected: selected)).disabled(target == nil || !editor.canEdit || editor.draft.presets.isEmpty)
         .accessibilityLabel(target?.title ?? key.label)
         .accessibilityValue(value?.presetIDs.map(editor.name).joined(separator: ", ") ?? "")
         .onDrop(of: [UTType.plainText], isTargeted: nil) { providers in
@@ -357,6 +366,36 @@ struct NativeSetWorkspace: View {
             }
             return true
         }
+    }
+}
+
+private enum KeyboardMetrics {
+    static let width: CGFloat = 760
+    static let padding: CGFloat = 8
+    static let keySize: CGFloat = 48
+    static let functionHeight: CGFloat = 36
+    static let gap: CGFloat = 4
+    static let rowSpacing: CGFloat = 5
+    static var innerWidth: CGFloat { width - padding * 2 }
+    static var height: CGFloat {
+        functionHeight + CGFloat(KeyboardLayoutKey.rows.count - 1) * (keySize + rowSpacing) + padding * 2
+    }
+}
+
+private struct KeycapButtonStyle: ButtonStyle {
+    let selected: Bool
+    @Environment(\.isEnabled) private var isEnabled
+    @State private var hovering = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        let highlighted = isEnabled && (hovering || configuration.isPressed || selected)
+        return configuration.label
+            .background(RoundedRectangle(cornerRadius: 6).fill(
+                highlighted ? Color.teal.opacity(configuration.isPressed ? 0.22 : selected ? 0.14 : 0.09) : Color(nsColor: .controlBackgroundColor)))
+            .overlay(RoundedRectangle(cornerRadius: 6).stroke(
+                highlighted ? Color.teal.opacity(selected ? 1 : 0.65) : Color.primary.opacity(0.10), lineWidth: highlighted ? 1.5 : 0.6))
+            .opacity(isEnabled ? 1 : 0.4)
+            .onHover { hovering = $0 }
     }
 }
 
