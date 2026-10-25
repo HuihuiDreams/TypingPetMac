@@ -10,7 +10,7 @@ This unofficial macOS app was inspired by [swoonqx/TypingPet](https://github.com
 
 ## Install
 
-**Requirements:** Apple Silicon Mac with macOS 13 or later. The current public build is the `v0.17.1` prerelease. It is signed with an Apple-issued Developer ID certificate and notarized by Apple, so you do not need to bypass Gatekeeper.
+**Requirements:** Apple Silicon Mac with macOS 13 or later. The current public build is the `v0.18.0` prerelease. It is signed with an Apple-issued Developer ID certificate and notarized by Apple, so you do not need to bypass Gatekeeper.
 
 ### Install with Homebrew
 
@@ -25,7 +25,7 @@ The app supports automatic updates. To update through Homebrew, quit the app, ru
 
 ### Install the DMG manually
 
-1. Download the [v0.17.1 DMG](https://github.com/ynifamily3/TypingPetMac/releases/download/v0.17.1/TypingPetMac-v0.17.1-arm64-installer.dmg) and double-click to open it.
+1. Download the [v0.18.0 DMG](https://github.com/ynifamily3/TypingPetMac/releases/download/v0.18.0/TypingPetMac-v0.18.0-arm64-installer.dmg) and double-click to open it.
 2. Drag `TypingPet` into the `Applications` folder beside it.
 3. Eject the disk image and open the app from Applications.
 
@@ -33,7 +33,7 @@ The DMG is also Developer ID signed and notarized by Apple. The release includes
 
 ### Install the ZIP manually
 
-1. Open the [v0.17.1 release](https://github.com/ynifamily3/TypingPetMac/releases/tag/v0.17.1) and download `TypingPetMac-v0.17.1-arm64.zip`. For an optional integrity check, download the `.sha256` file from the same page.
+1. Open the [v0.18.0 release](https://github.com/ynifamily3/TypingPetMac/releases/tag/v0.18.0) and download `TypingPetMac-v0.18.0-arm64.zip`. For an optional integrity check, download the `.sha256` file from the same page.
 2. Double-click the ZIP to extract it. Move `TypingPet.app` to **Applications** before launching; do not run it from Downloads.
 3. Open `TypingPet.app` from Applications. A paw icon appears in the menu bar.
 
@@ -41,7 +41,7 @@ If you downloaded both files into Downloads, verify the ZIP with:
 
 ```sh
 cd ~/Downloads
-shasum -a 256 -c TypingPetMac-v0.17.1-arm64.zip.sha256
+shasum -a 256 -c TypingPetMac-v0.18.0-arm64.zip.sha256
 ```
 
 ### First launch: Input Monitoring
@@ -78,13 +78,13 @@ These screenshots use sample tasks in the isolated development app. The distribu
 
 ## Features
 
-- Show `pet-idle.png` while idle and switch to a different reaction image on each global key event.
-- Assign images to specific keys or modifier combinations; exact matches take priority over random reactions.
+- Choose multiple image presets for typing and resting, with random or sequential playback.
+- Assign presets to specific keys or modifier combinations; exact matches take priority over the default typing reaction.
 - Drag the pet when position lock is off. A quick release glides a little before settling.
 - Hover to enlarge the pet, or grab it for a pressed-down spring effect. Set resting and hover opacity independently.
 - Optionally let a click-through, position-locked pet move away from the pointer while staying on-screen.
 - Hover controls hide or proportionally resize the pet. A gear immediately left of the resize handle opens Settings. Restore a hidden pet from the menu bar.
-- Return to the idle image after 0.75 seconds without input.
+- Return to the resting selection after 0.75 seconds without input.
 - Never store ordinary typed characters. Custom key rules store only the selected physical key code and modifier combination locally.
 
 ## Todos and focus timer
@@ -97,14 +97,15 @@ Tasks and measured focus time are stored on this Mac in `~/Library/Application S
 
 Open `설정` (Settings) from the paw icon in the menu bar.
 
-- My Packs: import, select, save and apply packs; remove a custom pack from its context menu.
-- Image Presets: freely name presets and add or replace their images.
-- Keyboard Mapping: assign multiple presets to keys and modifier combinations, configure Unassigned and IDLE, and preview the current draft.
+- Set Management: select a sidebar set to see its image presets and keyboard mappings on one page. Use the plus button to create an empty named set, or duplicate an existing set.
+- Add, replace, rename, and delete images in custom sets. Built-in image presets are fixed; duplicate the set to customize them.
+- Click a key to open its preset popover. Combine multiple modifier checkboxes, or use the Space and Enter shortcuts.
+- Edits save automatically. Editing another set keeps the current pet set active; switch explicitly with Use Set.
 - Appearance and Behavior: size, opacity, bounce, always-on-top, position lock, and pointer avoidance.
 - Todos and Focus: timer and record preferences.
 - General: language, appearance, launch at login, Input Monitoring, and updates.
 
-Import images or a folder to create a pack. The menu bar also offers quick idle/reaction replacements and restoring defaults. Imported presets are copied to `~/Library/Application Support/TypingPet/Images/Sets`; legacy key-specific images remain in `~/Library/Application Support/TypingPet/KeyReactions`, so their originals may be moved afterward.
+Create a set and add images, or import a folder from the menu bar. The menu bar also offers quick idle/reaction replacements and restoring defaults. Imported presets are copied to `~/Library/Application Support/TypingPet/Images/Sets`; legacy key-specific images remain in `~/Library/Application Support/TypingPet/KeyReactions`, so their originals may be moved afterward.
 
 For a folder set, name the idle image `idle.*` or `pet-idle.*`; other supported images become reactions. If there is no idle-named image, the first image in sorted order is used. A one-image folder works for both idle and reaction states. PNG, APNG, JPG, JPEG, GIF, TIFF, HEIC, HEIF, and WebP are supported. Images of different proportions are fitted inside a canvas based on the idle image.
 
@@ -132,7 +133,7 @@ The build script selects a Developer ID Application, Apple Development, or ad-ho
 
 ### Preset packs and keyboard mapping
 
-Use the settings sidebar to name and manage image presets, then assign multiple presets to each key and modifier combination. **Unassigned** and **IDLE** sit above the keyboard, each with random or sequential playback. Clicking a key or behavior opens one inline editor. Try the current draft in **Preview Mode**, then apply it with **Save Pack**. Import multiple images or a folder to create a new pack.
+Use the native sidebar to manage sets, then assign multiple presets to each key and modifier combination. Typing and resting selections sit above the keyboard, each with random or sequential playback. Clicking a key or behavior opens one anchored popover that stays open while you choose presets. Edits save immediately, and changes to the active set apply to the pet. The centered keyboard preserves its proportions and scrolls horizontally in narrower windows.
 
 See the [preset editor notes](developer-notes/preset-editor.md) for storage and compatibility details.
 

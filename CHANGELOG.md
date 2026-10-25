@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.18.0 - 2026-10-25
+
+- Redesign Settings with a native, resizable sidebar and a single page for each set's image presets and keyboard mappings.
+- Create empty named sets, duplicate existing sets with independent image copies, and save edits automatically. Keep built-in image presets fixed; duplicate the set to customize them.
+- Assign multiple presets to individual keys and modifier combinations, with random or sequential playback and separate typing and resting selections.
+- Keep preset selection popovers open while editing and anchor their tails to the selected key. Add modifier checkboxes and Space/Enter shortcuts.
+- Center the keyboard with square character keys, hover feedback, and an inverted-T arrow cluster; preserve its proportions in narrow windows with horizontal scrolling.
+- Show Input Monitoring authorization and connection status in General settings.
+
 ## 0.17.1 - 2026-10-24
 
 - Clarify app and website copy in Korean, English, Japanese, Simplified Chinese, and Traditional Chinese.

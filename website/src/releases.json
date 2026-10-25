@@ -1,5 +1,64 @@
 [
   {
+    "version": "0.18.0",
+    "date": "2026-10-25",
+    "ko": {
+      "title": "네이티브 세트 관리와 키보드 매핑",
+      "items": [
+        "크기를 조절할 수 있는 네이티브 사이드바와 세트별 이미지 프리셋·키보드 매핑 화면으로 설정을 개편했습니다.",
+        "이름을 입력해 빈 세트를 만들고 기존 세트를 독립적으로 복제할 수 있습니다. 변경 사항은 바로 저장되며, 기본 프리셋은 복제해서 수정할 수 있습니다.",
+        "키와 보조키 조합에 여러 프리셋을 지정하고 랜덤 또는 순서대로 표시할 수 있습니다. 입력 중일 때와 쉬고 있을 때도 각각 설정할 수 있습니다.",
+        "프리셋을 고르는 동안 열린 상태를 유지하는 팝오버를 해당 키에 연결하고, 보조키 체크박스와 스페이스·엔터 빠른 설정을 추가했습니다.",
+        "키보드를 가운데 정렬하고 일반 키는 정사각형으로, 방향키는 ㅗ 모양으로 표시합니다. 좁은 창에서는 가로 스크롤로 비율을 유지합니다.",
+        "일반 설정에서 입력 모니터링 권한과 연결 상태를 확인할 수 있습니다."
+      ]
+    },
+    "en": {
+      "title": "Native set management and keyboard mapping",
+      "items": [
+        "Redesigned Settings with a native, resizable sidebar and one page for each set’s image presets and keyboard mappings.",
+        "Create empty named sets and independent duplicates. Edits save automatically; duplicate the built-in set to customize its fixed presets.",
+        "Assign multiple presets to keys and modifier combinations with random or sequential playback, plus separate typing and resting selections.",
+        "Preset popovers stay open while editing and point to the selected key. Added modifier checkboxes and Space/Enter shortcuts.",
+        "Centered the keyboard with square character keys and inverted-T arrows. Horizontal scrolling preserves its proportions in narrow windows.",
+        "General settings now shows Input Monitoring authorization and connection status."
+      ]
+    },
+    "ja": {
+      "title": "ネイティブのセット管理とキーボード割り当て",
+      "items": [
+        "幅を調整できるネイティブのサイドバーを採用し、各セットの画像プリセットとキー割り当てを1つのページにまとめました。",
+        "名前を付けた空のセットの作成や、画像を独立してコピーする複製に対応しました。変更は自動保存されます。標準プリセットはセットを複製して編集できます。",
+        "キーや修飾キーの組み合わせに複数のプリセットを割り当て、ランダムまたは順番に表示できます。入力中と休止中の画像も個別に設定できます。",
+        "プリセットを選んでも閉じないポップオーバーを選択したキーに接続しました。修飾キーのチェックボックスとスペース・Enterのクイック設定を追加しました。",
+        "キーボードを中央に配置し、通常キーを正方形、矢印キーを逆T字型にしました。狭いウインドウでは横スクロールで比率を保ちます。",
+        "一般設定で入力監視の許可状況と接続状態を確認できます。"
+      ]
+    },
+    "zh-Hans": {
+      "title": "原生套组管理与键盘映射",
+      "items": [
+        "设置改用可调整宽度的原生侧边栏，每个套组的图片预设和键盘映射集中在同一页面。",
+        "输入名称即可创建空套组，也可复制现有套组并独立保存图片。更改自动保存；内置预设可在复制套组后修改。",
+        "可为按键及修饰键组合分配多个预设，随机或按顺序显示，并分别设置输入时和休息时的图片。",
+        "选择预设时弹出面板保持打开，并指向对应按键。新增修饰键复选框及空格、回车快捷设置。",
+        "键盘居中显示，普通按键为正方形，方向键呈倒T形。窄窗口通过横向滚动保持比例。",
+        "通用设置中可查看输入监控权限及连接状态。"
+      ]
+    },
+    "zh-Hant": {
+      "title": "原生套組管理與鍵盤對應",
+      "items": [
+        "設定改用可調整寬度的原生側邊欄，每個套組的圖片預設和鍵盤對應集中在同一頁面。",
+        "輸入名稱即可建立空套組，也可複製現有套組並獨立保存圖片。變更自動儲存；內建預設可在複製套組後修改。",
+        "可為按鍵及修飾鍵組合指定多個預設，隨機或依序顯示，並分別設定輸入時和休息時的圖片。",
+        "選擇預設時彈出面板保持開啟，並指向對應按鍵。新增修飾鍵核取方塊及空白鍵、Enter快速設定。",
+        "鍵盤置中顯示，一般按鍵為正方形，方向鍵呈倒T形。窄視窗透過橫向捲動保持比例。",
+        "一般設定中可查看輸入監控權限及連線狀態。"
+      ]
+    }
+  },
+  {
     "version": "0.17.1",
     "date": "2026-10-24",
     "ko": {
