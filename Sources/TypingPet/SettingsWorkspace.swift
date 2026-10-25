@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import Darwin
 import SwiftUI
 
 private enum WorkspacePage: String, CaseIterable {
@@ -87,6 +88,26 @@ private final class SidebarBrandView: NSStackView {
 }
 
 @MainActor
+private final class SidebarSetCellView: NSTableCellView {
+    let menuButton = NSButton()
+    private var trackingArea: NSTrackingArea?
+    private var isHovered = false
+    var isRowSelected = false { didSet { updateMenuVisibility() } }
+    var supportsSetMenu = false { didSet { updateMenuVisibility() } }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let trackingArea { removeTrackingArea(trackingArea) }
+        let area = NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect], owner: self, userInfo: nil)
+        addTrackingArea(area)
+        trackingArea = area
+    }
+    override func mouseEntered(with event: NSEvent) { isHovered = true; updateMenuVisibility() }
+    override func mouseExited(with event: NSEvent) { isHovered = false; updateMenuVisibility() }
+    private func updateMenuVisibility() { menuButton.isHidden = !(supportsSetMenu && (isHovered || isRowSelected)) }
+}
+
+@MainActor
 private final class WorkspaceSidebarController: NSViewController, NSTableViewDataSource, NSTableViewDelegate {
     private enum Row: Equatable { case set(UUID), settings, page(WorkspacePage) }
     private let editor: PackEditorModel
@@ -95,7 +116,7 @@ private final class WorkspaceSidebarController: NSViewController, NSTableViewDat
     private let addButton = NSButton()
     private let titleLabel = NSTextField(labelWithString: "")
     private let brandLabel = NSTextField(labelWithString: AppEnvironment.displayName)
-    private let subtitle = NSTextField(labelWithString: "")
+    private let brandArtwork = NSImageView()
     private var rows: [Row] = []
     private var subscriptions = Set<AnyCancellable>()
     private var createPopover: NSPopover?
@@ -113,19 +134,13 @@ private final class WorkspaceSidebarController: NSViewController, NSTableViewDat
         background.material = .sidebar
         background.blendingMode = .behindWindow
         view = background
-        let artwork = NSImageView(image: editor.cover(for: editor.store.library.activeSet) ?? NSImage())
-        artwork.imageScaling = .scaleProportionallyUpOrDown
-        artwork.setAccessibilityHidden(true)
-        artwork.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([artwork.widthAnchor.constraint(equalToConstant: 32), artwork.heightAnchor.constraint(equalToConstant: 32)])
+        brandArtwork.image = editor.cover(for: editor.store.library.activeSet) ?? NSImage()
+        brandArtwork.imageScaling = .scaleProportionallyUpOrDown
+        brandArtwork.setAccessibilityHidden(true)
+        brandArtwork.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([brandArtwork.widthAnchor.constraint(equalToConstant: 32), brandArtwork.heightAnchor.constraint(equalToConstant: 32)])
         brandLabel.font = .systemFont(ofSize: 14, weight: .semibold)
-        subtitle.font = .systemFont(ofSize: 11)
-        subtitle.textColor = .secondaryLabelColor
-        let labels = NSStackView(views: [brandLabel, subtitle])
-        labels.orientation = .vertical
-        labels.alignment = .leading
-        labels.spacing = 2
-        let brand = SidebarBrandView(views: [artwork, labels])
+        let brand = SidebarBrandView(views: [brandArtwork, brandLabel])
         brand.spacing = 8
         brand.alignment = .centerY
         titleLabel.font = .systemFont(ofSize: 11, weight: .medium)
@@ -146,6 +161,8 @@ private final class WorkspaceSidebarController: NSViewController, NSTableViewDat
         table.intercellSpacing = NSSize(width: 0, height: 2)
         table.dataSource = self
         table.delegate = self
+        table.target = self
+        table.doubleAction = #selector(openSetFromDoubleClick(_:))
         table.setAccessibilityLabel(L("Set Management"))
         table.registerForDraggedTypes([.string])
         table.setDraggingSourceOperationMask(.move, forLocal: true)
@@ -180,8 +197,8 @@ private final class WorkspaceSidebarController: NSViewController, NSTableViewDat
         guard isViewLoaded else { return }
         updating = true
         defer { updating = false }
+        brandArtwork.image = editor.cover(for: editor.store.library.activeSet) ?? NSImage()
         titleLabel.stringValue = L("Set Management")
-        subtitle.stringValue = L("Your Little Companion")
         addButton.setAccessibilityLabel(L("New Set"))
         addButton.toolTip = L("New Set")
         addButton.isEnabled = editor.canEdit
@@ -209,44 +226,94 @@ private final class WorkspaceSidebarController: NSViewController, NSTableViewDat
             ])
             return group
         }
-        let cell = NSTableCellView()
+        let isSetRow: Bool
+        if case .set = rows[row] { isSetRow = true } else { isSetRow = false }
+        let cell: NSTableCellView = isSetRow ? SidebarSetCellView() : NSTableCellView()
         let name: String
         let symbol: String
+        var presetArtwork: NSImage?
         var active = false
         switch rows[row] {
         case .set(let id):
             guard let set = editor.sets.first(where: { $0.id == id }) else { return cell }
             name = editor.configuration(for: set).name
             symbol = "shippingbox"
+            presetArtwork = editor.cover(for: set)
             active = id == editor.activeSetID
-        case .settings: name = L("Settings"); symbol = ""
-        case .page(let page): name = page.title; symbol = page.symbol
+        case .settings: name = L("Settings"); symbol = ""; presetArtwork = nil
+        case .page(let page): name = page.title; symbol = page.symbol; presetArtwork = nil
         }
         let label = NSTextField(labelWithString: name)
         label.lineBreakMode = .byTruncatingTail
         label.font = .systemFont(ofSize: rows[row] == .settings ? 11 : 13)
         label.textColor = rows[row] == .settings ? .secondaryLabelColor : .labelColor
         cell.textField = label
-        let image = NSImageView(image: NSImage(systemSymbolName: symbol, accessibilityDescription: nil) ?? NSImage())
-        image.contentTintColor = .secondaryLabelColor
+        let image = NSImageView(image: presetArtwork ?? NSImage(systemSymbolName: symbol, accessibilityDescription: nil) ?? NSImage())
+        image.imageScaling = .scaleProportionallyUpOrDown
+        if presetArtwork != nil {
+            image.wantsLayer = true
+            image.layer?.cornerRadius = 4
+            image.layer?.masksToBounds = true
+        } else {
+            image.contentTintColor = .secondaryLabelColor
+        }
         cell.imageView = image
         let check = NSImageView(image: NSImage(systemSymbolName: "checkmark.circle.fill", accessibilityDescription: L("In Use")) ?? NSImage())
         check.contentTintColor = .systemTeal
         check.isHidden = !active
         check.setAccessibilityLabel(L("In Use"))
         for child in [image, label, check] { child.translatesAutoresizingMaskIntoConstraints = false; cell.addSubview(child) }
-        NSLayoutConstraint.activate([
+        let iconDimension: CGFloat = rows[row] == .settings ? 0 : (presetArtwork == nil ? 16 : 20)
+        var constraints = [
             image.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 0), image.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
-            image.widthAnchor.constraint(equalToConstant: rows[row] == .settings ? 0 : 16), image.heightAnchor.constraint(equalToConstant: 16),
+            image.widthAnchor.constraint(equalToConstant: iconDimension), image.heightAnchor.constraint(equalToConstant: iconDimension),
             label.leadingAnchor.constraint(equalTo: image.trailingAnchor, constant: rows[row] == .settings ? 0 : 8), label.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
-            check.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -4), check.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
-            check.widthAnchor.constraint(equalToConstant: active ? 14 : 0), check.heightAnchor.constraint(equalToConstant: 14),
-            label.trailingAnchor.constraint(lessThanOrEqualTo: check.leadingAnchor, constant: -6)
-        ])
+            check.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
+            check.widthAnchor.constraint(equalToConstant: active ? 14 : 0), check.heightAnchor.constraint(equalToConstant: 14)
+        ]
+        if let setCell = cell as? SidebarSetCellView, case .set(let id) = rows[row], let set = editor.sets.first(where: { $0.id == id }) {
+            setCell.isRowSelected = table.selectedRow == row
+            setCell.supportsSetMenu = !set.isBuiltIn
+            if !set.isBuiltIn {
+                setCell.menuButton.image = NSImage(systemSymbolName: "ellipsis", accessibilityDescription: L("Set Options"))
+                setCell.menuButton.bezelStyle = .inline
+                setCell.menuButton.isBordered = false
+                setCell.menuButton.contentTintColor = .secondaryLabelColor
+                setCell.menuButton.identifier = NSUserInterfaceItemIdentifier(id.uuidString)
+                setCell.menuButton.target = self
+                setCell.menuButton.action = #selector(showSetMenu(_:))
+                setCell.menuButton.setAccessibilityLabel(L("Set Options"))
+                setCell.menuButton.toolTip = L("Set Options")
+                setCell.menuButton.translatesAutoresizingMaskIntoConstraints = false
+                setCell.addSubview(setCell.menuButton)
+                constraints += [
+                    setCell.menuButton.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -2),
+                    setCell.menuButton.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
+                    setCell.menuButton.widthAnchor.constraint(equalToConstant: 22),
+                    setCell.menuButton.heightAnchor.constraint(equalToConstant: 22),
+                    check.trailingAnchor.constraint(equalTo: setCell.menuButton.leadingAnchor, constant: -3),
+                    label.trailingAnchor.constraint(lessThanOrEqualTo: check.leadingAnchor, constant: -5)
+                ]
+            } else {
+                constraints += [
+                    check.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -4),
+                    label.trailingAnchor.constraint(lessThanOrEqualTo: check.leadingAnchor, constant: -6)
+                ]
+            }
+        } else {
+            constraints += [
+                check.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -4),
+                label.trailingAnchor.constraint(lessThanOrEqualTo: check.leadingAnchor, constant: -6)
+            ]
+        }
+        NSLayoutConstraint.activate(constraints)
         cell.toolTip = name
         return cell
     }
     func tableViewSelectionDidChange(_ notification: Notification) {
+        for row in 0..<table.numberOfRows {
+            (table.view(atColumn: 0, row: row, makeIfNecessary: false) as? SidebarSetCellView)?.isRowSelected = row == table.selectedRow
+        }
         guard !updating, rows.indices.contains(table.selectedRow) else { return }
         switch rows[table.selectedRow] {
         case .set(let id):
@@ -256,6 +323,49 @@ private final class WorkspaceSidebarController: NSViewController, NSTableViewDat
         case .page(let page): navigation.page = page
         case .settings: break
         }
+    }
+    @objc private func showSetMenu(_ sender: NSButton) {
+        guard let rawID = sender.identifier?.rawValue, let id = UUID(uuidString: rawID),
+              let set = editor.sets.first(where: { $0.id == id }), !set.isBuiltIn else { return }
+        let menu = NSMenu()
+        let use = NSMenuItem(title: L("Use This Set"), action: #selector(useSetFromMenu(_:)), keyEquivalent: "")
+        use.attributedTitle = NSAttributedString(string: use.title, attributes: [.font: NSFont.boldSystemFont(ofSize: NSFont.systemFontSize)])
+        use.target = self
+        use.representedObject = id
+        use.isEnabled = id != editor.activeSetID
+        menu.addItem(use)
+        menu.addItem(.separator())
+        let rename = NSMenuItem(title: L("Rename"), action: #selector(renameSetFromMenu(_:)), keyEquivalent: "")
+        rename.target = self
+        rename.representedObject = id
+        menu.addItem(rename)
+        let delete = NSMenuItem(title: L("Delete"), action: #selector(deleteSetFromMenu(_:)), keyEquivalent: "")
+        delete.target = self
+        delete.representedObject = id
+        menu.addItem(delete)
+        if let event = NSApp.currentEvent { NSMenu.popUpContextMenu(menu, with: event, for: sender) }
+    }
+    @objc private func openSetFromDoubleClick(_ sender: NSTableView) {
+        guard rows.indices.contains(sender.clickedRow), case .set(let id) = rows[sender.clickedRow],
+              let set = editor.sets.first(where: { $0.id == id }) else { return }
+        useSet(set)
+    }
+    @objc private func useSetFromMenu(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? UUID, let set = editor.sets.first(where: { $0.id == id }) else { return }
+        useSet(set)
+    }
+    private func useSet(_ set: PetImageSet) {
+        editor.selectSet(set)
+        navigation.page = .sets
+        editor.activate(set)
+    }
+    @objc private func renameSetFromMenu(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? UUID, let set = editor.sets.first(where: { $0.id == id }) else { return }
+        editor.renamePack(set)
+    }
+    @objc private func deleteSetFromMenu(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? UUID, let set = editor.sets.first(where: { $0.id == id }) else { return }
+        editor.removePack(set)
     }
     func tableView(_ tableView: NSTableView, pasteboardWriterForRow row: Int) -> NSPasteboardWriting? {
         guard case .set(let id) = rows[row] else { return nil }
@@ -305,7 +415,139 @@ private struct WorkspaceContentView: View {
             if navigation.page == .sets { NativeSetWorkspace(editor: editor) }
             else { NativeSettingsPages(model: model, todoStore: todoStore, updater: updater, navigation: navigation) }
         }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            SettingsLinksFooter()
+        }
         .onReceive(model.$imageSets) { _ in editor.refresh() }
+    }
+}
+
+private struct SettingsLinksFooter: View {
+    private let supportEmail = "support@miel.ing"
+
+    private var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? L("Unknown")
+    }
+
+    var body: some View {
+        HStack(spacing: 16) {
+            Spacer(minLength: 0)
+            iconLink("Website", url: "https://typing-pet.miel.ing", symbol: "globe")
+            iconLink("GitHub", url: "https://github.com/ynifamily3", symbol: "chevron.left.forwardslash.chevron.right")
+            iconLink("Repository", url: "https://github.com/ynifamily3/TypingPetMac", symbol: "shippingbox")
+            iconLink("X", url: "https://x.com/miel_ggyu", symbol: nil)
+            iconLink("Write an email", url: feedbackMailURL, symbol: "envelope")
+            HStack(spacing: 6) {
+                Text("v\(appVersion)")
+                    .font(.system(size: 10, weight: .regular, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                Text(L(AppEnvironment.isDevelopment ? "Development" : "Production"))
+                    .font(.system(size: 9, weight: .semibold))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
+                    .background(AppEnvironment.isDevelopment ? Color.orange.opacity(0.16) : Color.teal.opacity(0.16), in: Capsule())
+                    .foregroundStyle(AppEnvironment.isDevelopment ? Color.orange : Color.teal)
+            }
+            .padding(.leading, 4)
+            .help(L("Current version %1$@", appVersion))
+        }
+        .font(.system(size: 11, weight: .medium))
+        .padding(.horizontal, 20)
+        .padding(.vertical, 9)
+        .background(Color(nsColor: .windowBackgroundColor))
+        .overlay(alignment: .top) { Rectangle().fill(Color(nsColor: .separatorColor)).frame(height: 1) }
+    }
+
+    private func iconLink(_ title: String, url: String, symbol: String?) -> some View {
+        iconLink(title, url: URL(string: url), symbol: symbol)
+    }
+
+    private func iconLink(_ title: String, url: URL?, symbol: String?) -> some View {
+        Group {
+            if let url {
+                Link(destination: url) {
+                    Group {
+                        if let symbol {
+                            Label(L(title), systemImage: symbol)
+                        } else {
+                            HStack(spacing: 6) {
+                                XBrandMark().fill(.foreground).frame(width: 15, height: 15)
+                                Text(L(title))
+                            }
+                        }
+                    }.fixedSize()
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .foregroundStyle(.secondary)
+        .help(L(title))
+        .accessibilityLabel("\(L("Creator: Miel")) · \(L(title))")
+    }
+
+    private var feedbackMailURL: URL? {
+        var components = URLComponents()
+        components.scheme = "mailto"
+        components.path = supportEmail
+        components.queryItems = [
+            URLQueryItem(name: "subject", value: L("Typing Pet feedback")),
+            URLQueryItem(name: "body", value: feedbackMailBody)
+        ]
+        return components.url
+    }
+
+    private var feedbackMailBody: String {
+        let info = Bundle.main.infoDictionary ?? [:]
+        let version = info["CFBundleShortVersionString"] as? String ?? L("Unknown")
+        let build = info["CFBundleVersion"] as? String ?? L("Unknown")
+        var modelSize = 0
+        sysctlbyname("hw.model", nil, &modelSize, nil, 0)
+        var modelBuffer = [CChar](repeating: 0, count: max(modelSize, 1))
+        if modelSize > 0 { _ = sysctlbyname("hw.model", &modelBuffer, &modelSize, nil, 0) }
+        let deviceModel = modelSize > 0 ? String(cString: modelBuffer) : L("Unknown")
+        #if arch(arm64)
+        let architecture = "arm64"
+        #elseif arch(x86_64)
+        let architecture = "x86_64"
+        #else
+        let architecture = L("Unknown")
+        #endif
+        return "\(L("Describe the bug or question here."))\n\n---\n\(L("App")): Typing Pet \(version) (\(build))\nmacOS: \(ProcessInfo.processInfo.operatingSystemVersionString)\n\(L("Device model")): \(deviceModel)\n\(L("Architecture")): \(architecture)"
+    }
+}
+
+/// Official X logo geometry from X Corp.'s brand artwork, sourced via Wikimedia Commons.
+private struct XBrandMark: Shape {
+    private let contours: [[CGPoint]] = [
+        [
+            CGPoint(x: 21.742, y: 21.75), CGPoint(x: 14.179, y: 10.571),
+            CGPoint(x: 21.235, y: 2.25), CGPoint(x: 18.779, y: 2.25),
+            CGPoint(x: 13.088, y: 8.964), CGPoint(x: 8.548, y: 2.25),
+            CGPoint(x: 2.359, y: 2.25), CGPoint(x: 9.649, y: 13.026),
+            CGPoint(x: 2.25, y: 21.75), CGPoint(x: 4.706, y: 21.75),
+            CGPoint(x: 10.741, y: 14.632), CGPoint(x: 15.559, y: 21.75),
+            CGPoint(x: 21.75, y: 21.75)
+        ],
+        [
+            CGPoint(x: 7.739, y: 3.818), CGPoint(x: 18.81, y: 20.182),
+            CGPoint(x: 16.363, y: 20.182), CGPoint(x: 5.29, y: 3.818),
+            CGPoint(x: 7.737, y: 3.818)
+        ]
+    ]
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        for contour in contours {
+            guard let first = contour.first else { continue }
+            path.move(to: CGPoint(x: rect.minX + first.x * rect.width / 24,
+                                  y: rect.minY + first.y * rect.height / 24))
+            for point in contour.dropFirst() {
+                path.addLine(to: CGPoint(x: rect.minX + point.x * rect.width / 24,
+                                         y: rect.minY + point.y * rect.height / 24))
+            }
+            path.closeSubpath()
+        }
+        return path
     }
 }
 

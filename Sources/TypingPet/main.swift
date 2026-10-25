@@ -1036,7 +1036,11 @@ private final class GlobalKeyMonitor {
 private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let imageLibrary = PetImageLibrary()
     private let keyReactionStore = KeyReactionStore()
-    private lazy var packStore = PetPackStore(library: imageLibrary, keyStore: keyReactionStore)
+    private lazy var packStore: PetPackStore = {
+        let store = PetPackStore(library: imageLibrary, keyStore: keyReactionStore)
+        store.applyBuiltInKeyboardDefaultsIfNeeded()
+        return store
+    }()
     private let todoStore: TodoStore = {
         #if DEBUG
         if let path = ProcessInfo.processInfo.environment["TYPINGPET_TODO_TEST_PATH"] {

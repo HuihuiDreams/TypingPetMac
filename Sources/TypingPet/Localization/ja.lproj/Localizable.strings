@@ -65,7 +65,6 @@
 "Check for updates automatically" = "アップデートを自動で確認";
 "Checking for Updates…" = "アップデートを確認中…";
 "Checking for updates…" = "アップデートを確認中…";
-"Checks pet.miel.ing once a day. Only the app version is sent, and only updates with a verified signature are installed." = "1日1回pet.miel.ingで確認します。送信するのはアプリのバージョンのみで、署名を検証できたアップデートだけをインストールします。";
 "Choose" = "選択";
 "Choose Idle Image" = "待機画像を選択";
 "Choose Key Reaction Image" = "キー反応の画像を選択";
@@ -306,6 +305,25 @@
 "Unsupported image format: %1$@" = "非対応の画像形式：%1$@";
 "Updated to %1$@." = "%1$@にアップデートしました。";
 "Updates" = "アップデート";
+"Creator" = "制作者";
+"Creator: Miel" = "制作者: ミエル";
+"Website" = "ウェブサイト";
+"GitHub" = "GitHub";
+"Repository" = "リポジトリ";
+"X" = "X";
+"Bug report or question" = "不具合の報告・お問い合わせ";
+"The email draft includes basic app and system details." = "メールの下書きにアプリとシステムの基本情報が含まれます。";
+"Write an email" = "メールを書く";
+"Email copied" = "メールアドレスをコピーしました";
+"Copy email address" = "メールアドレスをコピー";
+"Typing Pet feedback" = "Typing Pet 不具合報告・お問い合わせ";
+"Unknown" = "不明";
+"Describe the bug or question here." = "不具合やお問い合わせ内容をここに記入してください。";
+"App" = "アプリ";
+"Device model" = "デバイスモデル";
+"Architecture" = "アーキテクチャ";
+"Development" = "開発版";
+"Production" = "正式版";
 "Updates are only available when running an app bundle." = "アップデートはアプリバンドルから実行している場合のみ利用できます。";
 "Use the DEV app in the menu bar. Quit the existing Dev app before launching again." = "メニューバーのDEVアプリを使用してください。再起動する前に、起動中のDevアプリを終了してください。";
 "Version %1$@ is available." = "バージョン%1$@を利用できます。";
@@ -366,6 +384,8 @@
 "Enter a name for the pack and each preset." = "パックと各プリセットの名前を入力してください。";
 "Give presets any name and reuse them across keys and reactions." = "プリセットに自由に名前を付け、複数のキーや反応に使えます。";
 "Image Presets" = "画像プリセット";
+"Drop image files here or choose Add Images." = "画像ファイルをここにドラッグするか、「画像を追加」を選んでください。";
+"No supported image files were dropped." = "対応する画像ファイルをドロップしてください。";
 "Image Presets · Select Multiple" = "画像プリセット · 複数選択可";
 "Import Image Pack" = "画像パックを読み込む";
 "In Use" = "使用中";
@@ -404,20 +424,20 @@
 "Unassigned" = "未割り当て";
 "Unsaved Changes" = "未保存の変更";
 "Uses Unassigned settings" = "未割り当ての設定を使用";
-"Your Little Companion" = "小さな相棒";
 
 // Native pack workspace
 "%1$@ presets" = "プリセット%1$@個";
 "A pack with this name already exists." = "同じ名前のパックがすでにあります。";
 "Add an image before using this pack." = "このパックを使う前に画像を追加してください。";
 "Add the first image to this pack." = "パックに最初の画像を追加しましょう。";
-"Changes saved automatically." = "変更は自動的に保存されます。";
+"Changes saved automatically." = "変更はすぐに適用されます。";
 "Check Again" = "再確認";
 "Close" = "閉じる";
 "Create" = "作成";
 "Create Pack" = "パックを作成";
 "Create an empty pack, then add your images." = "空のパックを作成してから画像を追加します。";
 "Delete Image" = "画像を削除";
+"Deleting the active set switches to “%1$@”. Original images will not be changed." = "使用中のセットを削除すると「%1$@」に切り替わります。元の画像は変更されません。";
 "Delete preset “%1$@”?" = "プリセット「%1$@」を削除しますか？";
 "Edit Presets" = "プリセットを編集";
 "Empty Pack" = "空のパック";
@@ -428,7 +448,7 @@
 "Select %1$@" = "%1$@を選択";
 "The first image is used for Unassigned and IDLE. You can change them in Keyboard Mapping." = "最初の画像は「未割り当て」とIDLEに使われます。キーボードマッピングで変更できます。";
 "Toggle Sidebar" = "サイドバーの表示／非表示";
-"Use Set" = "セットを使用";
+"Use This Set" = "このセットを使用";
 "Use another pack before deleting the last image in the active pack." = "使用中のパックの最後の画像を削除する前に、別のパックを使用してください。";
 "Using %1$@" = "%1$@を使用中";
 
@@ -445,11 +465,10 @@
 "Built-in presets are fixed. Duplicate to edit them." = "標準プリセットは固定されています。複製して編集できます。";
 "No images yet" = "画像がまだありません";
 "The first image is used while typing and while resting." = "最初の画像は入力中と待機中に使用されます。";
+"Touch ID / Power Button" = "Touch ID／電源ボタン";
 "When Resting" = "待機中";
 "Multiple selections allowed" = "複数選択可能";
-"Common Keys" = "よく使うキー";
 "Space" = "スペース";
 "Enter" = "Enter";
-"Quick setup for %1$@" = "%1$@ をクイック設定";
 "Click a key to edit its presets." = "キーをクリックしてプリセットを設定します。";
 "Edit %1$@" = "%1$@ を編集";

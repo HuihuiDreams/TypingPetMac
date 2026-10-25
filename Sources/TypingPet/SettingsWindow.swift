@@ -606,10 +606,9 @@ struct GeneralSettingsView: View {
                                 isEnabled: updater.unavailableReason == nil
                             )
                             Divider()
-                            SettingsNote(text: L("Checks pet.miel.ing once a day. Only the app version is sent, and only updates with a verified signature are installed."))
-                                .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     }
+
                 }
             }
             .padding(SettingsMetrics.space4)
@@ -622,6 +621,7 @@ struct GeneralSettingsView: View {
             if scope != .pet { model.refreshPermissions() }
         }
     }
+
 }
 
 struct TodoSettingsView: View {

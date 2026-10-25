@@ -1,5 +1,54 @@
 [
   {
+    "version": "0.18.1",
+    "date": "2026-10-25",
+    "ko": {
+      "title": "세트 편집과 매핑 개선",
+      "items": [
+        "프리셋 이미지를 키보드 키로 드래그해 매핑하고, 놓을 키를 강조합니다. 이미지 파일을 갤러리로 끌어와 프리셋으로 추가할 수도 있습니다.",
+        "사이드바에서 세트를 더블클릭해 바로 사용하고, 메뉴에서 사용·이름 변경·삭제를 할 수 있습니다. 사용 중인 세트를 삭제하면 바로 위 세트로 전환합니다.",
+        "기본 세트에 쉬고 있을 때·입력 중일 때·깜짝 매핑을 미리 설정하고, Touch ID/전원 버튼을 비활성 키로 표시합니다.",
+        "사이드바에 세트 프리셋 이미지를 표시하고 이미지 추가 카드를 더했습니다. 일반 설정 하단에는 제작자 링크와 기본 시스템 정보가 포함된 메일 문의, 버전 및 DEV/정식 배지를 표시합니다."
+      ]
+    },
+    "en": {
+      "title": "Set editing and mapping improvements",
+      "items": [
+        "Drag preset images onto keyboard keys to assign them, with the drop target highlighted. Drop image files into the gallery to import them as presets.",
+        "Double-click a sidebar set to use it. Its menu also offers Use, Rename, and Delete; deleting the active set switches to the set above it.",
+        "Preconfigure resting, typing, and surprise mappings for the built-in set, and show Touch ID/power as a disabled key.",
+        "Show each set’s preset artwork in the sidebar and add an image tile to the gallery. The Settings footer now includes creator links, an email inquiry with basic system details, and version and DEV/production badges."
+      ]
+    },
+    "ja": {
+      "title": "セット編集とキー割り当ての改善",
+      "items": [
+        "プリセット画像をキーボードのキーにドラッグして割り当てられます。ドロップ先のキーを強調表示し、ギャラリーへ画像ファイルをドロップして追加できます。",
+        "サイドバーのセットをダブルクリックすると使用できます。メニューから使用、名前変更、削除も行えます。使用中のセットを削除すると、その上のセットに切り替わります。",
+        "標準セットに待機中・入力中・驚きの割り当てを設定し、Touch ID／電源ボタンを無効なキーとして表示します。",
+        "サイドバーに各セットのプリセット画像を表示し、ギャラリーに画像追加タイルを追加しました。設定のフッターには作者リンク、基本的なシステム情報を含むメール問い合わせ、バージョンとDEV／製品版バッジを表示します。"
+      ]
+    },
+    "zh-Hans": {
+      "title": "套组编辑与键盘映射改进",
+      "items": [
+        "将预设图片拖到键盘按键即可映射，目标按键会高亮显示；也可将图片文件拖入图库添加为预设。",
+        "双击侧边栏中的套组即可使用，也可在菜单中选择使用、重命名或删除。删除当前使用的套组后会切换到其上方的套组。",
+        "为内置套组预设休息、输入和惊讶映射，并将 Touch ID／电源按钮显示为禁用按键。",
+        "侧边栏显示各套组的预设图片，图库新增图片添加卡片。设置页脚新增作者链接、包含基本系统信息的邮件咨询，以及版本和 DEV／正式版徽章。"
+      ]
+    },
+    "zh-Hant": {
+      "title": "套組編輯與鍵盤對應改進",
+      "items": [
+        "將預設圖片拖到鍵盤按鍵即可對應，目標按鍵會反白顯示；也可將圖片檔拖入圖庫新增為預設。",
+        "按兩下側邊欄中的套組即可使用，也可在選單中選擇使用、重新命名或刪除。刪除目前使用的套組後會切換至其上方的套組。",
+        "為內建套組預設休息、輸入和驚訝對應，並將 Touch ID／電源按鈕顯示為停用按鍵。",
+        "側邊欄顯示各套組的預設圖片，圖庫新增圖片新增卡片。設定頁尾新增作者連結、包含基本系統資訊的電子郵件詢問，以及版本和 DEV／正式版徽章。"
+      ]
+    }
+  },
+  {
     "version": "0.18.0",
     "date": "2026-10-25",
     "ko": {
