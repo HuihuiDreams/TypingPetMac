@@ -10,7 +10,7 @@ This unofficial macOS app was inspired by [swoonqx/TypingPet](https://github.com
 
 ## Install
 
-**Requirements:** Apple Silicon Mac with macOS 13 or later. The current public build is the `v0.18.0` prerelease. It is signed with an Apple-issued Developer ID certificate and notarized by Apple, so you do not need to bypass Gatekeeper.
+**Requirements:** Apple Silicon Mac with macOS 13 or later. The current public build is the `v0.18.1` prerelease. It is signed with an Apple-issued Developer ID certificate and notarized by Apple, so you do not need to bypass Gatekeeper.
 
 ### Install with Homebrew
 
@@ -25,7 +25,7 @@ The app supports automatic updates. To update through Homebrew, quit the app, ru
 
 ### Install the DMG manually
 
-1. Download the [v0.18.0 DMG](https://github.com/ynifamily3/TypingPetMac/releases/download/v0.18.0/TypingPetMac-v0.18.0-arm64-installer.dmg) and double-click to open it.
+1. Download the [v0.18.1 DMG](https://github.com/ynifamily3/TypingPetMac/releases/download/v0.18.1/TypingPetMac-v0.18.1-arm64-installer.dmg) and double-click to open it.
 2. Drag `TypingPet` into the `Applications` folder beside it.
 3. Eject the disk image and open the app from Applications.
 
@@ -33,7 +33,7 @@ The DMG is also Developer ID signed and notarized by Apple. The release includes
 
 ### Install the ZIP manually
 
-1. Open the [v0.18.0 release](https://github.com/ynifamily3/TypingPetMac/releases/tag/v0.18.0) and download `TypingPetMac-v0.18.0-arm64.zip`. For an optional integrity check, download the `.sha256` file from the same page.
+1. Open the [v0.18.1 release](https://github.com/ynifamily3/TypingPetMac/releases/tag/v0.18.1) and download `TypingPetMac-v0.18.1-arm64.zip`. For an optional integrity check, download the `.sha256` file from the same page.
 2. Double-click the ZIP to extract it. Move `TypingPet.app` to **Applications** before launching; do not run it from Downloads.
 3. Open `TypingPet.app` from Applications. A paw icon appears in the menu bar.
 
@@ -41,7 +41,7 @@ If you downloaded both files into Downloads, verify the ZIP with:
 
 ```sh
 cd ~/Downloads
-shasum -a 256 -c TypingPetMac-v0.18.0-arm64.zip.sha256
+shasum -a 256 -c TypingPetMac-v0.18.1-arm64.zip.sha256
 ```
 
 ### First launch: Input Monitoring
@@ -99,7 +99,7 @@ Open `설정` (Settings) from the paw icon in the menu bar.
 
 - Set Management: select a sidebar set to see its image presets and keyboard mappings on one page. Use the plus button to create an empty named set, or duplicate an existing set.
 - Add, replace, rename, and delete images in custom sets. Built-in image presets are fixed; duplicate the set to customize them.
-- Click a key to open its preset popover. Combine multiple modifier checkboxes, or use the Space and Enter shortcuts.
+- Click a key to open its preset popover. Combine multiple modifier checkboxes to configure key combinations.
 - Edits save automatically. Editing another set keeps the current pet set active; switch explicitly with Use Set.
 - Appearance and Behavior: size, opacity, bounce, always-on-top, position lock, and pointer avoidance.
 - Todos and Focus: timer and record preferences.

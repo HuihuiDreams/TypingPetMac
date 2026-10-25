@@ -15,7 +15,7 @@ if (location.pathname === '/') {
 } else {
   const pathLocale = location.pathname.split('/')[1];
   const locale = isLocale(pathLocale) ? pathLocale : 'ko';
-  const page = location.pathname.includes('/changelog') ? 'changelog' : 'home';
+  const page = location.pathname.includes('/unsubscribe') ? 'unsubscribe' : location.pathname.includes('/changelog') ? 'changelog' : 'home';
   void initWebsiteAnalytics().catch(() => {});
   hydrateRoot(document.getElementById('root')!, <App locale={locale} page={page} />);
 }

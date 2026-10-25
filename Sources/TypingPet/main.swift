@@ -1036,7 +1036,11 @@ private final class GlobalKeyMonitor {
 private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let imageLibrary = PetImageLibrary()
     private let keyReactionStore = KeyReactionStore()
-    private lazy var packStore = PetPackStore(library: imageLibrary, keyStore: keyReactionStore)
+    private lazy var packStore: PetPackStore = {
+        let store = PetPackStore(library: imageLibrary, keyStore: keyReactionStore)
+        store.applyBuiltInKeyboardDefaultsIfNeeded()
+        return store
+    }()
     private let todoStore: TodoStore = {
         #if DEBUG
         if let path = ProcessInfo.processInfo.environment["TYPINGPET_TODO_TEST_PATH"] {
@@ -1322,6 +1326,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
                 applyAlwaysOnTop: { [weak self] in self?.petController.isAlwaysOnTop = $0 },
                 applyPositionLock: { [weak self] in self?.petController.isPositionLocked = $0 },
                 applyPointerAvoidance: { [weak self] in self?.petController.avoidsPointerWhenLocked = $0 },
+                applyAppearance: { [weak self] in self?.todoBubble?.setAppearanceMode($0) },
                 reloadPet: { [weak self] in self?.petController.reloadImages() },
                 openInputMonitoringSettings: { [weak self] in self?.openInputMonitoringSettings() },
                 monitoringIsRunning: { [weak self] in self?.keyMonitor?.isRunning == true },

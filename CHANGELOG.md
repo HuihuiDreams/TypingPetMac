@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.18.1 - 2026-10-25
+
+- Drag preset images onto keyboard keys to assign them, with a glow on the active drop target; drop image files into the gallery to import them.
+- Improve set management with preset artwork in the sidebar, double-click activation, and a context menu for using, renaming, and deleting sets. Deleting the active set switches to the set above it.
+- Add default keyboard mappings for the built-in set and show the Touch ID/power button as a disabled key.
+- Add creator links and a support email draft with basic system details to the Settings footer, alongside the app version and DEV/production badge.
+- Refine preset cards, hover feedback, and the update-check settings copy.
+
 ## 0.18.0 - 2026-10-25
 
 - Redesign Settings with a native, resizable sidebar and a single page for each set's image presets and keyboard mappings.

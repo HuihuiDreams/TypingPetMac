@@ -98,6 +98,7 @@ final class PetPackStore {
         var version = 1
         var packs: [String: PetPackConfiguration]
     }
+    private static let builtInKeyboardDefaultsAppliedKey = "builtInKeyboardDefaultsApplied-v1"
     let library: PetImageLibrary
     private let legacyKeys: KeyReactionStore
     private let fileManager: FileManager
@@ -162,6 +163,20 @@ final class PetPackStore {
         guard pack.isUsable else { throw PetPackError.emptyPack }
         try validate(pack, in: set)
         try library.activateSet(id: set.id)
+    }
+
+    func applyBuiltInKeyboardDefaultsIfNeeded() {
+        let defaults = AppEnvironment.defaults
+        guard !defaults.bool(forKey: Self.builtInKeyboardDefaultsAppliedKey),
+              loadError == nil,
+              let builtIn = library.imageSets.first(where: \.isBuiltIn) else { return }
+        let pack = applyingBuiltInKeyboardDefaults(to: configuration(for: builtIn))
+        do {
+            try save(pack, for: builtIn)
+            defaults.set(true, forKey: Self.builtInKeyboardDefaultsAppliedKey)
+        } catch {
+            // Keep the migration eligible for the next launch if the saved pack cannot be updated.
+        }
     }
 
     func createPack(name: String) throws -> PetImageSet {
@@ -318,6 +333,29 @@ final class PetPackStore {
                 pack.presets.append(PetImagePreset(id: id, name: rule.stroke.displayName, fileName: rule.imageFileName, source: .keyReaction))
                 pack.mappings.append(PresetKeyMapping(stroke: rule.stroke, selection: PresetSelection(presetIDs: [id])))
             }
+        }
+        return pack
+    }
+
+    private func applyingBuiltInKeyboardDefaults(to original: PetPackConfiguration) -> PetPackConfiguration {
+        var pack = original
+        let idle = "pet-idle.png"
+        let typingPresets = [idle, "pet-left.png", "pet-right.png"]
+        let surprised = "pet-exclamation.png"
+        guard typingPresets.allSatisfy({ id in pack.presets.contains(where: { $0.id == id }) }),
+              pack.presets.contains(where: { $0.id == surprised }) else { return pack }
+
+        pack.idle = PresetSelection(presetIDs: [idle], mode: .cycle)
+        pack.unassigned = PresetSelection(presetIDs: typingPresets, mode: .cycle)
+
+        let space = KeyStroke(keyCode: 49, modifiers: [])
+        let enter = KeyStroke(keyCode: 36, modifiers: [])
+        pack.mappings.removeAll()
+        for stroke in [space, enter] {
+            pack.mappings.append(PresetKeyMapping(
+                stroke: stroke,
+                selection: PresetSelection(presetIDs: [surprised], mode: .cycle)
+            ))
         }
         return pack
     }

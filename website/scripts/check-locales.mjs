@@ -19,7 +19,7 @@ for (const locale of locales) {
   assert.ok(Object.values(newsletterContent[locale]).every(value => typeof value === 'string' && value.trim()), `${locale} newsletter messages`);
   assert.deepEqual(Object.keys(content[locale]).sort(), Object.keys(content.en).sort(), `${locale} content keys`);
   for (const [key, value] of Object.entries(content[locale])) {
-    assert.ok(value.flat?.(2).every(item => typeof item === 'string' && item.trim()) ?? (typeof value === 'string' && value.trim()), `${locale}.${key}`);
+    assert.ok(value.flat?.(2).every(item => typeof item === 'string' && item.trim()) ?? (typeof value === 'string' && (!value || value.trim())), `${locale}.${key}`);
   }
   for (const note of notes) {
     assert.ok(note[locale]?.title?.trim() && note[locale]?.items.length, `${locale} release ${note.version}`);
@@ -39,7 +39,7 @@ for (const locale of locales) {
       assert.ok(html.includes(`href="${downloadUrl('github', 'zip').replaceAll('&', '&amp;')}"`), 'ZIP download retained');
       if (release.dmg) {
         assert.ok(html.includes(`href="${downloadUrl('github', 'dmg').replaceAll('&', '&amp;')}"`), 'DMG download');
-        assert.ok(html.includes(content[locale].dmgTab), 'translated DMG tab');
+        assert.ok(html.includes(content[locale].dmgTitle), 'translated DMG install method');
       }
     }
     assert.ok(!html.includes('undefined'));
@@ -49,12 +49,17 @@ for (const locale of locales) {
     const themeBytes = await readFile(`dist${themeScript[1]}`);
     assert.equal(createHash('sha256').update(themeBytes).digest('hex').slice(0, 12), themeScript[2]);
     assert.ok(html.includes('class="theme-toggle"'));
-    assert.equal((html.match(/aria-haspopup="menu"/g) || []).length, 2, 'language and appearance menu triggers');
+    assert.equal((html.match(/aria-haspopup="menu"/g) || []).length, 1, 'language menu trigger');
     assert.ok(html.includes('role="combobox"'), 'newsletter language select');
-    assert.equal((html.match(/role="checkbox"/g) || []).length, 2, 'newsletter consent controls');
+    assert.equal((html.match(/role="checkbox"/g) || []).length, 1, 'newsletter consent control');
     assert.ok(html.includes('role="switch"'), 'analytics setting');
     assert.ok(!/<(?:details|select)\b/.test(html), 'interactive controls use Base UI primitives');
   }
+}
+for (const locale of locales) {
+  const html = await readFile(`dist/${locale}/unsubscribe/index.html`, 'utf8');
+  assert.ok(html.includes('noindex,follow'), `${locale} unsubscribe page is not indexed`);
+  assert.ok(html.includes('newsletter/unsubscribe'), `${locale} unsubscribe form is missing`);
 }
 const sitemap = await readFile('dist/sitemap.xml', 'utf8');
 assert.equal((sitemap.match(/<loc>/g) || []).length, locales.length * 2);

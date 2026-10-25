@@ -53,6 +53,7 @@ final class TypingPetSettingsModel: ObservableObject {
     private let applyAlwaysOnTop: (Bool) -> Void
     private let applyPositionLock: (Bool) -> Void
     private let applyPointerAvoidance: (Bool) -> Void
+    private let applyAppearance: (SettingsAppearanceMode) -> Void
     private let reloadPet: () -> Void
     private let openInputMonitoringSettingsAction: () -> Void
     private let monitoringIsRunning: () -> Bool
@@ -77,6 +78,7 @@ final class TypingPetSettingsModel: ObservableObject {
         applyAlwaysOnTop: @escaping (Bool) -> Void,
         applyPositionLock: @escaping (Bool) -> Void,
         applyPointerAvoidance: @escaping (Bool) -> Void,
+        applyAppearance: @escaping (SettingsAppearanceMode) -> Void,
         reloadPet: @escaping () -> Void,
         openInputMonitoringSettings: @escaping () -> Void,
         monitoringIsRunning: @escaping () -> Bool = { false },
@@ -102,6 +104,7 @@ final class TypingPetSettingsModel: ObservableObject {
         self.applyAlwaysOnTop = applyAlwaysOnTop
         self.applyPositionLock = applyPositionLock
         self.applyPointerAvoidance = applyPointerAvoidance
+        self.applyAppearance = applyAppearance
         self.reloadPet = reloadPet
         openInputMonitoringSettingsAction = openInputMonitoringSettings
         self.monitoringIsRunning = monitoringIsRunning
@@ -187,6 +190,7 @@ final class TypingPetSettingsModel: ObservableObject {
     func setAppearanceMode(_ value: SettingsAppearanceMode) {
         appearanceMode = value
         defaults.set(value.rawValue, forKey: SettingsAppearanceMode.defaultsKey)
+        applyAppearance(value)
         onAppearanceChanged?(value)
     }
 
@@ -602,10 +606,9 @@ struct GeneralSettingsView: View {
                                 isEnabled: updater.unavailableReason == nil
                             )
                             Divider()
-                            SettingsNote(text: L("Checks pet.miel.ing once a day. Only the app version is sent, and only updates with a verified signature are installed."))
-                                .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     }
+
                 }
             }
             .padding(SettingsMetrics.space4)
@@ -618,6 +621,7 @@ struct GeneralSettingsView: View {
             if scope != .pet { model.refreshPermissions() }
         }
     }
+
 }
 
 struct TodoSettingsView: View {

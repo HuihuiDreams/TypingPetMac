@@ -10,7 +10,7 @@ Windows용 [swoonqx/TypingPet](https://github.com/swoonqx/TypingPet)에서 아�
 
 ## 설치
 
-**지원 환경:** Apple Silicon Mac, macOS 13 이상. 현재 공개 버전은 `v0.18.0` 프리릴리스입니다.
+**지원 환경:** Apple Silicon Mac, macOS 13 이상. 현재 공개 버전은 `v0.18.1` 프리릴리스입니다.
 Apple이 발급한 Developer ID 인증서로 서명했고 Apple 공증도 통과했습니다. Gatekeeper 경고를 우회할 필요가 없습니다.
 
 ### Homebrew로 설치
@@ -26,7 +26,7 @@ brew install --cask ynifamily3/tap/typing-pet
 
 ### DMG로 직접 설치
 
-1. [v0.18.0 DMG](https://github.com/ynifamily3/TypingPetMac/releases/download/v0.18.0/TypingPetMac-v0.18.0-arm64-installer.dmg)를 내려받아 두 번 눌러 엽니다.
+1. [v0.18.1 DMG](https://github.com/ynifamily3/TypingPetMac/releases/download/v0.18.1/TypingPetMac-v0.18.1-arm64-installer.dmg)를 내려받아 두 번 눌러 엽니다.
 2. `TypingPet` 앱을 옆의 `Applications` 폴더로 드래그합니다.
 3. 디스크 이미지를 추출하고 응용 프로그램 폴더에서 앱을 실행합니다.
 
@@ -34,7 +34,7 @@ DMG도 Developer ID로 서명하고 Apple 공증을 통과했습니다. 같은 �
 
 ### ZIP으로 직접 설치
 
-1. [v0.18.0 릴리스](https://github.com/ynifamily3/TypingPetMac/releases/tag/v0.18.0)에서 `TypingPetMac-v0.18.0-arm64.zip`을 내려받습니다. 무결성을 확인하려면 같은 페이지의 `.sha256` 파일도 받습니다.
+1. [v0.18.1 릴리스](https://github.com/ynifamily3/TypingPetMac/releases/tag/v0.18.1)에서 `TypingPetMac-v0.18.1-arm64.zip`을 내려받습니다. 무결성을 확인하려면 같은 페이지의 `.sha256` 파일도 받습니다.
 2. ZIP을 두 번 눌러 압축을 풀고 `TypingPet.app`을 **응용 프로그램(Applications)** 폴더로 옮깁니다. 다운로드 폴더에서 바로 실행하지 마세요.
 3. 응용 프로그램 폴더의 `TypingPet.app`을 실행합니다. 메뉴 막대에 발바닥 아이콘이 나타납니다.
 
@@ -42,7 +42,7 @@ DMG도 Developer ID로 서명하고 Apple 공증을 통과했습니다. 같은 �
 
 ```sh
 cd ~/Downloads
-shasum -a 256 -c TypingPetMac-v0.18.0-arm64.zip.sha256
+shasum -a 256 -c TypingPetMac-v0.18.1-arm64.zip.sha256
 ```
 
 ### 첫 실행: 입력 모니터링
@@ -114,7 +114,7 @@ shasum -a 256 -c TypingPetMac-v0.18.0-arm64.zip.sha256
 
 - `세트 관리`: 사이드바에서 세트를 선택하면 이미지 프리셋과 키보드 매핑이 한 페이지에 표시됩니다. `+`로 빈 세트를 만들거나 기존 세트를 복제할 수 있습니다.
 - 사용자 세트의 이미지는 추가·교체·이름 변경·삭제할 수 있습니다. 기본 프리셋은 고정되어 있어요. 복제해서 수정할 수 있어요.
-- 키를 클릭하면 프리셋 선택 팝오버가 열립니다. 보조키는 여러 개 함께 선택할 수 있고, 스페이스와 엔터는 빠른 설정 버튼도 제공합니다.
+- 키를 클릭하면 프리셋 선택 팝오버가 열립니다. 보조키는 여러 개 함께 선택할 수 있습니다.
 - 변경 사항은 바로 저장됩니다. 다른 세트를 편집해도 사용 중인 세트는 유지되며, `세트 사용`으로 직접 전환합니다.
 - `모양과 동작`: 크기, 투명도, 통통 튀는 정도, 항상 위, 위치 잠금·마우스 피하기
 - `할 일과 집중`: 타이머와 기록 데이터 설정

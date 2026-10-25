@@ -9,7 +9,7 @@
 .ui-select-trigger{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:46px;width:100%;border:var(--line);background:#fffdf8;border-radius:0;padding:10px 12px;font:inherit;font-size:14px;text-align:left;color:var(--ink)}
 .ui-select-popup{min-width:var(--anchor-width)}
 .ui-select-list{max-height:min(20rem,calc(var(--available-height) - 14px));overflow-y:auto;overscroll-behavior:contain}
-.ui-checkbox{display:grid;place-items:center;width:18px;height:18px;flex-shrink:0;margin-top:2px;border:1.5px solid var(--ink);background:#fffdf8;color:#20211f}
+.ui-checkbox{display:grid;place-items:center;width:18px;height:18px;flex-shrink:0;margin-top:-1px;border:1.5px solid var(--ink);background:#fffdf8;color:#20211f}
 .ui-checkbox[data-checked]{background:var(--yellow)}
 .field-error{font-size:11px;line-height:1.7;color:#a22424;margin-top:7px}
 [role=checkbox]:focus-visible,[role=switch]:focus-visible,[role=tab]:focus-visible{outline:3px solid #7145bc;outline-offset:4px}
