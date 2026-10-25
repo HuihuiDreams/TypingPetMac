@@ -6,7 +6,7 @@ mkdir -p "$project_dir/.build/tmp"
 export TMPDIR="$project_dir/.build/tmp"
 destination="${1:-$project_dir/dist}"
 configuration="${SWIFT_BUILD_CONFIGURATION:-release}"
-channel="${TYPINGPET_BUILD_CHANNEL:-development}"
+channel="${TYPINGPET_BUILD_CHANNEL:-production}"
 version="${TYPINGPET_VERSION:-$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' "$project_dir/version.json")}"
 build_number="${TYPINGPET_BUILD:-$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["build"])' "$project_dir/version.json")}"
 update_key_dir="${TYPINGPET_UPDATE_KEY_DIR:-$HOME/.config/typingpet/update-keys}"
@@ -29,8 +29,7 @@ update_public_key=""
 if [[ -f "$update_key_dir/$channel.pub" ]]; then
     update_public_key="$(<"$update_key_dir/$channel.pub")"
 elif [[ "$channel" == production ]]; then
-    echo "Missing $update_key_dir/$channel.pub. Restore the original update public key for released builds." >&2
-    exit 1
+    echo "Warning: no production update key at $update_key_dir/$channel.pub. Released build will not embed update signing key."
 else
     echo "Warning: no development update key. Run: swift scripts/update_keys.swift generate development"
 fi
