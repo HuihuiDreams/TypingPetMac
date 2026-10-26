@@ -1,5 +1,29 @@
 [
   {
+    "version": "0.19.2",
+    "date": "2026-10-26",
+    "ko": {
+      "title": "설정 사이드바 구분선 제거",
+      "items": ["설정 사이드바와 본문 사이의 세로 구분선을 제거했습니다."]
+    },
+    "en": {
+      "title": "Remove the Settings sidebar divider",
+      "items": ["Removed the vertical divider between the Settings sidebar and content."]
+    },
+    "ja": {
+      "title": "設定サイドバーの境界線を削除",
+      "items": ["設定サイドバーとコンテンツの間にある縦の境界線を削除しました。"]
+    },
+    "zh-Hans": {
+      "title": "移除设置侧边栏分隔线",
+      "items": ["移除了设置侧边栏与内容之间的竖直分隔线。"]
+    },
+    "zh-Hant": {
+      "title": "移除設定側邊欄分隔線",
+      "items": ["移除了設定側邊欄與內容之間的垂直分隔線。"]
+    }
+  },
+  {
     "version": "0.19.1",
     "date": "2026-10-26",
     "ko": {

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.19.2 - 2026-10-26
+
+- Remove the visible divider line between the Settings sidebar and its content.
+
 ## 0.19.1 - 2026-10-26
 
 - Remove the extra divider below the automatic update switch in Settings.
