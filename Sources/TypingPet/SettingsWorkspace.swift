@@ -21,11 +21,56 @@ private enum WorkspacePage: String, CaseIterable {
         case .general: "gearshape"
         }
     }
+    var tint: NSColor {
+        switch self {
+        case .sets: .systemTeal
+        case .appearance: .systemBlue
+        case .todos: .systemPurple
+        case .general: .secondaryLabelColor
+        }
+    }
+}
+
+private final class SettingsToolbarTitleCell: NSTextFieldCell {
+    override var cellSize: NSSize {
+        let size = super.cellSize
+        return NSSize(width: size.width + 24, height: size.height)
+    }
+
+    override func drawingRect(forBounds rect: NSRect) -> NSRect {
+        super.drawingRect(forBounds: rect).insetBy(dx: 12, dy: 0)
+    }
 }
 
 @MainActor
 private final class WorkspaceNavigation: ObservableObject {
-    @Published var page: WorkspacePage = .sets
+    @Published private(set) var history: SettingsNavigationHistory
+    init(initialSetID: UUID) { history = SettingsNavigationHistory(initial: .imageSet(initialSetID)) }
+    var page: WorkspacePage {
+        switch history.current {
+        case .imageSet: .sets
+        case .appearance: .appearance
+        case .todos: .todos
+        case .general: .general
+        }
+    }
+    func visit(_ destination: SettingsDestination) {
+        guard destination != history.current else { return }
+        history.visit(destination)
+    }
+    func visit(_ page: WorkspacePage) {
+        switch page {
+        case .sets: break
+        case .appearance: visit(SettingsDestination.appearance)
+        case .todos: visit(SettingsDestination.todos)
+        case .general: visit(SettingsDestination.general)
+        }
+    }
+    func goBack() { history.goBack() }
+    func goForward() { history.goForward() }
+    func removeDeletedSets(validIDs: Set<UUID>, fallbackID: UUID) {
+        history.removeDeletedSets(validIDs: validIDs, fallbackID: fallbackID)
+    }
 }
 
 /// AppKit owns the actual window, toolbar, split divider, and sidebar selection.
@@ -33,16 +78,24 @@ private final class WorkspaceNavigation: ObservableObject {
 @MainActor
 final class SettingsWorkspaceController: NSSplitViewController, NSToolbarDelegate {
     private let editor: PackEditorModel
-    private let navigation = WorkspaceNavigation()
-    private let sidebarToggleID = NSToolbarItem.Identifier("TypingPetSidebarToggle")
+    private let navigation: WorkspaceNavigation
+    private let historyID = NSToolbarItem.Identifier("TypingPetSettingsHistory")
+    private let historyControl = NSSegmentedControl()
+    private let pageTitleID = NSToolbarItem.Identifier("TypingPetSettingsPageTitle")
+    private let pageTitle = NSTextField(labelWithString: "")
+    private var subscriptions = Set<AnyCancellable>()
+    private var restoringHistory = false
 
     init(model: TypingPetSettingsModel, todoStore: TodoStore, updater: UpdateController) {
         editor = PackEditorModel(store: model.packStore, onChange: { reload in model.packDidChange(reload: reload) })
+        navigation = WorkspaceNavigation(initialSetID: editor.selectedSetID)
         super.init(nibName: nil, bundle: nil)
         let sidebar = NSSplitViewItem(sidebarWithViewController: WorkspaceSidebarController(editor: editor, navigation: navigation))
-        sidebar.minimumThickness = 190
-        sidebar.maximumThickness = 340
-        sidebar.canCollapse = true
+        sidebar.minimumThickness = 240
+        sidebar.maximumThickness = 320
+        sidebar.canCollapse = false
+        sidebar.canCollapseFromWindowResize = false
+        sidebar.allowsFullHeightLayout = true
         sidebar.preferredThicknessFraction = 0.23
         let content = NSSplitViewItem(viewController: WorkspaceContentController(
             model: model, todoStore: todoStore, updater: updater, editor: editor, navigation: navigation))
@@ -52,8 +105,43 @@ final class SettingsWorkspaceController: NSSplitViewController, NSToolbarDelegat
         splitView.isVertical = true
         splitView.dividerStyle = .thin
         splitView.autosaveName = NSSplitView.AutosaveName("TypingPetSettingsSidebar")
+        navigation.$history.sink { [weak self] history in
+            guard let self else { return }
+            if case .imageSet(let id) = history.current, let set = self.editor.sets.first(where: { $0.id == id }) {
+                self.restoringHistory = true
+                self.editor.selectSet(set)
+                self.restoringHistory = false
+            }
+            self.updateToolbar(history: history)
+        }.store(in: &subscriptions)
+        editor.onSelectionChanged = { [weak self] id in
+            guard let self, !self.restoringHistory else { return }
+            self.navigation.visit(.imageSet(id))
+        }
+        editor.$sets.receive(on: DispatchQueue.main).sink { [weak self] sets in
+            guard let self else { return }
+            self.navigation.removeDeletedSets(validIDs: Set(sets.map(\.id)), fallbackID: self.editor.selectedSetID)
+        }.store(in: &subscriptions)
+        editor.objectWillChange.debounce(for: .milliseconds(16), scheduler: DispatchQueue.main).sink { [weak self] in
+            guard let self else { return }
+            self.updateToolbar(history: self.navigation.history)
+        }.store(in: &subscriptions)
+        AppLocalization.shared.$language.receive(on: DispatchQueue.main).sink { [weak self] _ in
+            guard let self else { return }
+            self.updateToolbar(history: self.navigation.history)
+        }.store(in: &subscriptions)
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    override func viewWillAppear() {
+        super.viewWillAppear()
+        // Restore any saved width, but never restore a previously hidden sidebar.
+        splitViewItems.first?.isCollapsed = false
+    }
+
+    override func toggleSidebar(_ sender: Any?) {
+        splitViewItems.first?.isCollapsed = false
+    }
 
     override func splitView(_ splitView: NSSplitView, effectiveRect proposedEffectiveRect: NSRect, forDrawnRect drawnRect: NSRect, ofDividerAt dividerIndex: Int) -> NSRect {
         let native = super.splitView(splitView, effectiveRect: proposedEffectiveRect, forDrawnRect: drawnRect, ofDividerAt: dividerIndex)
@@ -64,20 +152,77 @@ final class SettingsWorkspaceController: NSSplitViewController, NSToolbarDelegat
         let toolbar = NSToolbar(identifier: "TypingPetSettingsToolbar")
         toolbar.delegate = self
         toolbar.displayMode = .iconOnly
+        toolbar.allowsUserCustomization = false
         window.toolbar = toolbar
         window.toolbarStyle = .unified
     }
-    func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] { [sidebarToggleID, .flexibleSpace] }
+    func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] { [.sidebarTrackingSeparator, historyID, pageTitleID, .flexibleSpace] }
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] { toolbarDefaultItemIdentifiers(toolbar) }
     func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier itemIdentifier: NSToolbarItem.Identifier, willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
-        guard itemIdentifier == sidebarToggleID else { return nil }
-        let item = NSToolbarItem(itemIdentifier: sidebarToggleID)
-        item.label = L("Toggle Sidebar")
-        item.toolTip = L("Toggle Sidebar")
-        item.image = NSImage(systemSymbolName: "sidebar.left", accessibilityDescription: L("Toggle Sidebar"))
-        item.target = self
-        item.action = #selector(toggleSidebar(_:))
+        if itemIdentifier == .sidebarTrackingSeparator {
+            return NSTrackingSeparatorToolbarItem(identifier: itemIdentifier, splitView: splitView, dividerIndex: 0)
+        }
+        if itemIdentifier == historyID {
+            historyControl.segmentCount = 2
+            historyControl.trackingMode = .momentary
+            historyControl.segmentStyle = .automatic
+            historyControl.setWidth(30, forSegment: 0)
+            historyControl.setWidth(30, forSegment: 1)
+            historyControl.target = self
+            historyControl.action = #selector(navigateHistory(_:))
+            updateToolbar(history: navigation.history)
+            let item = NSToolbarItem(itemIdentifier: historyID)
+            item.label = L("Navigate Settings")
+            item.view = historyControl
+            return item
+        }
+        guard itemIdentifier == pageTitleID else { return nil }
+        updateToolbar(history: navigation.history)
+        pageTitle.cell = SettingsToolbarTitleCell(textCell: pageTitle.stringValue)
+        pageTitle.isEnabled = true
+        pageTitle.isEditable = false
+        pageTitle.isSelectable = false
+        pageTitle.isBordered = false
+        pageTitle.drawsBackground = false
+        pageTitle.textColor = .labelColor
+        pageTitle.font = .systemFont(ofSize: 15, weight: .semibold)
+        pageTitle.lineBreakMode = .byTruncatingTail
+        pageTitle.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        let item = NSToolbarItem(itemIdentifier: pageTitleID)
+        item.label = L("Settings")
+        item.view = pageTitle
         return item
+    }
+
+    private func updateToolbar(history: SettingsNavigationHistory) {
+        let page: WorkspacePage
+        switch history.current {
+        case .imageSet: page = .sets
+        case .appearance: page = .appearance
+        case .todos: page = .todos
+        case .general: page = .general
+        }
+        if case .imageSet(let id) = history.current, let set = editor.sets.first(where: { $0.id == id }) {
+            pageTitle.stringValue = editor.configuration(for: set).name
+        } else {
+            pageTitle.stringValue = page.title
+        }
+        pageTitle.setAccessibilityLabel(pageTitle.stringValue)
+        guard historyControl.segmentCount == 2 else { return }
+        historyControl.setImage(NSImage(systemSymbolName: "chevron.left", accessibilityDescription: L("Back")), forSegment: 0)
+        historyControl.setImage(NSImage(systemSymbolName: "chevron.right", accessibilityDescription: L("Forward")), forSegment: 1)
+        historyControl.setEnabled(history.canGoBack, forSegment: 0)
+        historyControl.setEnabled(history.canGoForward, forSegment: 1)
+        historyControl.setToolTip(L("Back"), forSegment: 0)
+        historyControl.setToolTip(L("Forward"), forSegment: 1)
+        historyControl.setAccessibilityLabel(L("Navigate Settings"))
+        view.window?.toolbar?.items.first(where: { $0.itemIdentifier == historyID })?.label = L("Navigate Settings")
+        view.window?.toolbar?.items.first(where: { $0.itemIdentifier == pageTitleID })?.label = pageTitle.stringValue
+    }
+
+    @objc private func navigateHistory(_ sender: NSSegmentedControl) {
+        if sender.selectedSegment == 0 { navigation.goBack() }
+        else if sender.selectedSegment == 1 { navigation.goForward() }
     }
 }
 
@@ -176,7 +321,7 @@ private final class WorkspaceSidebarController: NSViewController, NSTableViewDat
             view.addSubview(child)
         }
         NSLayoutConstraint.activate([
-            brand.topAnchor.constraint(equalTo: view.topAnchor, constant: 16),
+            brand.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 16),
             brand.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
             brand.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -12),
             heading.topAnchor.constraint(equalTo: brand.bottomAnchor, constant: 18),
@@ -188,7 +333,7 @@ private final class WorkspaceSidebarController: NSViewController, NSTableViewDat
             scroll.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -12)
         ])
         editor.objectWillChange.receive(on: DispatchQueue.main).sink { [weak self] in self?.reload() }.store(in: &subscriptions)
-        navigation.$page.receive(on: DispatchQueue.main).sink { [weak self] _ in self?.reload() }.store(in: &subscriptions)
+        navigation.$history.map(\.current).removeDuplicates().receive(on: DispatchQueue.main).sink { [weak self] _ in self?.reload() }.store(in: &subscriptions)
         AppLocalization.shared.$language.receive(on: DispatchQueue.main).sink { [weak self] _ in self?.reload() }.store(in: &subscriptions)
         reload()
     }
@@ -208,7 +353,7 @@ private final class WorkspaceSidebarController: NSViewController, NSTableViewDat
         if let row = rows.firstIndex(of: desired) { table.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false) }
     }
     func numberOfRows(in tableView: NSTableView) -> Int { rows.count }
-    func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat { rows[row] == .settings ? 32 : 30 }
+    func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat { rows[row] == .settings ? 36 : 38 }
     func tableView(_ tableView: NSTableView, isGroupRow row: Int) -> Bool { rows[row] == .settings }
     func tableView(_ tableView: NSTableView, shouldSelectRow row: Int) -> Bool { rows[row] != .settings }
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
@@ -232,6 +377,7 @@ private final class WorkspaceSidebarController: NSViewController, NSTableViewDat
         let name: String
         let symbol: String
         var presetArtwork: NSImage?
+        var iconTint = NSColor.secondaryLabelColor
         var active = false
         switch rows[row] {
         case .set(let id):
@@ -241,7 +387,7 @@ private final class WorkspaceSidebarController: NSViewController, NSTableViewDat
             presetArtwork = editor.cover(for: set)
             active = id == editor.activeSetID
         case .settings: name = L("Settings"); symbol = ""; presetArtwork = nil
-        case .page(let page): name = page.title; symbol = page.symbol; presetArtwork = nil
+        case .page(let page): name = page.title; symbol = page.symbol; presetArtwork = nil; iconTint = page.tint
         }
         let label = NSTextField(labelWithString: name)
         label.lineBreakMode = .byTruncatingTail
@@ -255,15 +401,16 @@ private final class WorkspaceSidebarController: NSViewController, NSTableViewDat
             image.layer?.cornerRadius = 4
             image.layer?.masksToBounds = true
         } else {
-            image.contentTintColor = .secondaryLabelColor
+            image.contentTintColor = iconTint
+            image.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 17, weight: .medium)
         }
         cell.imageView = image
         let check = NSImageView(image: NSImage(systemSymbolName: "checkmark.circle.fill", accessibilityDescription: L("In Use")) ?? NSImage())
-        check.contentTintColor = .systemTeal
+        check.contentTintColor = .controlAccentColor
         check.isHidden = !active
         check.setAccessibilityLabel(L("In Use"))
         for child in [image, label, check] { child.translatesAutoresizingMaskIntoConstraints = false; cell.addSubview(child) }
-        let iconDimension: CGFloat = rows[row] == .settings ? 0 : (presetArtwork == nil ? 16 : 20)
+        let iconDimension: CGFloat = presetArtwork == nil ? 20 : 24
         var constraints = [
             image.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 0), image.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
             image.widthAnchor.constraint(equalToConstant: iconDimension), image.heightAnchor.constraint(equalToConstant: iconDimension),
@@ -319,8 +466,9 @@ private final class WorkspaceSidebarController: NSViewController, NSTableViewDat
         case .set(let id):
             guard let set = editor.sets.first(where: { $0.id == id }) else { return }
             editor.selectSet(set)
-            navigation.page = .sets
-        case .page(let page): navigation.page = page
+            navigation.visit(.imageSet(id))
+        case .page(let page):
+            navigation.visit(page)
         case .settings: break
         }
     }
@@ -356,7 +504,7 @@ private final class WorkspaceSidebarController: NSViewController, NSTableViewDat
     }
     private func useSet(_ set: PetImageSet) {
         editor.selectSet(set)
-        navigation.page = .sets
+        navigation.visit(.imageSet(set.id))
         editor.activate(set)
     }
     @objc private func renameSetFromMenu(_ sender: NSMenuItem) {
@@ -386,10 +534,26 @@ private final class WorkspaceSidebarController: NSViewController, NSTableViewDat
         if createPopover?.isShown == true { createPopover?.close(); return }
         let popover = NSPopover()
         popover.behavior = .transient
-        popover.contentViewController = NSHostingController(rootView: CreateSetPopover(editor: editor) { [weak self, weak popover] in
-            self?.navigation.page = .sets
+        let host = NSHostingController(rootView: CreateSetPopover(editor: editor) { [weak self, weak popover] in
+            if let self { self.navigation.visit(.imageSet(self.editor.selectedSetID)) }
             popover?.close()
         } onCancel: { [weak popover] in popover?.close() })
+        // Size before showing so the arrow stays centered on the add button.
+        host.sizingOptions = []
+        let size = host.sizeThatFits(in: CGSize(width: 360, height: 600))
+        host.view.setFrameSize(size)
+        popover.contentViewController = host
+        popover.contentSize = size
+        host.rootView.onContentSizeChange = { [weak self, weak host, weak popover] in
+            DispatchQueue.main.async {
+                guard let self, let host, let popover, popover.isShown else { return }
+                let size = host.sizeThatFits(in: CGSize(width: 360, height: 600))
+                guard size != popover.contentSize else { return }
+                host.view.setFrameSize(size)
+                popover.contentSize = size
+                popover.show(relativeTo: self.addButton.bounds, of: self.addButton, preferredEdge: .maxX)
+            }
+        }
         createPopover = popover
         popover.show(relativeTo: addButton.bounds, of: addButton, preferredEdge: .maxX)
     }
@@ -430,13 +594,25 @@ private struct SettingsLinksFooter: View {
     }
 
     var body: some View {
+        ViewThatFits(in: .horizontal) {
+            links(showsLabels: true).fixedSize()
+            links(showsLabels: false).fixedSize()
+        }
+        .frame(maxWidth: .infinity, alignment: .trailing)
+        .font(.system(size: 11, weight: .medium))
+        .padding(.horizontal, 22)
+        .padding(.vertical, 10)
+        .background(.bar)
+    }
+
+    private func links(showsLabels: Bool) -> some View {
         HStack(spacing: 16) {
             Spacer(minLength: 0)
-            iconLink("Website", url: "https://typing-pet.miel.ing", symbol: "globe")
-            iconLink("GitHub", url: "https://github.com/ynifamily3", symbol: "chevron.left.forwardslash.chevron.right")
-            iconLink("Repository", url: "https://github.com/ynifamily3/TypingPetMac", symbol: "shippingbox")
-            iconLink("X", url: "https://x.com/miel_ggyu", symbol: nil)
-            iconLink("Write an email", url: feedbackMailURL, symbol: "envelope")
+            iconLink("Website", url: URL(string: "https://typing-pet.miel.ing"), symbol: "globe", showsLabel: showsLabels)
+            iconLink("GitHub", url: URL(string: "https://github.com/ynifamily3"), symbol: "chevron.left.forwardslash.chevron.right", showsLabel: showsLabels)
+            iconLink("Repository", url: URL(string: "https://github.com/ynifamily3/TypingPetMac"), symbol: "shippingbox", showsLabel: showsLabels)
+            iconLink("X", url: URL(string: "https://x.com/miel_ggyu"), symbol: nil, showsLabel: showsLabels)
+            iconLink("Write an email", url: feedbackMailURL, symbol: "envelope", showsLabel: showsLabels)
             HStack(spacing: 6) {
                 Text("v\(appVersion)")
                     .font(.system(size: 10, weight: .regular, design: .monospaced))
@@ -445,34 +621,26 @@ private struct SettingsLinksFooter: View {
                     .font(.system(size: 9, weight: .semibold))
                     .padding(.horizontal, 6)
                     .padding(.vertical, 3)
-                    .background(AppEnvironment.isDevelopment ? Color.orange.opacity(0.16) : Color.teal.opacity(0.16), in: Capsule())
-                    .foregroundStyle(AppEnvironment.isDevelopment ? Color.orange : Color.teal)
+                    .background(AppEnvironment.isDevelopment ? Color.orange.opacity(0.16) : Color.accentColor.opacity(0.16), in: Capsule())
+                    .foregroundStyle(AppEnvironment.isDevelopment ? Color.orange : Color.accentColor)
             }
             .padding(.leading, 4)
             .help(L("Current version %1$@", appVersion))
         }
-        .font(.system(size: 11, weight: .medium))
-        .padding(.horizontal, 20)
-        .padding(.vertical, 9)
-        .background(Color(nsColor: .windowBackgroundColor))
-        .overlay(alignment: .top) { Rectangle().fill(Color(nsColor: .separatorColor)).frame(height: 1) }
     }
 
-    private func iconLink(_ title: String, url: String, symbol: String?) -> some View {
-        iconLink(title, url: URL(string: url), symbol: symbol)
-    }
-
-    private func iconLink(_ title: String, url: URL?, symbol: String?) -> some View {
+    private func iconLink(_ title: String, url: URL?, symbol: String?, showsLabel: Bool) -> some View {
         Group {
             if let url {
                 Link(destination: url) {
                     Group {
                         if let symbol {
-                            Label(L(title), systemImage: symbol)
+                            if showsLabel { Label(L(title), systemImage: symbol) }
+                            else { Image(systemName: symbol) }
                         } else {
                             HStack(spacing: 6) {
                                 XBrandMark().fill(.foreground).frame(width: 15, height: 15)
-                                Text(L(title))
+                                if showsLabel { Text(L(title)) }
                             }
                         }
                     }.fixedSize()
@@ -558,18 +726,16 @@ private struct NativeSettingsPages: View {
     let updater: UpdateController
     @ObservedObject var navigation: WorkspaceNavigation
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            Text(navigation.page.title).font(.system(size: 22, weight: .semibold))
-            Group {
+        Group {
                 switch navigation.page {
                 case .sets: EmptyView()
                 case .appearance: GeneralSettingsView(model: model, updater: updater, scope: .pet)
                 case .todos: TodoSettingsView(store: todoStore)
                 case .general: GeneralSettingsView(model: model, updater: updater, scope: .system)
                 }
-            }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
-        .padding(22).background(Color(nsColor: .windowBackgroundColor)).tint(.teal)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(Color(nsColor: .windowBackgroundColor))
         .environment(\.locale, localization.locale)
         .alert(L("Error"), isPresented: Binding(get: { model.errorMessage != nil }, set: { if !$0 { model.errorMessage = nil } })) {
             Button(L("OK")) { model.errorMessage = nil }
@@ -581,13 +747,21 @@ private struct CreateSetPopover: View {
     @ObservedObject var editor: PackEditorModel
     let onCreated: () -> Void
     let onCancel: () -> Void
+    var onContentSizeChange: () -> Void = {}
     @State private var name = ""
     @State private var error: String?
     @FocusState private var focused: Bool
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text(L("New Set")).font(.headline)
-            TextField(L("Pack Name"), text: $name).textFieldStyle(.roundedBorder).focused($focused).onSubmit(create)
+            TextField(L("Pack Name"), text: $name)
+                .textFieldStyle(.roundedBorder)
+                .focused($focused)
+                .onChange(of: name) { value in
+                    let limited = TodoTitlePolicy.limitedDraft(value)
+                    if limited != value { name = limited }
+                }
+                .onSubmit(create)
             Text(L("Create an empty pack, then add your images.")).font(.callout).foregroundStyle(.secondary)
             if let error { Text(error).foregroundStyle(.red).font(.callout) }
             HStack {
@@ -596,6 +770,7 @@ private struct CreateSetPopover: View {
                 Button(L("Create"), action: create).keyboardShortcut(.defaultAction).disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
         }.padding(20).frame(width: 290).onAppear { focused = true }
+            .onChange(of: error) { _ in onContentSizeChange() }
     }
     private func create() {
         do { try editor.createPack(name: name); onCreated() }

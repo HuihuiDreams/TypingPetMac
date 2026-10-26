@@ -136,7 +136,6 @@ struct NativeSetWorkspace: View {
         .background(Color(nsColor: .windowBackgroundColor))
         .background(PopoverCoordinateRoot(controller: popovers))
         .coordinateSpace(name: "set-workspace")
-        .tint(.teal)
         .environment(\.locale, localization.locale)
         .onChange(of: editor.selectedSetID) { _ in popovers.close() }
         .onChange(of: editor.modifiers) { _ in popovers.updateModifiers() }
@@ -152,21 +151,21 @@ struct NativeSetWorkspace: View {
         HStack(alignment: .center, spacing: 14) {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 8) {
-                    Text(editor.draft.name).font(.system(size: 22, weight: .semibold)).lineLimit(2)
-                    if editor.isActive { Label(L("In Use"), systemImage: "checkmark.circle.fill").font(.caption).foregroundStyle(.teal).fixedSize() }
+                    Text(editor.displayConfiguration.name).font(.system(size: 22, weight: .semibold)).lineLimit(2)
+                    if editor.isActive { Label(L("In Use"), systemImage: "checkmark.circle.fill").font(.caption).foregroundStyle(Color.accentColor).fixedSize() }
                     Button {
                         popovers.close()
                         do { try editor.duplicatePack() } catch { editor.errorMessage = error.localizedDescription }
                     } label: { Label(L("Duplicate"), systemImage: "plus.square.on.square") }
                     .buttonStyle(.bordered)
-                    .controlSize(.small)
+                    .controlSize(.regular)
                     .disabled(!editor.canEdit)
                     if !editor.selectedSet.isBuiltIn {
                         Menu {
                             Button(L("Rename")) { popovers.close(); editor.renamePack(editor.selectedSet) }
                             Button(L("Delete")) { popovers.close(); editor.removePack(editor.selectedSet) }
                         } label: { Image(systemName: "ellipsis") }
-                        .menuStyle(.borderedButton).fixedSize().accessibilityLabel(L("Set Options"))
+                        .menuStyle(.borderedButton).controlSize(.regular).fixedSize().accessibilityLabel(L("Set Options"))
                     }
                 }
                 Text(L("Changes saved automatically."))
@@ -189,11 +188,6 @@ struct NativeSetWorkspace: View {
                 Spacer()
                 if editor.canEditPresets { Button { popovers.close(); editor.addPresets() } label: { Label(L("Add Images…"), systemImage: "plus") } }
             }
-            if editor.canEditPresets {
-                Text(L("Drop image files here or choose Add Images."))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
             if editor.draft.presets.isEmpty {
                 VStack(spacing: 12) {
                     Image(systemName: "photo.badge.plus").font(.system(size: 30)).foregroundStyle(.tertiary)
@@ -204,7 +198,7 @@ struct NativeSetWorkspace: View {
                 .frame(maxWidth: .infinity).padding(30).modifier(SetSurface(radius: 14))
             } else {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 100, maximum: 180))], spacing: 10) {
-                    ForEach(editor.draft.presets) { preset in
+                    ForEach(editor.displayConfiguration.presets) { preset in
                         Group {
                             if editor.selectedSet.isBuiltIn {
                                 galleryTile(preset, hovered: hoveredPresetID == preset.id)
@@ -248,7 +242,7 @@ struct NativeSetWorkspace: View {
         .overlay {
             if isGalleryDropTargeted {
                 RoundedRectangle(cornerRadius: 14)
-                    .stroke(Color.teal, style: StrokeStyle(lineWidth: 2, dash: [7, 5]))
+                    .stroke(Color.accentColor, style: StrokeStyle(lineWidth: 2, dash: [7, 5]))
                     .allowsHitTesting(false)
             }
         }
@@ -340,7 +334,6 @@ struct NativeSetWorkspace: View {
             VStack(alignment: .leading, spacing: 7) {
                 HStack(spacing: 7) {
                     Text(L("Modifier Combination"))
-                    Text(L("Multiple selections allowed")).font(.caption)
                 }.font(.callout).foregroundStyle(.secondary)
                 HStack(spacing: 10) {
                     modifier(.control, symbol: "⌃", name: "Control")
@@ -382,7 +375,7 @@ struct NativeSetWorkspace: View {
                 Image(systemName: "ellipsis").foregroundStyle(.secondary)
             }
             .padding(14).frame(maxWidth: .infinity, minHeight: 68).modifier(SetSurface(radius: 13))
-            .overlay(RoundedRectangle(cornerRadius: 13).stroke(popovers.target == .mapping(target) ? Color.teal : .clear))
+            .overlay(RoundedRectangle(cornerRadius: 13).stroke(popovers.target == .mapping(target) ? Color.accentColor : .clear))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain).disabled(!editor.canEdit || editor.draft.presets.isEmpty)
@@ -512,10 +505,10 @@ private struct KeycapButtonStyle: ButtonStyle {
         let highlighted = isEnabled && (hovering || configuration.isPressed || selected || dropTargeted)
         return configuration.label
             .background(RoundedRectangle(cornerRadius: 6).fill(
-                dropTargeted ? Color.teal.opacity(0.36) : highlighted ? Color.teal.opacity(configuration.isPressed ? 0.22 : selected ? 0.14 : 0.09) : Color(nsColor: .controlBackgroundColor)))
+                dropTargeted ? Color.accentColor.opacity(0.36) : highlighted ? Color.accentColor.opacity(configuration.isPressed ? 0.22 : selected ? 0.14 : 0.09) : Color(nsColor: .controlBackgroundColor)))
             .overlay(RoundedRectangle(cornerRadius: 6).stroke(
-                dropTargeted ? Color.teal : highlighted ? Color.teal.opacity(selected ? 1 : 0.65) : Color.primary.opacity(0.10), lineWidth: dropTargeted ? 2 : highlighted ? 1.5 : 0.6))
-            .shadow(color: dropTargeted ? Color.teal.opacity(0.85) : .clear, radius: dropTargeted ? 10 : 0)
+                dropTargeted ? Color.accentColor : highlighted ? Color.accentColor.opacity(selected ? 1 : 0.65) : Color.primary.opacity(0.10), lineWidth: dropTargeted ? 2 : highlighted ? 1.5 : 0.6))
+            .shadow(color: dropTargeted ? Color.accentColor.opacity(0.85) : .clear, radius: dropTargeted ? 10 : 0)
             .scaleEffect(dropTargeted ? 1.04 : 1)
             .animation(.easeInOut(duration: 0.12), value: dropTargeted)
             .opacity(isEnabled ? 1 : 0.4)
@@ -534,7 +527,7 @@ private struct PackPopoverContent: View {
             case .preset(let id): GalleryPresetPopover(editor: editor, controller: controller, presetID: id).id(id)
             case nil: EmptyView()
             }
-        }.tint(.teal).environment(\.locale, localization.locale)
+        }.environment(\.locale, localization.locale)
     }
 }
 
@@ -559,17 +552,17 @@ private struct MappingPresetPopover: View {
             Text(value.presetIDs.isEmpty ? L("Uses Unassigned settings") : L("%1$@ selected", value.presetIDs.count)).font(.caption).foregroundStyle(.secondary)
             ScrollView {
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4), spacing: 8) {
-                    ForEach(editor.draft.presets) { preset in
+                    ForEach(editor.displayConfiguration.presets) { preset in
                         Button { editor.togglePreset(preset.id, for: target) } label: {
                             VStack(spacing: 5) {
                                 SetArtwork(image: editor.image(for: preset)).frame(height: 44)
                                 Text(preset.name).font(.caption).lineLimit(2)
                             }
                             .padding(8).frame(maxWidth: .infinity)
-                            .background(RoundedRectangle(cornerRadius: 9).fill(value.presetIDs.contains(preset.id) ? Color.teal.opacity(0.13) : Color(nsColor: .controlBackgroundColor)))
-                            .overlay(RoundedRectangle(cornerRadius: 9).stroke(value.presetIDs.contains(preset.id) ? Color.teal : Color.primary.opacity(0.10)))
+                            .background(RoundedRectangle(cornerRadius: 9).fill(value.presetIDs.contains(preset.id) ? Color.accentColor.opacity(0.13) : Color(nsColor: .controlBackgroundColor)))
+                            .overlay(RoundedRectangle(cornerRadius: 9).stroke(value.presetIDs.contains(preset.id) ? Color.accentColor : Color.primary.opacity(0.10)))
                             .overlay(alignment: .topTrailing) {
-                                if value.presetIDs.contains(preset.id) { Image(systemName: "checkmark.circle.fill").font(.caption).foregroundStyle(.teal).padding(4) }
+                                if value.presetIDs.contains(preset.id) { Image(systemName: "checkmark.circle.fill").font(.caption).foregroundStyle(Color.accentColor).padding(4) }
                             }.contentShape(Rectangle())
                         }
                         .buttonStyle(.plain).accessibilityLabel(preset.name).accessibilityAddTraits(value.presetIDs.contains(preset.id) ? .isSelected : [])
@@ -611,7 +604,13 @@ private struct GalleryPresetPopover: View {
                 Spacer()
                 Button { controller.close() } label: { Image(systemName: "xmark") }.buttonStyle(.plain).accessibilityLabel(L("Close"))
             }
-            TextField(L("Preset Name"), text: $name).textFieldStyle(.roundedBorder).onSubmit(apply)
+            TextField(L("Preset Name"), text: $name)
+                .textFieldStyle(.roundedBorder)
+                .onChange(of: name) { value in
+                    let limited = TodoTitlePolicy.limitedDraft(value)
+                    if limited != value { name = limited }
+                }
+                .onSubmit(apply)
             HStack {
                 Button(L("Replace Image…")) { editor.selectedPresetID = presetID; controller.close(); editor.replacePresetImage() }
                 Button(L("Delete Image")) { editor.selectedPresetID = presetID; controller.close(); editor.removeSelectedPreset() }

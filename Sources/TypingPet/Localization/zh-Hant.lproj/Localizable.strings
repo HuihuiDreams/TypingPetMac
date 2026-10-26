@@ -384,7 +384,6 @@
 "Enter a name for the pack and each preset." = "請輸入套件和每個預設的名稱。";
 "Give presets any name and reuse them across keys and reactions." = "為預設自由命名，並用於多個按鍵和反應。";
 "Image Presets" = "圖片預設";
-"Drop image files here or choose Add Images." = "將圖片檔拖曳到此處，或選擇「加入圖片」。";
 "No supported image files were dropped." = "請放入支援的圖片檔。";
 "Image Presets · Select Multiple" = "圖片預設 · 可複選";
 "Import Image Pack" = "匯入圖片套件";
@@ -472,3 +471,8 @@
 "Enter" = "Enter";
 "Click a key to edit its presets." = "點擊按鍵以編輯預設。";
 "Edit %1$@" = "編輯 %1$@";
+
+/* Settings navigation */
+"Back" = "返回";
+"Forward" = "前進";
+"Navigate Settings" = "設定導覽";

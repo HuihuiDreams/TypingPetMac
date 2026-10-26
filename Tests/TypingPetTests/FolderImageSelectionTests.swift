@@ -138,4 +138,53 @@ final class FolderImageSelectionTests: XCTestCase {
         try library.replaceIdle(with: resource)
         XCTAssertTrue(library.idleURL?.path.contains("/Sets/") == true)
     }
+
+    @MainActor
+    func testAllImageLookupsRejectPersistedTraversalBeforeResolvingExistingFiles() throws {
+        let fileManager = FileManager.default
+        let root = fileManager.temporaryDirectory.appendingPathComponent("TypingPetPaths-\(UUID())", isDirectory: true)
+        let images = root.appendingPathComponent("Images", isDirectory: true)
+        try fileManager.createDirectory(at: images.appendingPathComponent("Sets/Safe"), withIntermediateDirectories: true)
+        let outsideFolder = root.appendingPathComponent("Outside", isDirectory: true)
+        try fileManager.createDirectory(at: outsideFolder, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: root) }
+        let outside = root.appendingPathComponent("outside.png")
+        try Data("outside the image library".utf8).write(to: outside)
+        try fileManager.copyItem(at: outside, to: outsideFolder.appendingPathComponent("outside.png"))
+
+        let suite = "TypingPetPaths.\(UUID())"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let cases: [(String?, String)] = [
+            ("Safe", "../../../outside.png"),
+            ("../../Outside", "outside.png"),
+            (nil, "../outside.png"), // Legacy selections use the Images directory directly.
+            ("Safe", outside.path)
+        ]
+        for (folder, fileName) in cases {
+            let set = PetImageSet(id: UUID(), name: "Invalid", storageFolder: folder,
+                                  idleFileName: fileName, reactionFileNames: [fileName], isBuiltIn: false)
+            defaults.set(try JSONEncoder().encode([set]), forKey: "imageGalleryData-v1")
+            defaults.set(set.id.uuidString, forKey: "activeImageSetID-v1")
+            let library = PetImageLibrary(defaults: defaults, imagesDirectory: images)
+            XCTAssertNil(library.idleURL, "Resolved unsafe idle path: \(folder ?? "legacy")/\(fileName)")
+            XCTAssertTrue(library.reactionURLs.isEmpty)
+            XCTAssertNil(library.presetImageURL(fileName: fileName, in: set))
+        }
+    }
+
+    @MainActor
+    func testBuiltInResourceLookupRejectsTraversalAndKeepsNormalResources() throws {
+        let suite = "TypingPetBuiltInPaths.\(UUID())"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let library = PetImageLibrary(defaults: defaults, imagesDirectory: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString))
+        var set = try XCTUnwrap(library.imageSets.first)
+        XCTAssertNotNil(library.idleURL(for: set))
+        set.idleFileName = "../pet-idle.png"
+        set.reactionFileNames = ["../pet-left.png"]
+        XCTAssertNil(library.idleURL(for: set))
+        XCTAssertTrue(library.reactionURLs(for: set).isEmpty)
+        XCTAssertNil(library.presetImageURL(fileName: set.idleFileName, in: set))
+    }
 }

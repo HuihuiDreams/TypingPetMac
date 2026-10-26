@@ -12,6 +12,16 @@ struct UpdateManifest: Codable, Equatable {
     let sha256: String
     let signature: String
     let notes: String?
+    var localizedNotes: [String: String]? = nil
+
+    func releaseNotes(language: String) -> String? {
+        let resolved = AppLanguageMode.system.resolvedLanguage(preferredLanguages: [language])
+        // Older feeds only have notes. Partial translations fall back to English.
+        for text in [localizedNotes?[resolved], localizedNotes?["en"], notes] {
+            if let text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return text }
+        }
+        return nil
+    }
 
     func isNewer(than currentBuild: Int) -> Bool { build > currentBuild }
 

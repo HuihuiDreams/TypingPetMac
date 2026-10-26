@@ -1,17 +1,53 @@
 import Foundation
 import Combine
 import CoreGraphics
+import Darwin
 
 struct TodoFileStorage {
     let url: URL
+    static let maximumFileSize = 10 * 1024 * 1024
+    private let setPrivatePermissions: (Int32) throws -> Void
+
+    init(url: URL, setPrivatePermissions: @escaping (Int32) throws -> Void = TodoFileStorage.protectFile) {
+        self.url = url
+        self.setPrivatePermissions = setPrivatePermissions
+    }
+
+    static func protectFile(_ descriptor: Int32) throws {
+        guard Darwin.fchmod(descriptor, S_IRUSR | S_IWUSR) == 0 else {
+            throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+        }
+    }
+
     static var defaultURL: URL {
         AppEnvironment.supportDirectory.appendingPathComponent("todo-state.json")
     }
     func load() throws -> TodoState {
-        guard FileManager.default.fileExists(atPath: url.path) else { return TodoState() }
+        // Check and read the same descriptor. Never follow a link or block opening a FIFO.
+        let descriptor = Darwin.open(url.path, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC)
+        guard descriptor >= 0 else {
+            let code = errno
+            if code == ENOENT || code == ENOTDIR { return TodoState() }
+            throw POSIXError(POSIXErrorCode(rawValue: code) ?? .EIO)
+        }
+        let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
+        defer { try? handle.close() }
+        var attributes = stat()
+        guard Darwin.fstat(descriptor, &attributes) == 0 else {
+            throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+        }
+        guard attributes.st_mode & S_IFMT == S_IFREG, attributes.st_size <= Self.maximumFileSize else {
+            throw TodoDataError.invalidState
+        }
+        // Keep the bound even if another process grows the file after fstat.
+        var data = Data()
+        while let chunk = try handle.read(upToCount: min(64 * 1024, Self.maximumFileSize + 1 - data.count)), !chunk.isEmpty {
+            data.append(chunk)
+            guard data.count <= Self.maximumFileSize else { throw TodoDataError.invalidState }
+        }
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
-        let state = try decoder.decode(TodoState.self, from: Data(contentsOf: url))
+        let state = try decoder.decode(TodoState.self, from: data)
         try state.validate()
         return state
     }
@@ -21,8 +57,33 @@ struct TodoFileStorage {
         encoder.dateEncodingStrategy = .iso8601
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         let data = try encoder.encode(state)
+        // Do not publish a file the next launch would refuse to load.
+        guard data.count <= Self.maximumFileSize else { throw TodoDataError.invalidState }
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try data.write(to: url, options: .atomic)
+
+        // mkstemp creates an exclusive 0600 file beside the destination for an atomic rename.
+        var template = Array(url.deletingLastPathComponent().appendingPathComponent(".todo-state-XXXXXX").path.utf8CString)
+        let descriptor = mkstemp(&template)
+        guard descriptor >= 0 else {
+            throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+        }
+        let temporaryURL = URL(fileURLWithPath: String(cString: template))
+        let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
+        defer {
+            try? handle.close()
+            try? FileManager.default.removeItem(at: temporaryURL)
+        }
+        guard fcntl(descriptor, F_SETFD, FD_CLOEXEC) == 0 else {
+            throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+        }
+        // Fail before writing personal data or replacing the original if protection fails.
+        try setPrivatePermissions(descriptor)
+        try handle.write(contentsOf: data)
+        try handle.synchronize()
+        try handle.close()
+        guard Darwin.rename(temporaryURL.path, url.path) == 0 else {
+            throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+        }
     }
 }
 

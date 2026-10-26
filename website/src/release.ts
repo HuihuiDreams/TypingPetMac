@@ -9,5 +9,9 @@ type DiskImage = {
 };
 
 // Keep the optional format typed even when generated metadata contains null.
-const release: Omit<typeof metadata, 'dmg'> & { dmg: DiskImage | null } = metadata;
+const release: Omit<typeof metadata, 'dmg' | 'publishedAt' | 'releaseTimes'> & {
+  dmg: DiskImage | null;
+  publishedAt?: string;
+  releaseTimes?: Record<string, string>;
+} = metadata;
 export default release;

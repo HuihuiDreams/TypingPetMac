@@ -25,12 +25,24 @@ The request carries no query and no identifiers. The server sees the default `UR
   "size": 7191671,
   "sha256": "…",
   "signature": "base64 Ed25519 signature of the zip bytes",
-  "notes": "- Changes"
+  "notes": "- Changes",
+  "localizedNotes": {
+    "ko": "업데이트 내역\n\n• 변경 내용",
+    "en": "Release notes\n\n• Changes",
+    "ja": "更新内容\n\n• 変更点",
+    "zh-Hans": "更新内容\n\n• 更改",
+    "zh-Hant": "更新內容\n\n• 變更"
+  }
 }
 ```
 
 `build` is `CFBundleVersion`. Only a build greater than the running build is offered.
 The zip contains one `.app`.
+
+The update prompt selects `localizedNotes` using the app's language setting, including System.
+If that translation is missing or blank, it uses English, then the legacy `notes` field.
+Older apps ignore the added field and continue showing `notes`. A client update is required
+before an installed older app can display translated release notes.
 
 ## Install flow
 
@@ -84,6 +96,10 @@ If public verification fails, inspect the server before retrying; the local feed
 Published builds are immutable. Increase `CFBundleVersion` for the next update.
 Serve `latest.json` without caching.
 The notes come from the matching `CHANGELOG.md` section, or from `UPDATE_NOTES`.
+That legacy field stays available for older clients. `localizedNotes` is generated from the
+matching version in `website/src/releases.json`, using its title and items as plain text.
+Production preflight and publishing require nonempty notes in all five supported languages,
+including update-server-only releases, before publishing a new feed.
 
 The production key was rotated for 0.14.2 after the old private key was lost. Builds through 0.14.1 embed the old public key,
 so they cannot install 0.14.2 from the feed. Install 0.14.2 manually once; builds after that can use the new feed normally.

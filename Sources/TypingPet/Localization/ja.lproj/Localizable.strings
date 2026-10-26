@@ -384,7 +384,6 @@
 "Enter a name for the pack and each preset." = "パックと各プリセットの名前を入力してください。";
 "Give presets any name and reuse them across keys and reactions." = "プリセットに自由に名前を付け、複数のキーや反応に使えます。";
 "Image Presets" = "画像プリセット";
-"Drop image files here or choose Add Images." = "画像ファイルをここにドラッグするか、「画像を追加」を選んでください。";
 "No supported image files were dropped." = "対応する画像ファイルをドロップしてください。";
 "Image Presets · Select Multiple" = "画像プリセット · 複数選択可";
 "Import Image Pack" = "画像パックを読み込む";
@@ -472,3 +471,8 @@
 "Enter" = "Enter";
 "Click a key to edit its presets." = "キーをクリックしてプリセットを設定します。";
 "Edit %1$@" = "%1$@ を編集";
+
+/* Settings navigation */
+"Back" = "戻る";
+"Forward" = "進む";
+"Navigate Settings" = "設定の移動";

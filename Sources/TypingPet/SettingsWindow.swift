@@ -288,9 +288,10 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         window.title = AppEnvironment.displayName + L(" Settings")
         window.setContentSize(SettingsWindowSizing.contentSize())
         window.contentMinSize = SettingsWindowSizing.minimumSize()
-        window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
+        window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
         window.titleVisibility = .hidden
-        window.titlebarAppearsTransparent = true
+        window.titlebarAppearsTransparent = false
+        window.titlebarSeparatorStyle = .none
         window.isMovableByWindowBackground = false
         workspace.installToolbar(on: window)
         window.appearance = model.appearanceMode.windowAppearance
@@ -317,7 +318,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     func show() {
         if let window {
             window.contentMinSize = SettingsWindowSizing.minimumSize()
-            let size = window.contentLayoutRect.size
+            let size = window.contentView?.frame.size ?? window.contentLayoutRect.size
             window.setContentSize(NSSize(width: max(size.width, window.contentMinSize.width), height: max(size.height, window.contentMinSize.height)))
         }
         NSApp.setActivationPolicy(.regular)
@@ -368,6 +369,9 @@ private struct FlatSettingsSection<Content: View>: View {
             Text(title)
                 .font(.headline)
             content
+                .padding(.horizontal, SettingsMetrics.space4)
+                .padding(.vertical, SettingsMetrics.space2)
+                .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
     }
 }
@@ -417,8 +421,11 @@ private struct SettingsToggleRow: View {
             HStack(spacing: SettingsMetrics.space3) {
                 Text(title)
                 Spacer(minLength: SettingsMetrics.space3)
-                Toggle("", isOn: $isOn)
+                Toggle(title, isOn: $isOn)
+                    .toggleStyle(.switch)
                     .labelsHidden()
+                    .controlSize(.small)
+                    .fixedSize()
             }
         }
         .disabled(!isEnabled)
@@ -484,7 +491,7 @@ struct GeneralSettingsView: View {
                                         Text(L("Strong")).tag(3)
                                     }
                                     .labelsHidden()
-                                    .frame(width: 112)
+                                    .frame(width: 112, alignment: .trailing)
                                 }
                             }
                             Divider()
@@ -529,7 +536,7 @@ struct GeneralSettingsView: View {
                                         Text(L("language.traditionalChinese")).tag(AppLanguageMode.traditionalChinese)
                                     }
                                     .labelsHidden()
-                                    .frame(width: 200)
+                                    .frame(width: 200, alignment: .trailing)
                                 }
                             }
                             Divider()
@@ -547,7 +554,7 @@ struct GeneralSettingsView: View {
                                     }
                                     .pickerStyle(.segmented)
                                     .labelsHidden()
-                                    .frame(width: 252)
+                                    .frame(width: 252, alignment: .trailing)
                                 }
                             }
                             Divider()
@@ -605,13 +612,12 @@ struct GeneralSettingsView: View {
                                 isOn: $updater.automaticChecks,
                                 isEnabled: updater.unavailableReason == nil
                             )
-                            Divider()
                         }
                     }
 
                 }
             }
-            .padding(SettingsMetrics.space4)
+            .padding(22)
         }
         .onAppear { model.refreshPermissions() }
         .onReceive(Timer.publish(every: 2, on: .main, in: .common).autoconnect()) { _ in
@@ -663,7 +669,7 @@ struct TodoSettingsView: View {
                                     }
                                 }
                                 .labelsHidden()
-                                .frame(width: 168)
+                                .frame(width: 168, alignment: .trailing)
                             }
                         }
                         .disabled(!enabled || store.loadBlocked)
@@ -707,7 +713,7 @@ struct TodoSettingsView: View {
                                     Text(L("Compact")).tag(TodoListStyle.compact)
                                 }
                                 .labelsHidden()
-                                .frame(width: 168)
+                                .frame(width: 168, alignment: .trailing)
                             }
                         }
                         Divider()
@@ -723,7 +729,7 @@ struct TodoSettingsView: View {
                                     Text(L("On hover")).tag(TodoBubbleVisibility.hover)
                                 }
                                 .labelsHidden()
-                                .frame(width: 168)
+                                .frame(width: 168, alignment: .trailing)
                             }
                         }
                         Divider()
@@ -775,7 +781,7 @@ struct TodoSettingsView: View {
                     }
                 }
             }
-            .padding(SettingsMetrics.space4)
+            .padding(22)
         }
     }
 }

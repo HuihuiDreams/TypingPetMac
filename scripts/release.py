@@ -19,6 +19,7 @@ from urllib.parse import urlparse
 import zipfile
 
 from homebrew_cask import CASK_PATH, TAP_REPO, render_cask, validate_cask_update
+from release_notes import localized_release_notes
 
 PROJECT = Path(__file__).resolve().parent.parent
 BASE_URL = "https://pet.miel.ing/update"
@@ -154,8 +155,6 @@ class Release:
                            if section.startswith(self.version + " ")), "")
         if not self.notes:
             fail(f"Add a nonempty '## {self.version} - YYYY-MM-DD' section to CHANGELOG.md.")
-        if self.options.github and self.website_enabled:
-            self.check_website_notes()
         identities = self.command("security", "find-identity", "-v", "-p", "codesigning", capture=True)
         identities = re.findall(r'"(Developer ID Application:[^"]+)"', identities)
         identity = self.env.get("CODE_SIGN_IDENTITY")
@@ -190,6 +189,7 @@ class Release:
             fail(f"Increase both version and build above {self.previous['version']} ({self.previous['build']}) in version.json.")
         elif self.output.exists():
             fail(f"Release directory already exists: {self.output}. Use --resume for a prepared release, or inspect the failed attempt first.")
+        self.check_website_notes()
         if self.options.github:
             self.repo = self.command("gh", "repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner", capture=True)
             remote_commit = self.command("gh", "api", f"repos/{self.repo}/commits/{self.commit}", "--jq", ".sha", capture=True)
@@ -202,15 +202,7 @@ class Release:
                 fail("Homebrew tap must be public and writable by the active GitHub account.")
 
     def check_website_notes(self):
-        notes = json.loads((self.root / "website/src/releases.json").read_text())
-        note = next((note for note in notes if note.get("version") == self.version), None)
-        for language in json.loads((self.root / "website/src/locales.json").read_text()):
-            localized = (note or {}).get(language, {})
-            items = localized.get("items")
-            if (not isinstance(localized.get("title"), str) or not localized["title"].strip()
-                    or not isinstance(items, list) or not items
-                    or not all(isinstance(item, str) and item.strip() for item in items)):
-                fail(f"Add {language} website notes for {self.version} in website/src/releases.json before releasing.")
+        localized_release_notes(self.root, self.version, required=True)
 
     def publish_homebrew(self):
         # Only reference the exact bytes of the now-public GitHub asset.

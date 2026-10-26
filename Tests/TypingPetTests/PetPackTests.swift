@@ -3,6 +3,38 @@ import XCTest
 @testable import TypingPet
 
 final class PetPackTests: XCTestCase {
+    @MainActor
+    func testBuiltInNamesFollowLanguageWithoutChangingMappingsOrStoredData() throws {
+        let f = try Fixture(); defer { f.cleanup() }
+        let localization = AppLocalization(defaults: f.defaults)
+        localization.setMode(.korean)
+        let store = PetPackStore(library: f.library, keyStore: f.keys, localization: localization)
+        let editor = PackEditorModel(store: store)
+        let original = store.activeConfiguration
+        let bytes = try Data(contentsOf: f.library.packConfigurationsURL)
+        for mode in AppLanguageMode.allCases where mode != .system {
+            localization.setMode(mode)
+            let language = mode.resolvedLanguage()
+            let displayed = editor.displayConfiguration
+            XCTAssertEqual(displayed.name, AppLocalization.string("Default Set", language: language))
+            XCTAssertEqual(displayed.mappings, original.mappings)
+            XCTAssertEqual(displayed.presets.map(\.id), original.presets.map(\.id))
+            for preset in displayed.presets {
+                let key = try XCTUnwrap(PetImagePreset.builtInNameKey(fileName: preset.fileName))
+                XCTAssertEqual(preset.name, AppLocalization.string(key, language: language))
+            }
+            XCTAssertEqual(try Data(contentsOf: f.library.packConfigurationsURL), bytes)
+        }
+        // A draft created in Korean can still save mapping changes after choosing another language.
+        XCTAssertNoThrow(try store.save(original, for: f.library.activeSet))
+
+        let custom = try store.createPack(name: "내 세트 그대로")
+        editor.refresh()
+        editor.selectSet(custom)
+        localization.setMode(.english)
+        XCTAssertEqual(editor.displayConfiguration.name, "내 세트 그대로")
+    }
+
     @MainActor private struct Fixture {
         let root: URL
         let defaults: UserDefaults
