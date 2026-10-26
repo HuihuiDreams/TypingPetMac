@@ -1,174 +1,238 @@
 # TypingPetMac — Threat Model
 
-> Repo: `HuihuiDreams/TypingPetMac` (fork of `ynifamily3/TypingPetMac`), branch `main`, baseline v0.12.2.
+> Repo: `HuihuiDreams/TypingPetMac` (fork of `ynifamily3/TypingPetMac`), branch `main`, baseline v0.19.1 (Build 32).
 > Method: repo-grounded AppSec threat model. Every architectural claim is anchored to a repo path/symbol.
-> Status: assumptions are stated inline; see **Scope and assumptions** and **Open questions**.
+> Context Validation: confirmed with maintainer — ad-hoc/unsigned distribution remains supported alongside notarized builds; update feeds are statically hosted with offline maintainer-held Ed25519 keys; Todo persistence is 100% local POSIX storage.
 
 ## Executive summary
 
-TypingPetMac is an offline, single-process macOS menu-bar app (`LSUIElement`, `ing.miel.typingpet`) whose defining security-relevant property is that it **holds macOS "Input Monitoring" (`ListenEvent`) TCC access and passively monitors every keystroke system-wide** through a `CGEventTap` (`GlobalKeyMonitor.swift:52-61`). There is **no network code, no subprocess execution, no eval, and no credential storage** in the app (confirmed by search: no `URLSession`, `Process`, `NSTask`, `NSAppleScript`, keys/tokens). That removes the entire remote attack class (RCE-over-HTTP, SSRF, injection, MITM) — the architecture doc/section 8 matches the code.
+TypingPetMac is a native macOS desktop companion app (`LSUIElement`, `ing.miel.typingpet`) that combines a borderless floating desktop pet with companion utilities (Todo list, Pomodoro timer) and an in-house auto-updater. The application's defining high-value security asset is that it **holds the macOS "Input Monitoring" (`ListenEvent`) TCC privilege and continuously observes global keystroke events** via `CGEventTap` (`GlobalKeyMonitor.swift:30-72`). Between v0.12.2 and v0.19.1, the system underwent three major architectural expansions: an in-house secure auto-update subsystem (ADR-002), a unified Pet Pack expression engine (ADR-003), and a dual-window companion architecture with interactive text input (ADR-004). 
 
-The residual risk therefore concentrates in two places, not in the app's parser surface:
-
-1. **Distribution integrity vs. a high-value permission.** The app requires a TCC grant that is a surveillance-grade foothold, yet releases are unsigned or ad-hoc signed by default and the user-facing docs instruct users to defeat Gatekeeper with `xattr -cr` while asserting the app is "绝对安全" (absolutely safe). A tampered or malicious build that users run this way inherits a persistent, launch-at-login, system-wide keystroke monitor.
-2. **Local file/preference trust boundaries** (user-picked folders and the `UserDefaults` catalog). These are already well-defended by a single-level filename guard (`StoredFileName.isSafe`) with regression tests, so this surface is **low** residual risk — but it is where a reviewer should confirm the guard is not bypassable.
+The primary security risks concentrate in:
+1. **Distribution integrity & Gatekeeper bypass on a high-privilege binary (TM-001, TM-002)**: Ad-hoc/unsigned distribution remains an active delivery method requiring users to execute `xattr -cr` to bypass Gatekeeper. Because the app requests surveillance-grade `ListenEvent` TCC permissions, pre-authorization tampering of distributed zips presents high potential impact.
+2. **Auto-update supply-chain & staging boundaries (TM-003, TM-004)**: The introduction of network capability (`UpdateInstaller.swift:11-36`) and out-of-process bundle replacement (`UpdateInstaller.swift:114-143`) breaks the historical "zero-network / zero-process" model. This surface is defended by multi-layered cryptographic controls (Ed25519 signatures, SHA-256 hashes, Apple Notarization assessment via `spctl`, and strict Team ID code requirements).
+3. **Companion text focus invariants & keystroke isolation (TM-005)**: Adding interactive Todo text input creates potential focus-hijacking hazards where background keystrokes could leak into the pet's fields; this is mitigated by an Aggressive Focus Surrender architecture.
+4. **Local file and catalog trust boundaries (TM-006, TM-007, TM-008)**: Pack assets and Todo records are defended by single-level filename sanitization (`StoredFileName.isSafe`), fail-closed regular-file/symlink checks, and hardened Darwin POSIX atomic file descriptors (`O_NOFOLLOW | O_CLOEXEC`, `0600` permissions, 10 MiB limits).
 
 ## Scope and assumptions
 
-**In scope (runtime):** `Sources/TypingPet/*`, the packaging scripts (`scripts/build_app.sh`, `scripts/notarize_release.sh`), and the CI workflow (`.github/workflows/ci.yml`).
+**In scope (runtime & packaging):**
+- Core runtime: `Sources/TypingPet/*` (including `GlobalKeyMonitor`, `PetController`, `TodoBubbleWindowController`, `TodoStore`, `UpdateController`, `UpdateInstaller`, `UpdateManifest`, `PetPacks`, `PetImageLibrary`).
+- Hardened Runtime configuration: `Sources/TypingPet/Resources/TypingPet.entitlements`.
+- Release, update, and build tooling: `scripts/build_app.sh`, `scripts/notarize_release.sh`, `scripts/publish_update.sh`, `scripts/update_keys.swift`, `scripts/release.py`, `scripts/test_release.py`, `version.json`.
+- CI quality gates: `.github/workflows/ci.yml`.
 
-**Out of scope:** Tests (`Tests/TypingPetTests/*`), default bundled art assets, and Apple system frameworks (`CoreGraphics`, `AppKit`, `ServiceManagement`) themselves.
+**Out of scope:**
+- Unit test suites: `Tests/TypingPetTests/*`.
+- Default bundled static artwork: `Sources/TypingPet/Resources/*.png`, `AppIcon.icns`.
+- macOS system frameworks: `AppKit`, `CoreGraphics`, `QuartzCore`, `CryptoKit`, `ServiceManagement`.
 
-**Assumptions (correct these if wrong — they move the ranking):**
-- *Deployment:* distributed directly to end users as a zipped `.app` (README download/install flow), not through the Mac App Store. (Note: Mac App Store App Sandbox rules fundamentally prohibit global session `CGEventTap` keystroke monitoring across arbitrary third-party applications; see **Open questions**).
-- *Exposure:* no network listener; the app cannot be reached remotely. Only local, same-host attackers and file/preference inputs matter.
-- *Data sensitivity:* keystroke **metadata** (physical keycode + modifier flags) is treated as sensitive; the app claims it stores/transmits nothing (`README.md:90-93`, `AppDelegate.swift:244`).
-- *Single user, single machine;* no multi-tenancy, no server component.
-- *Trust in the source repo itself* is assumed for the analysis of the shipped app; the fork/upstream relationship is treated as a supply-chain boundary.
+**Assumptions (validated with maintainer):**
+- *Distribution channels:* Distributed as standalone `.zip` archives directly to end users. Both Apple Developer ID signed/notarized releases and ad-hoc unsigned (`-`) builds remain supported distribution targets. (Mac App Store is not a target because global session `CGEventTap` keystroke monitoring is fundamentally prohibited by App Store App Sandbox rules).
+- *Update infrastructure:* Update feeds (`https://pet.miel.ing/update/production/latest.json`) are hosted on static CDN / object storage. The Ed25519 update signing private key resides exclusively on the maintainer's local secure environment (`~/.config/typingpet/update-keys/`) and is never committed to git or exposed to CI runners.
+- *Network boundary:* Network I/O is strictly quarantined to `UpdateInstaller` using ephemeral uncredentialed `URLSession` sessions solely for checking update feeds and downloading release packages. The core desktop pet, keystroke monitor, and Todo subsystem remain 100% offline with zero network capabilities, telemetry, or analytics.
+- *Data sensitivity:* Global keystroke metadata (physical keycode + modifier flags) is considered highly sensitive surveillance-grade data; user Todo tasks are private personal data persisted strictly locally (`0600` POSIX permissions) with no cloud sync or remote export.
+- *Host execution model:* Single-user macOS desktop (macOS 13+); no multi-tenancy, no setuid/root helpers, no background daemons or XPC services.
 
-**Open questions that would materially change ranking:** see **Open questions** at the end of this document.
+**Open questions:**
+- *Distribution transition:* Whether ad-hoc releases will eventually be fully deprecated in favor of Developer ID signed releases once distribution infrastructure matures, allowing complete removal of `xattr -cr` guidance from documentation.
 
 ## System model
 
 ### Primary components
-- `main.swift` — `@MainActor` bootstrap, sets `.accessory` activation policy (`main.swift:5-10`).
-- `AppDelegate.swift` — lifecycle, `NSStatusItem` menu, `SMAppService` login item, TCC permission coordination (`AppDelegate.swift:29-62`, `155-169`, `231-252`).
-- `GlobalKeyMonitor.swift` — `CGEventTap` `.listenOnly` on `keyDown`, maps to `KeyStroke` (`GlobalKeyMonitor.swift:30-72`).
-- `PetController.swift` — floating non-activating panel, physics/pointer-evasion, keystroke→image reaction dispatch (`PetController.swift:203-222`).
-- `PetImageLibrary.swift` — custom image sets, disk store under Application Support, filename safety guard (`PetImageLibrary.swift:5-9`, `245-334`).
-- `KeyReactions.swift` — per-keystroke image rules + disk store (`KeyReactions.swift:84-151`).
-- `SettingsWindow.swift` — SwiftUI settings, `NSOpenPanel` imports, key recorder (`SettingsWindow.swift:147-217`, `557-627`).
-- `InputMonitoringGuide.swift` — permission onboarding panel; enumerates on-screen windows via `CGWindowListCopyWindowInfo` to follow System Settings (`InputMonitoringGuide.swift:86-114`).
+
+- **`main.swift` & `AppEnvironment.swift`**: `@MainActor` bootstrap entrypoint. Resolves runtime profile (`production` vs `development`), isolates dev state to distinct bundle ID (`ing.miel.typingpet.dev`) and directory (`TypingPetDev`), enforces single-instance mutual exclusion via `flock` on `.runtime.lock` (`DevelopmentRunLock`), and sets `.accessory` activation policy (`main.swift:3-26`, `AppEnvironment.swift:5-61`).
+- **`AppDelegate.swift`**: Application lifecycle orchestrator. Manages `NSStatusItem` menu tray, `SMAppService.mainApp` launch-at-login registration, TCC authorization checks, and update lifecycle termination hooks (`AppDelegate.swift:36-70, 240-260`).
+- **`GlobalKeyMonitor.swift`**: Low-level event tap engine. Instantiates session `CGEventTap` (`.listenOnly`) for `keyDown` events, decodes physical key codes and modifier flags into `KeyStroke` structures, and manages MachPort invalidation/reconnection (`GlobalKeyMonitor.swift:30-72`).
+- **`PetController.swift` & `PetViews.swift`**: Main floating overlay subsystem. Renders borderless, non-activating floating panel (`PetPanel`, `canBecomeKey = false`, `canBecomeMain = false`), runs pointer avoidance and spring physics, applies energy guards (`abs(opacity - target) > 0.001`), and routes keystroke events to active pet packs (`PetController.swift:203-240`, `PetViews.swift:10-35`).
+- **`PetPacks.swift`, `PackEditorModel.swift`, `NativeSetWorkspace.swift`**: Unified Pet Pack engine (ADR-003). Manages `PetPackConfiguration`, multi-frame sequential/random playback modes, channel-isolated playback cursors (`PresetPlaybackCursor`), and preset asset bindings with copy-on-edit protection for built-in packs (`PetPacks.swift:22-120, 280-340`).
+- **`PetImageLibrary.swift` & `KeyReactions.swift`**: Image asset disk storage adapter. Manages user image files under `~/Library/Application Support/TypingPet/Sets/<UUID>/`, enforces path traversal defense (`StoredFileName.isSafe`), validates files fail-closed against symlinks, and maintains an `NSCache` memory cache for thumbnails (`PetImageLibrary.swift:5-9, 149-157, 316-329`).
+- **`TodoBubbleWindowController.swift` & `TodoBubbleView.swift`**: Dual-window companion subsystem (ADR-004). Coordinates secondary floating speech bubble panel (`TodoPanel`, `canBecomeKey = true`, `canBecomeMain = false`) anchored dynamically to `PetPanel`, implementing Aggressive Focus Surrender on outside clicks, blur, screen lock, or sleep (`TodoBubbleWindowController.swift:5-17, 126-170, 200-225`).
+- **`TodoStore.swift`, `TodoState.swift`, `FocusTimerEngine.swift`**: Companion state and persistence layer. Implements Pomodoro focus timer state machine and hardened Darwin POSIX atomic persistence for `todo-state.json` with strict schema validation (`TodoStore.swift:25-86`, `TodoState.swift:118-156`).
+- **`TextEditingShortcuts.swift`**: AppKit shortcut dispatcher. Intercepts standard editing shortcuts (`⌘X`, `⌘C`, `⌘V`, `⌘A`, `⌘Z`) for the non-activating accessory application and routes them directly to active text fields (`TextEditingShortcuts.swift:10-40`).
+- **`UpdateController.swift`, `UpdateManifest.swift`, `UpdateInstaller.swift`**: In-house cryptographic auto-update subsystem (ADR-002). Fetches release manifests over HTTPS via ephemeral `URLSession`, verifies Ed25519 signatures and SHA-256 digests, checks Apple Notarization (`spctl`) and Developer ID Team ID, and launches an out-of-process `/bin/zsh` helper script for atomic bundle replacement with rollback (`UpdateController.swift:23-50`, `UpdateManifest.swift:41-102, 118-166`, `UpdateInstaller.swift:11-36, 82-143`).
+- **`InputMonitoringGuide.swift` & `InputMonitoringGuideModel.swift`**: TCC onboarding assistant. Guides users to macOS System Settings and inspects on-screen window list bounds via `CGWindowListCopyWindowInfo` (inspecting only bundle IDs and window geometry) to dock alongside System Settings (`InputMonitoringGuide.swift:86-114`).
+- **`SettingsWindow.swift`, `SettingsWorkspace.swift`, `SettingsNavigation.swift`**: Native settings interface. Tabbed AppKit/SwiftUI workspace with toolbar navigation, language switcher, appearance overrides, and update preferences (`SettingsWindow.swift:147-217`).
 
 ### Data flows and trust boundaries
 
-- **macOS WindowServer/TCC → GlobalKeyMonitor.** Types: raw `CGEvent` keystrokes → `KeyStroke(keyCode, modifiers)`. Channel: session event tap (`.listenOnly`). Guarantees: OS-enforced TCC `ListenEvent` gate via `CGPreflightListenEventAccess()` / `CGRequestListenEventAccess()` (`GlobalKeyMonitor.swift:26-28`, `AppDelegate.swift:232-241`); pass-through (`passUnretained`) so no event is consumed/modified. Validation: only `keyDown` is read; character/IME data is **not** captured (`GlobalKeyMonitor.swift:44-46`).
-- **User → App: folder import.** Types: user-selected folder of image files. Channel: `NSOpenPanel` → `PetImageLibrary.addSet` → `copyItem` into `Sets/<UUID>/`. Guarantees: user-driven via standard open panel; regular-file + non-symlink filter (`isSymbolicLink == false && isRegularFile == true`), extension allow-list, and `NSImage` read check before copy (`PetImageLibrary.swift:149-157`, `336-354`); rollback on failure (`180-183`). No schema/magic-byte validation beyond extension + `NSImage` decode.
-- **User → App: single image for key rule.** Channel: `NSOpenPanel` (`allowedContentTypes = [.image]`) → `KeyReactionStore.setRule` → `copyItem` into `KeyReactions/` (`SettingsWindow.swift:557-566`, `KeyReactions.swift:95-126`).
-- **UserDefaults → App (catalog).** Types: JSON `[PetImageSet]` / `[KeyReactionRule]`. Channel: local preferences plist decoded on init (`PetImageLibrary.swift:92-97`, `KeyReactions.swift:76-81`). Guarantees: filenames validated on use by `StoredFileName.isSafe` (rejects empty, `.`, `..`, any name containing `/`) before any read/delete (`PetImageLibrary.swift:5-9`, `251`, `316-329`; `KeyReactions.swift:89`, `139-147`).
-- **App ↔ Application Support filesystem.** Types: stored image copies. Channel: `FileManager`. Guarantees: all paths derived from validated single-level names; deletion scoped to `Sets/<UUID>/` or legacy `Images/` single files, never user source dirs (`PetImageLibrary.swift:313-334`).
-- **App → macOS services.** Login item via `SMAppService.mainApp.register()` (`AppDelegate.swift:155-161`); opens `x-apple.systempreferences:...Privacy_ListenEvent` (`InputMonitoringGuide.swift:29-36`); reads system window list (`InputMonitoringGuide.swift:92-95`).
-- **Release pipeline → end user.** Channel: developer runs `build_app.sh` locally (build → bundle → `Info.plist` → codesign) producing `dist/TypingPet-macOS.zip`; `notarize_release.sh` (Developer ID + notarytool + staple). (Note: CI in `.github/workflows/ci.yml` is limited to automated `swift test` and does not package or publish release bundles). Guarantees: Developer ID path when a cert exists; **falls back to ad-hoc `-`** otherwise (`build_app.sh:63-90`). User docs instruct `xattr -cr` to clear quarantine (`README.md:33-38`).
+- **macOS WindowServer/TCC → GlobalKeyMonitor**:
+  - *Data types:* Raw low-level `CGEvent` keyboard events → `KeyStroke(keyCode, modifiers)`.
+  - *Channel:* macOS session event tap (`CGEventTapCreate`, `.listenOnly`).
+  - *Guarantees & Validation:* OS-enforced TCC `ListenEvent` gate checked via `CGPreflightListenEventAccess()` and `CGRequestListenEventAccess()` (`AppDelegate.swift:240-252`). Pass-through via `passUnretained` ensures events are never consumed, delayed, or altered. Only physical `keyCode` and modifier bitmasks are read; text characters and IME composition buffers are never read or stored (`GlobalKeyMonitor.swift:44-46`).
+- **User Filesystem → App: Pet Pack & Image Import**:
+  - *Data types:* User-selected folders or image files (PNG, JPEG, GIF, TIFF, WebP).
+  - *Channel:* `NSOpenPanel` or drag-and-drop into `NativeSetWorkspace`.
+  - *Guarantees & Validation:* Fail-closed regular file validation (`isSymbolicLink == false && isRegularFile == true`), file extension allow-list, `NSImage` initialization check prior to filesystem copy (`PetImageLibrary.swift:149-157, 336-354`). Copied into isolated unique storage directories (`Sets/<UUID>/`); failed operations trigger complete filesystem rollback.
+- **User → TodoPanel: Interactive Task Input & Shortcuts**:
+  - *Data types:* Plaintext task titles, Pomodoro duration configurations.
+  - *Channel:* AppKit `TodoPanel` (`canBecomeKey = true`), SwiftUI `TextField`, `TextEditingShortcuts`.
+  - *Guarantees & Validation:* Aggressive Focus Surrender: global mouse monitor (`leftMouseDown`, `rightMouseDown`), `didResignKeyNotification`, `NSWorkspace.willSleepNotification`, and `com.apple.screenIsLocked` immediately invoke `panel.makeFirstResponder(nil)` (`TodoBubbleWindowController.swift:126-170`). Input lengths are strictly capped by `TodoTitlePolicy.maxLength = 120` and sanitized of linebreaks.
+- **App ↔ Application Support: Todo Atomic Persistence**:
+  - *Data types:* Serialized JSON state (`todo-state.json`).
+  - *Channel:* Darwin POSIX file operations via `TodoFileStorage`.
+  - *Guarantees & Validation:* File descriptor opened with `O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC` (`TodoStore.swift:27`); mode verified as `S_IFREG`; strict 10 MiB file size ceiling enforced during chunked read (`TodoStore.swift:39-47`). Atomic persistence writes to exclusive temporary file via `mkstemp`, sets user-only permissions (`0600`) via `Darwin.fchmod`, synchronizes buffers via `handle.synchronize()`, and performs atomic swap via `Darwin.rename` (`TodoStore.swift:63-85`). In-memory data strictly validated via `TodoState.validate()`.
+- **App ↔ Application Support: Pack Configurations & Asset Storage**:
+  - *Data types:* JSON configuration (`packs.json`), image files.
+  - *Channel:* `FileManager`.
+  - *Guarantees & Validation:* All asset filenames validated via `StoredFileName.isSafe` (rejects empty names, `.`, `..`, and any path containing `/`) before read or deletion (`PetImageLibrary.swift:5-9, 316-329`). File deletion strictly scoped to managed application subdirectories (`Sets/<UUID>/`), never touching user source locations.
+- **Remote Update Server (CDN) → UpdateInstaller**:
+  - *Data types:* JSON update manifest (`latest.json`), ZIP distribution archive (`TypingPet-*.zip`).
+  - *Channel:* Ephemeral `URLSession` (no cache, no cookies, no credentials).
+  - *Guarantees & Validation:* Transport security: HTTPS strictly enforced for production (`UpdateManifest.swift:87-91`). Cryptographic validation via `UpdateVerifier`:
+    1. Byte size exact match: `data.count == manifest.size`.
+    2. Digest match: SHA-256 hash digest matching `manifest.sha256`.
+    3. Digital signature: Ed25519 signature validation (`CryptoKit.Curve25519.Signing.PublicKey`) using public key embedded in code-signed `Info.plist` (`TypingPetUpdatePublicKey`).
+    4. Bundle identity check: `CFBundleIdentifier` matches running bundle, build channel matches (`production`), build number is strictly monotonic (`build > currentBuild`).
+    5. Apple Code Requirement: Evaluates `SecStaticCodeCheckValidity` enforcing Developer ID Team ID match when configured (`UpdateManifest.swift:95-100, 148-165`).
+    6. Apple Notarization: Evaluates `/usr/sbin/spctl --assess --type execute` on extracted `.app` bundle for production releases (`UpdateInstaller.swift:60-62`).
+- **App → Subprocesses (Update Extraction & Atomic Bundle Replacement)**:
+  - *Data types:* Extracted application bundle, process PID, file paths.
+  - *Channel:* Subprocess execution via `Process` (`/usr/bin/ditto`, `/usr/sbin/spctl`, `/bin/zsh`).
+  - *Guarantees & Validation:* Staging isolated under `~/Library/Caches/<bundle-id>/Updates/<build>-<uuid>/`. Independent `/bin/zsh` helper script executes detached from main application: polls `kill -0 "$pid"` until main process exits, backs up existing `.app` to `previous.app`, performs atomic swap with staged `.app`, clears quarantine (`xattr -dr com.apple.quarantine`), and automatically rolls back if replacement fails (`UpdateInstaller.swift:114-143`).
+- **Developer Workstation / CI → End User Distribution**:
+  - *Data types:* Standalone `.zip` packages, update feed manifests.
+  - *Channel:* Direct download from GitHub Releases/website, or in-app auto-update.
+  - *Guarantees & Validation:* Signed with Developer ID Application certificate and notarized via `notarize_release.sh` when available; fallback to ad-hoc (`-`) with Hardened Runtime entitlements (`TypingPet.entitlements`), `-D TYPINGPET_DISTRIBUTION`, `xcrun strip -S`, and SHA-256 release checksum output (`build_app.sh:48-60, 98-122`). Release pipeline (`scripts/release.py:50-71, 125-140`) enforces automated binary-level inspection (`inspect_archive`) rejecting any `/Users/<name>/` build paths, private key files, or credential patterns (`SECRET_PATTERNS`), verified in CI by `scripts/test_release.py:140-150`.
 
 #### Diagram
 
 ```mermaid
 flowchart TD
-    OS["macOS WindowServer and TCC"] -->|keystrokes| KEYMON["GlobalKeyMonitor event tap"]
-    KEYMON --> CTRL["PetController reaction dispatch"]
-    USER["Local user"] -->|open panel| IMPORT["Image import and copy"]
-    IMPORT --> LIB["PetImageLibrary storage"]
-    IMPORT --> KSTORE["KeyReactionStore storage"]
-    DEFAULTS["UserDefaults catalog"] --> LIB
-    DEFAULTS --> KSTORE
-    LIB -->|read delete scoped| DISK["Application Support TypingPet"]
-    KSTORE -->|read delete scoped| DISK
-    CTRL -->|login item and settings url| OS
-    DEV["Developer workstation"] -->|scripts/build_app.sh| DIST["Distribution zip"]
-    DIST -->|download and xattr -cr| USER
-    CI["GitHub Actions CI"] -->|swift test only| REPO["Source repo"]
+    WS["macOS WindowServer and TCC"] -->|keystrokes| MON["GlobalKeyMonitor CGEventTap"]
+    MON --> CTRL["PetController Dispatch"]
+    
+    USER["Local User"] -->|open panel or drag| IMPORT["PetPack and Image Import"]
+    IMPORT --> PACKS["PetPackStore and Library"]
+    PACKS --> DISK_SETS["Application Support Sets"]
+    
+    USER -->|text input and shortcuts| TODO_WIN["TodoBubbleWindowController"]
+    TODO_WIN -->|focus surrender guard| TODO_PANEL["TodoPanel Key Window"]
+    TODO_PANEL --> TODO_STORE["TodoStore POSIX Handler"]
+    TODO_STORE -->|0600 atomic rename| DISK_TODO["Application Support todo-state.json"]
+    
+    UPDATE_SVR["Update Server HTTPS"] -->|manifest and archive| UPD_INST["UpdateInstaller Ephemeral Session"]
+    UPD_INST -->|Ed25519 and spctl| VERIFIER["UpdateVerifier"]
+    VERIFIER --> CACHE["Staging Cache Directory"]
+    CACHE -->|launch helper| ZSH_HELPER["install.sh Background Helper"]
+    ZSH_HELPER -->|atomic swap and rollback| APP_BUNDLE["TypingPet.app Bundle"]
+    
+    DEV["Developer Workstation"] -->|scripts build_app.sh| DIST_ZIP["Distribution Archive"]
+    DIST_ZIP -->|download and xattr -cr| USER
+    CI["GitHub Actions CI"] -->|swift test and release tests| REPO["Source Repository"]
 ```
 
 ## Assets and security objectives
 
 | Asset | Why it matters | Security objective (C/I/A) |
 | --- | --- | --- |
-| System-wide keystroke metadata stream | Captured via `CGEventTap`; leak = keylogger-class impact | Confidentiality |
-| Input Monitoring (`ListenEvent`) TCC grant on app identity | Enables the keystroke tap; abused = persistent surveillance foothold | Integrity / Confidentiality |
-| Login-item registration (`SMAppService`) | Auto-runs the tap at every login | Integrity |
-| User-imported image sets (and source folders they came from) | User's personal files; deletion/read would be data loss | Integrity / Confidentiality |
-| Stored copies under `Application Support/TypingPet/` | App-managed data; correctness of cleanup matters | Integrity / Availability |
-| `UserDefaults` catalog (gallery + rules JSON) | Drives file paths used for read/delete | Integrity |
-| Release binary, signing identity, notarization ticket | Determines what code users trust and run | Integrity |
-| Login/asset/pipeline origin (upstream repo, CI action) | Supply-chain trust anchor | Integrity |
+| System-wide keystroke stream | Observed via `CGEventTap`; unauthorized leakage constitutes keylogger-grade surveillance | Confidentiality |
+| Input Monitoring (`ListenEvent`) TCC entitlement | Grants global keystroke tap; exploitation grants persistent, unprompted surveillance foothold | Integrity / Confidentiality |
+| Login item (`SMAppService.mainApp`) | Automatically restarts the application and event tap upon user login | Integrity |
+| Auto-update Ed25519 signing keypair | Private key signs release manifests; public key in `Info.plist` authorizes executable replacement | Integrity |
+| Update delivery channel & staged bundle | Compromise allows delivery of malicious binary replacement to existing installations | Integrity / Availability |
+| Companion Todo task records (`todo-state.json`) | Contains private user task titles and timer history; corruption or unauthorized read causes data breach/loss | Confidentiality / Integrity |
+| User-imported image sets & packs | User personal art assets; unauthorized deletion or traversal causes user data loss | Integrity / Availability |
+| Preferences catalog (`UserDefaults` & `packs.json`) | Controls file paths, active pack selections, and update configurations | Integrity |
+| Release binary & code signature | Determines authenticity and trustworthiness of code executed by end users | Integrity |
 
 ## Attacker model
 
 ### Capabilities
-- **Local same-user malware / malicious app**: can read and write the user's `~/Library/Preferences/ing.miel.typingpet.plist` and `Application Support/TypingPet/`, and can pass crafted image folders through the app's own UI. (Note: a same-user attacker able to write UserDefaults already has same-user code execution, which bounds the *incremental* impact of preference tampering. However, on ad-hoc signed builds (`-`), the binary lacks Apple Library Validation, which theoretically leaves it susceptible to local dylib injection via `DYLD_INSERT_LIBRARIES` by same-user malware seeking to piggyback on the active `ListenEvent` TCC grant without triggering a new OS permission prompt.)
-- **Malicious file author**: can supply an image file (or folder of images) a user imports, including malformed or "decompression-bomb" images and symlinks.
-- **Supply-chain actor**: controls or tampers with a distributed artifact (e.g., a re-uploaded zip on the download path, or a fork/PR in the repo), and can influence `build_app.sh` when it runs.
-- **Distribution intermediary / re-packager**: can modify the unsigned zip between build and download.
 
-### Non-capabilities (unless assumptions change)
-- **No remote/network attacker**: no sockets, no `URLSession`, no server — nothing to connect to (`README.md:90-93`; no matches for network APIs in `Sources/`).
-- **No pre-auth or privilege-escalation path in-app**: single-process, no setuid, no helper, no XPC, runs as the user; cannot escalate beyond the user or read other users' data.
-- **No keystroke *content* capture**: only physical keycode + modifier flags are read; text/IME composition is not accessed (`GlobalKeyMonitor.swift:44-46`; `SettingsWindow.swift:426`).
-- **No code-injection surface**: no `eval`, no shell, no dynamic code, no deserialization of non-JSON untrusted formats.
-- **Signed/notarized path** removes forgery risk for that release channel (but is not the default).
+- **Untrusted distribution intermediary / mirror host:** Can modify distributed `.zip` archives on unverified download mirrors or supply-chain channels, enticing users to install modified binaries.
+- **Local same-user malware / untrusted process:** Has read/write access to user directories (`~/Library/Preferences/`, `~/Library/Application Support/TypingPet/`, `~/Library/Caches/`), can create malicious symlinks, modify preferences plists, or attempt to alter staged update binaries before replacement. On ad-hoc builds (`-`), same-user processes could exploit the absence of Team ID Library Validation to attempt dylib injection.
+- **Malicious file author:** Can supply crafted image files, directory-traversal filenames, deep directory structures, or symlinked files via folder imports or drag-and-drop into the pet pack workspace.
+- **Network adversary (Update Channel):** Can monitor or attempt Man-in-the-Middle (MitM) attacks against network connections to `pet.miel.ing`, attempt DNS poisoning, or attempt to host spoofed update feeds.
+
+### Non-capabilities
+
+- **No remote access to core desktop pet:** Core interaction, keystroke tap, physics, and Todo companion contain zero network listener, socket, or RPC code. Remote network attackers have no route to interact with core components.
+- **No update signature forgery:** Without the maintainer's offline Ed25519 private key, network adversaries cannot forge valid signatures accepted by `UpdateVerifier`, even if they compromise DNS or CDN content.
+- **No privilege escalation beyond standard user:** The application runs strictly as a non-root standard user process (`LSUIElement`), contains no setuid binaries, and communicates with no privileged system helper tools.
+- **No capture of text content or IME state:** `GlobalKeyMonitor` reads solely physical keycodes and modifier bitmasks from the WindowServer event stream; it has no capability to read processed Unicode strings, IME composition text, or clipboard content during global typing.
+- **No background focus stealing:** Primary `PetPanel` is strictly non-activating (`canBecomeKey = false`); `TodoPanel` enforces Aggressive Focus Surrender on outside clicks, blur, or screen lock, preventing background capture of external app keystrokes.
 
 ## Entry points and attack surfaces
 
-| Surface | How reached | Trust boundary | Notes | Evidence |
+| Surface | How reached | Trust boundary | Notes | Evidence (repo path / symbol) |
 | --- | --- | --- | --- | --- |
-| Global `keyDown` event tap | OS delivers all keystrokes | WindowServer/TCC → app | `.listenOnly`, pass-through, keycode+modifiers only | `GlobalKeyMonitor.swift:30-61` |
-| Folder image import | Settings → "添加文件夹" `NSOpenPanel` | User file → app | Extension allow-list + `NSImage` decode; copy into `Sets/<UUID>/` | `SettingsWindow.swift:147-161`, `PetImageLibrary.swift:149-195`, `333-347` |
-| Single image for key rule | Settings → "添加规则" `NSOpenPanel` | User file → app | `.image` only; copied into `KeyReactions/` | `SettingsWindow.swift:557-566`, `KeyReactions.swift:95-122` |
-| Image replacement (idle/reactions) | Settings / controller | User file → app | Same copy path with rollback | `PetImageLibrary.swift:220-227`, `270-308` |
-| Preferences catalog decode | App launch | UserDefaults → app | JSON; filenames guarded on use | `PetImageLibrary.swift:92-97`, `KeyReactions.swift:76-81` |
-| CLI flag `--show-settings` | App launch args | local caller → app | Only opens the settings window | `AppDelegate.swift:59-61` |
-| On-screen window enumeration | Guide `show()` timers | app → OS | Reads owner PID + bounds for System Settings bundle ids only | `InputMonitoringGuide.swift:86-114` |
-| Login-item registration | Menu/settings toggle | app → OS | `SMAppService.mainApp` | `AppDelegate.swift:155-169`, `SettingsWindow.swift:128-136` |
-| Settings deep-link open | Guide/menu button | app → OS | Fixed `x-apple.systempreferences:` URL | `InputMonitoringGuide.swift:29-36` |
-| Release build/sign | Developer/CI runs script | dev/CI → artifact | Auto-selects identity or ad-hoc `-` | `build_app.sh:63-84` |
-| CI pipeline | Push/PR to `main` | repo → CI | `actions/checkout@v5`, `swift test` | `.github/workflows/ci.yml:9-16` |
+| Global `keyDown` event tap | macOS WindowServer delivers keystrokes | OS WindowServer/TCC → App | Session tap (`.listenOnly`), pass-through, keycodes + modifiers only | `GlobalKeyMonitor.swift:30-72` |
+| Auto-update feed fetch | `UpdateController` scheduled timer / manual trigger | Internet (CDN) → App | HTTPS feed fetch via ephemeral `URLSession`; JSON decode | `UpdateInstaller.swift:25-36` |
+| Auto-update archive download | Triggered when newer build is detected | Internet (CDN) → App | Download to `~/Library/Caches/.../update.zip`; Ed25519 & SHA-256 verified | `UpdateInstaller.swift:43-53` |
+| Archive extraction & inspection | `UpdateInstaller.stage()` | Untrusted archive → Staging filesystem | Invokes `/usr/bin/ditto -x -k`; inspects single `.app` bundle | `UpdateInstaller.swift:54-68` |
+| Background install helper script | Launched on app termination when update ready | App → Background Subprocess | Writes `install.sh`, launches `/bin/zsh`, performs atomic `mv` and rollback | `UpdateInstaller.swift:82-143` |
+| Todo text input fields | User clicks floating bubble task field | User keyboard → TodoPanel | Key window status acquired; shortcuts parsed via `TextEditingShortcuts` | `TodoBubbleWindowController.swift:5-17`, `TextEditingShortcuts.swift:10-40` |
+| Todo state persistence | App launch, periodic tick, or task edit | Filesystem → TodoStore | POSIX `O_NOFOLLOW | O_NONBLOCK`, `0600` permissions, 10 MiB limit | `TodoStore.swift:25-86` |
+| Pet pack folder import | Settings → "添加文件夹" open panel | User filesystem → App | Fail-closed symlink check, extension allow-list, `NSImage` decode check | `PetImageLibrary.swift:149-157`, `PetPacks.swift:302-308` |
+| Single preset image drag/drop | Settings → Drag image to key / canvas | User filesystem → App | Same copy and validation path with rollback | `NativeSetWorkspace.swift:180-210`, `PetPacks.swift:320-338` |
+| Preferences catalog decode | App startup | `UserDefaults` plists → App | Decodes `packs.json` & preferences; validated with `StoredFileName.isSafe` | `PetPreferences.swift:10-45`, `PetPacks.swift:280-305` |
+| On-screen window enumeration | Permission guide layout tracking | App → macOS WindowServer | Reads bundle IDs and frames of System Settings via `CGWindowListCopyWindowInfo` | `InputMonitoringGuide.swift:86-114` |
+| Login item registration | Toggle in settings or status menu | App → macOS ServiceManagement | Registers main bundle via `SMAppService.mainApp` | `AppDelegate.swift:155-169` |
+| Release build & signing pipeline | Developer executes build/release scripts | Workstation / CI → Artifact | Enforces entitlements, strips symbols, scans binary for home paths/secrets, signs & hashes zip | `scripts/build_app.sh:48-122`, `scripts/release.py:50-71` |
 
 ## Top abuse paths
 
-1. **Tampered-build surveillance.** Attacker re-packages/modifies the unsigned `TypingPet-macOS.zip` → user follows README and runs `xattr -cr` to bypass Gatekeeper → malicious build asks for (or already has) Input Monitoring → system-wide keystroke tap exfiltrates via the attacker's added code. (Note: on ad-hoc builds, macOS binds the TCC entry to the binary's `cdhash`; modifying an already-authorized binary invalidates the grant, so the primary risk is pre-authorization distribution tampering where a user grants TCC to an already-trojaned binary). Impact: full keystroke monitoring, persistent.
-2. **Supply-chain persistence.** A malicious contributor/PR or compromised CI produces a build → since releases default to ad-hoc signing and trust is placed in the repo/download page → users run it with the app's TCC identity and login item, dodging signature-based detection.
-3. **Preference-catalog path abuse (mitigated).** Same-user attacker edits `imageGalleryData-v1` / `keyReactionRules-v1` with `../../` names → if unguarded, app would read/delete outside storage. Current guard rejects these and tests assert it.
-4. **Symlink folder import.** User imports a folder containing a symlinked `*.png` pointing at a sensitive file → app copies the link and decodes it, surfacing content inside the pet (and the link persists in `Sets/<UUID>/`).
-5. **Decode resource exhaustion.** User imports a huge or "image bomb" file → `NSImage(contentsOf:)` expansion spikes memory/CPU. Local, user-triggered DoS.
-6. **Guide window probing.** A local process observes that the guide panel enumerates window bounds to align beside System Settings — no sensitive data is read, but it confirms a global window-list reader exists.
+1. **Tampered Ad-hoc Distribution Surveillance (TM-001)**: Attacker hosts or redistributes a modified `TypingPet-macOS.zip` containing an outbound keylogger payload -> User downloads build and encounters Gatekeeper warning -> User follows README instructions to run `xattr -cr` -> App launches, requests Input Monitoring -> User grants TCC access -> Malicious binary establishes persistent surveillance with login item.
+2. **Gatekeeper Habituation Abuse (TM-002)**: Instruction to run `xattr -cr` habituates users to bypass macOS Gatekeeper screening without validating cryptographic hashes -> Attackers distribute lookalike archives under the guise of "damaged app" bypass.
+3. **Malicious / Compromised Update Feed MitM (TM-003)**: Attacker compromises CDN hosting or executes DNS spoofing on `pet.miel.ing` -> Delivers modified `latest.json` referencing a trojaned update archive -> `UpdateInstaller` downloads archive -> `UpdateVerifier` evaluates Ed25519 signature against public key embedded in code-signed `Info.plist` -> Signature verification fails -> Archive is deterministically deleted from staging cache.
+4. **Local Staging TOCTOU Race Condition (TM-004)**: Same-user malware monitors `~/Library/Caches/ing.miel.typingpet/Updates/` -> Detects valid update extraction -> Attempts to modify binary contents inside `extracted/TypingPet.app` before `install.sh` executes -> Mitigated by re-running `UpdateVerifier.verifyApp` (`SecStaticCodeCheckValidity` with `kSecCSStrictValidate`) immediately before launching `install.sh` in `applicationWillTerminate()`; any same-user process already has equivalent write access to the target bundle.
+5. **Keystroke Interception via Focus Retention (TM-005)**: User clicks Todo bubble to edit a task title -> User switches to a sensitive application (e.g., terminal, password prompt) -> If Todo window fails to resign key focus, external keystrokes type into the Todo task field -> Mitigated by Aggressive Focus Surrender: global mouse click monitor, `didResignKeyNotification`, and screen lock notifications immediately force `makeFirstResponder(nil)`.
+6. **Path Traversal via Catalog Tampering (TM-006)**: Same-user attacker or malicious script edits `packs.json` or `imageGalleryData-v1` injecting `../../` relative paths into `fileName` or `storageFolder` -> App initializes -> Attempted traversal is intercepted and rejected by `StoredFileName.isSafe`, preventing file read or deletion outside application support sandbox.
+7. **Symlink Traversal via Folder Import (TM-007)**: Malicious actor crafts a zip folder containing a symlink `normal.png -> ~/.ssh/id_rsa` -> User imports folder into Pet Pack workspace -> App inspects file attributes using `URLResourceKey.isSymbolicLinkKey` and `isRegularFileKey` -> Symlink is detected and rejected fail-closed; import succeeds only for genuine regular files.
+8. **Resource Exhaustion via Local Image Import (TM-008)**: User selects a malformed or very large local image file -> `NSImage(contentsOf:)` decodes only user-selected local files -> Mitigated by `NSCache` count limit of 64 (`PetImageLibrary.swift:81`) and explicit cache eviction of previous pack reaction frames upon pack switching (`PetImageLibrary.swift:193-201`).
+9. **Development Feed URL Override Hijack (TM-009)**: Same-user attacker modifies development preferences setting `updateFeedURL` to point to a local malicious server -> In Dev mode (`ing.miel.typingpet.dev`), loopback HTTP is permitted -> Attacker serves malicious build -> Blocked because `UpdateVerifier` still enforces Ed25519 signature check against the dev public key.
 
 ## Threat model table
 
-| ID | Threat source | Prerequisites | Threat action | Impact | Impacted assets | Existing controls (evidence) | Gaps | Recommended mitigations | Detection ideas | Likelihood | Impact severity | Priority |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| TM-001 | Tampered distributed build / local malware | User downloads and runs a modified build; grants Input Monitoring | Ship a build that adds keystroke exfil on top of the legitimate tap; inherit login item + TCC grant | Full system-wide keystroke surveillance, persistence | Keystroke stream, TCC grant, login item | `.listenOnly` pass-through (`GlobalKeyMonitor.swift:52-61`); zero network in shipped code; ad-hoc TCC binds to binary `cdhash`; `TypingPet.entitlements` locks down Hardened Runtime (`disable-library-validation = false`, enforced when signed with a Team ID certificate); `build_app.sh` requires entitlements and outputs `shasum -a 256` for release verification | Releases default to ad-hoc signing when Developer ID is absent (where Team-ID library validation is inactive and Gatekeeper intercepts) | Developer ID-sign + notarize releases when cert available (`notarize_release.sh`); publish SHA-256 with releases for user verification; provide source build option | Watch for `CGEventTap` keyDown + outbound-socket combination in any "TypingPet" binary; Gatekeeper/`notarization` telemetry | Low | High | Medium |
-| TM-002 | Distribution process | None (misconfiguration) | Ad-hoc signed artifact presented to users as safe, with instructions to strip quarantine | Users bypass OS malware screening without verifying integrity | Release integrity, user trust, TCC grant | `build_app.sh` prefers Developer ID when present (`build_app.sh:78-90`); `notarize_release.sh` enforces Developer ID; README/README.txt instruct SHA-256 hash check before `xattr -cr`; tempered claims to verifiable offline properties | Gatekeeper warnings remain on ad-hoc builds until Developer ID cert is acquired | Make notarized build when Developer ID is available; enforce SHA-256 release checklist | CI gate that fails release without a Developer ID cert; alert if a published zip lacks a stapled ticket | Low | High | Medium |
-| TM-003 | Same-user local attacker / corrupted catalog | Ability to edit `UserDefaults` or on-disk JSON | Inject `../` filenames or `storageFolder` values to redirect reads/deletes outside storage | Arbitrary file read or file/dir deletion | Stored copies, user files | `StoredFileName.isSafe` gate on every resolve/delete (`PetImageLibrary.swift:5-9`, `251`, `316-329`; `KeyReactions.swift:89`, `139-147`); tests assert rejection (`ImageStorageFailureTests.swift:306-342`) | Guard is the only defense; any future path-building that skips it reintroduces traversal | Keep all path construction funneled through the guard; add a lint/test that fails if `appendingPathComponent` is called with an unvalidated catalog name | Unit assertion already exists; add fuzz test enumerating catalog names | Low | Medium | Low |
-| TM-004 | Malicious file author | User imports a folder containing a symlink | Symlinked `*.png` copied into store; decoded content surfaced; link persists | Limited info disclosure inside the app; stray link on disk | User files, storage | Extension allow-list + `NSImage` decode before copy (`PetImageLibrary.swift:336-354`); `skipsHiddenFiles` on listing; `addSet`, `copyImage`, and `setRule` enforce fail-closed `isSymbolicLink == false && isRegularFile == true`; `NSImage` fails on non-image targets | None (mitigated by fail-closed regular-file and non-symlink check + regression tests) | Keep symlink filtering active in file import paths | Log/alert on symlink encountered during import | Very Low | Low | Low |
-| TM-005 | Malicious file author | User imports a crafted/bomb image | `NSImage(contentsOf:)`/decode exhausts memory/CPU | Local availability hit, possible freeze | App availability | `NSCache` count limit 64 (`PetImageLibrary.swift:81`); decode failure handled as error | No size/pixel-dimension cap before decode | Check file size and/or pixel dimensions before `NSImage` decode; cap imported count | Track import failures; alert on repeated decode timeouts | Low | Low | Low |
-| TM-006 | Supply-chain actor | Influence over repo/CI or the developer's keychain | Taint build inputs; or `build_app.sh` auto-selects an unintended signing identity | Release integrity compromise; wrong cert used | Release binary, signing identity | Script prefers explicit `CODE_SIGN_IDENTITY`, else searches keychain (`build_app.sh:63-77`) | Auto-discovery can pick an unexpected cert; CI action not pinned by SHA | Require explicit identity in CI; pin third-party actions to commit SHAs; protect `main` and require review | Build provenance logs; `codesign -dv` recorded per release; alert on identity change between releases | Low | High | Medium |
-| TM-007 | Local attacker (weak capability) | Local process, screen access | Observe guide panel enumerating window list / aligning beside System Settings | No sensitive data read; exposes a global window reader | Screen/geometry metadata | Reads only System Settings PIDs + bounds (`InputMonitoringGuide.swift:86-114`); avoids window title (`kCGWindowName`) and content capture (`CGWindowListCreateImage`), avoiding triggering Screen Recording (`kTCCServiceScreenCapture`) TCC prompts | None meaningful | None required; keep bundle-id filter minimal | n/a | Low | Low | Low |
-| TM-008 | Researcher / packager | Runs release build | `#filePath` embeds local machine path in binary | Low-sensitivity path disclosure | Release binary metadata | `#filePath` only inside `#if DEBUG` (`PetImageLibrary.swift:264-270`) | None (guard verified; sole occurrence) | Keep the `#if DEBUG` rule enforced in review/CI grep | CI grep failing on `#filePath` outside `#if DEBUG` | Very Low | Very Low | Low |
+| Threat ID | Threat source | Prerequisites | Threat action | Impact | Impacted assets | Existing controls (evidence) | Gaps | Recommended mitigations | Detection ideas | Likelihood | Impact severity | Priority |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| TM-001 | Tampered distributed build / malicious mirror | User downloads modified archive from unverified mirror; grants TCC | Inject exfiltration payload into ad-hoc binary; inherit `ListenEvent` TCC grant and login persistence | Full system-wide keystroke surveillance and persistence | Keystroke stream, TCC grant, login item | `.listenOnly` pass-through (`GlobalKeyMonitor.swift:52-61`); zero network in core codebase; `TypingPet.entitlements` specifies Hardened Runtime flags; `build_app.sh` calculates and displays release SHA-256; `spctl` assessment enforced for notarized builds | Ad-hoc releases default to `-` signature where Team-ID Library Validation is inactive and Gatekeeper blocks | Promote Developer ID signed and notarized releases as primary; publish SHA-256 checksums on GitHub Releases; encourage source builds | Monitor for unexpected network sockets in processes named TypingPet; Gatekeeper telemetry | Low | High | Medium |
+| TM-002 | Distribution process & documentation | User runs ad-hoc build | End user follows `xattr -cr` guidance without verifying SHA-256 hash | User bypasses OS Gatekeeper screening, facilitating trojan delivery | Release integrity, user trust, TCC grant | `build_app.sh` auto-selects Developer ID when present; `notarize_release.sh` enforces notarization; README provides `shasum -a 256` verification instructions | Users frequently bypass verification and execute `xattr -cr` blindly | Provide one-line terminal verification command before `xattr -cr`; transition to notarized distribution | Audit download logs; warn users in README about hazards of downloading from third-party sites | Medium | High | High |
+| TM-003 | Network adversary / compromised CDN | Man-in-the-Middle or control over update CDN | Serve spoofed `latest.json` manifest and tampered update archive | Attempted execution of unauthorized binary update | Application binary, update delivery channel | Ephemeral `URLSession`; HTTPS enforced in production (`UpdateManifest.swift:87-91`); Ed25519 signature verification via `CryptoKit` against embedded public key (`UpdateVerifier.swift:128-135`); SHA-256 digest match; monotonic build number requirement | Update feed uses static CDN without mutual TLS | Enforce Ed25519 key rotation runbook; monitor CDN access logs for unauthorized manifest modifications | Alert on manifest decode failures or invalid Ed25519 signature verification attempts | Very Low | High | Low |
+| TM-004 | Local same-user malware | Local malware with user filesystem access | Tamper with staged `.app` bundle in `~/Library/Caches/.../Updates/` before helper moves it | Local privilege persistence / code execution within app context | Executable binary, TCC grant | Isolated staging directory with UUID; `UpdateVerifier.verifyApp` re-checks bundle ID, build channel, and `SecStaticCodeCheckValidity` (`kSecCSStrictValidate`) immediately prior to launching helper (`UpdateController.swift:184-195`); helper restores backup on error | None meaningful across privilege boundaries (a same-user process already has write access to the user-writable target `.app`) | Keep `UpdateVerifier.verifyApp` in `applicationWillTerminate()` immediately before `launchHelper` | File integrity monitoring on `~/Library/Caches/ing.miel.typingpet/Updates/` | Low | Medium | Low |
+| TM-005 | Focus retention / UI confusion | User editing Todo tasks while switching apps | Keystrokes intended for external application typed into Todo task input field | Unintended keystroke capture / sensitive data stored in Todo history | User privacy, Todo task records | Aggressive Focus Surrender: global mouse click monitor (`leftMouseDown`, `rightMouseDown`), `NSWindow.didResignKeyNotification`, `NSWorkspace.willSleepNotification`, and `com.apple.screenIsLocked` call `makeFirstResponder(nil)` (`TodoBubbleWindowController.swift:126-170`) | If user clicks directly on Todo text field, it legitimately acquires key focus | Keep visual feedback prominent when Todo bubble is active | Monitor unexpected key event dispatch while app is inactive | Low | Medium | Low |
+| TM-006 | Same-user attacker / corrupt catalog | Local write access to `UserDefaults` or `packs.json` | Inject `../` traversal sequences into preset filenames or storage folders | Arbitrary file read or unauthorized file deletion under user directories | User files, application support storage | `StoredFileName.isSafe` validates every file read/delete (rejects `.`, `..`, empty, `/`) (`PetImageLibrary.swift:5-9, 316-329`); regression tests assert rejection (`ImageStorageFailureTests.swift:306-342`) | Guard must be called on every path construction site | Funnel all path construction through centralized safe URL builders; lint against raw `appendingPathComponent` without validation | Unit tests and fuzz testing of catalog deserialization | Low | Medium | Low |
+| TM-007 | Malicious file author | User imports crafted folder or pack containing symlinks | Symlink copied to app storage, pointing to sensitive files (e.g. `~/.ssh`) | Information disclosure in app UI or accidental file overwrite | User files, app storage | Fail-closed validation (`isSymbolicLink == false && isRegularFile == true`) in `addSet`, `copyImage`, and `PetPacks` import (`PetImageLibrary.swift:149-157`, `PetPacks.swift:302-308`); `NSImage` decode check before copy | None identified in current import paths | Maintain fail-closed symlink checks across all future import and drag-and-drop paths | Log any encountered symlinks during import operations | Very Low | Low | Low |
+| TM-008 | Malicious file author | User imports huge or malformed local image | `NSImage` decode increases memory usage during local import | Transient local memory spike | Application availability | `NSCache` memory cache limits thumbnails to 64 items (`PetImageLibrary.swift:81`); `activateSet` evicts previous set reaction cache (`PetImageLibrary.swift:193-201`); decode failure handled gracefully | None meaningful (images are strictly user-selected local files with no remote/untrusted upload surface; arbitrary pixel caps would reject legitimate 4K/5K artwork) | Keep `NSCache` count limit and active-set cache eviction in place | Track import decode failures | Very Low | Low | Low |
+| TM-009 | Same-user attacker / dev misuse | Ability to edit development preferences | Set `updateFeedURL` to point to malicious loopback server | Trigger update check against local mock server | Development binary integrity | Allowed only in development profile (`profile == .development`); restricted to `localhost`, `127.0.0.1`, `::1` (`UpdateManifest.swift:87-91`); Ed25519 signature verification remains mandatory | Dev builds can test updates over unencrypted loopback HTTP | Keep `NSAllowsLocalNetworking` restricted strictly to development builds (`generate_plist.py:28-30`) | Log feed override configuration in development console | Very Low | Low | Low |
+| TM-010 | Local same-user malware | Local malware attempting to hijack or corrupt Todo storage | Inject FIFO, symlink, or race `todo-state.json` write | Denial of service or corrupted task state | Todo state persistence | `TodoFileStorage` opens with `O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC`; mode verified `S_IFREG`; 10 MiB limit; `0600` permissions; atomic swap via `mkstemp` and `rename` (`TodoStore.swift:25-86`) | None identified; hardened against symlinks and blocking FIFOs | Maintain POSIX descriptor checks; avoid higher-level Cocoa write methods that follow symlinks | Log POSIX errors when opening or renaming state files | Very Low | Low | Low |
+| TM-011 | Local process / screen observer | Local process observing window server geometry | Observe `InputMonitoringGuide` enumerating window bounds | Information disclosure regarding open System Settings window | Window geometry metadata | Enumerates only bundle IDs matching Apple System Settings; avoids window names (`kCGWindowName`) and content capture (`CGWindowListCreateImage`) (`InputMonitoringGuide.swift:86-114`) | Window existence and screen bounds of System Settings are visible to the process | None required; keep bundle ID filter minimal and non-invasive | n/a | Low | Very Low | Low |
+| TM-012 | Compiler / Packager | Building release binary | Leaking local developer file paths or private keys in release artifacts | Low-sensitivity local filesystem path disclosure or credential leak in release binary | Binary metadata & secret privacy | `#filePath` strictly restricted to `#if DEBUG` (`PetImageLibrary.swift:332-338`); `build_app.sh` compiles production with `-D TYPINGPET_DISTRIBUTION` and strips symbols via `xcrun strip -S` (`build_app.sh:48-60`); `scripts/release.py` (`inspect_archive`, `snapshot`) scans release binary bytes for `/Users/<name>/` paths and private keys/tokens (`scripts/release.py:50-71, 125-140`), tested by `scripts/test_release.py:140-150` | None (enforced at both source compilation and release binary inspection layers) | Keep `inspect_archive` and `test_release.py` active in CI (`.github/workflows/ci.yml:20`) | CI failure on `test_release.py` or `release.py` preflight/archive inspection | Very Low | Very Low | Low |
 
-*Assumption note:* the ranking of TM-001/TM-002 depends heavily on the distribution assumption above (direct download, unsigned default). If releases are always notarized and served from a signature-verifiable channel, both drop to **Medium/Low** and the parser-boundary items become the top relative risks. Note that Mac App Store sandboxing is not a viable alternative mitigation because `CGEventTap` session monitoring is prohibited within the App Sandbox.
+*Assumption calibration:* The "High" priority assigned to TM-002 reflects the user confirmation that unsigned/ad-hoc packages remain an active distribution channel, where Gatekeeper warnings are bypassed via `xattr -cr`. If official distribution moves exclusively to Apple Developer ID signed and notarized bundles, TM-001 and TM-002 would drop to Low.
 
 ## Criticality calibration
 
-- **Critical (for this repo):** a remote, unauthenticated path to code execution or to the keystroke stream — *currently none exists* (no network, no dynamic code). If one were found, it would be critical because the app already holds a system-wide input tap.
-- **High:** compromise of the *distributed binary* or its trust story such that a keystroke-monitoring app can be tampered and still run with TCC/login persistence (TM-001, TM-002). Impact is surveillance-grade; likelihood is channel-dependent.
-- **Medium:** local, user- or same-user-triggered integrity/availability issues without privilege gain — e.g., supply-chain build identity confusion (TM-006), or a future path-traversal regression in the catalog guard (TM-003).
-- **Low:** bounded-impact local issues — symlink import, decode resource use, window-list enumeration, debug-path leakage (TM-004/005/007/008). Examples: importing a malformed image crashes a single user session; a symlinked art file surfaces a local file thumbnail.
+- **Critical (for this repo):** Remote, unauthenticated execution of arbitrary code or unauthorized exfiltration of the system-wide keystroke stream. Currently, no such path exists: core keystroke processing is 100% offline, and update downloads require cryptographically valid Ed25519 signatures and Developer ID notarization before execution.
+- **High:** Distribution or supply-chain compromise where a tampered binary claiming `ListenEvent` TCC permissions is executed by users (e.g., TM-001, TM-002). Because the app holds persistent keystroke-monitoring capabilities, any pre-authorization binary tampering has high surveillance impact.
+- **Medium:** Local, same-user integrity or availability bypasses without privilege escalation — such as race conditions in local update staging (TM-004), accidental focus capture in the companion Todo bubble (TM-005), or potential regressions in the catalog filename traversal guard (TM-006).
+- **Low:** Bounded-impact local issues — symlink import attempts (TM-007), local image decode memory usage (TM-008), dev feed overrides (TM-009), POSIX file locking contention (TM-010), window metadata observation (TM-011), or build path leakage (TM-012).
 
 ## Focus paths for security review
 
 | Path | Why it matters | Related Threat IDs |
 | --- | --- | --- |
-| `Sources/TypingPet/GlobalKeyMonitor.swift` | The entire high-value capability (`CGEventTap`); any change here changes surveillance risk | TM-001 |
-| `Sources/TypingPet/AppDelegate.swift` | Owns TCC coordination + `SMAppService` login item (persistence) | TM-001, TM-002 |
-| `scripts/build_app.sh` | Default ad-hoc signing fallback; auto-selected identity | TM-002, TM-006 |
-| `scripts/notarize_release.sh` | The trust-building path that should be mandatory | TM-001, TM-002 |
-| `README.md`, `README.txt` | `xattr -cr` guidance and offline privacy claims shape user risk | TM-002 |
-| `Sources/TypingPet/PetImageLibrary.swift` | Core of the file read/delete trust boundary and the filename guard | TM-003, TM-004, TM-005, TM-008 |
-| `Sources/TypingPet/KeyReactions.swift` | Second store with the same filename-guard pattern | TM-003, TM-004 |
-| `Sources/TypingPet/SettingsWindow.swift` | `NSOpenPanel` import/recorder entry points; error surfacing | TM-003, TM-004, TM-005 |
-| `Sources/TypingPet/InputMonitoringGuide.swift` | Window enumeration + deep-link open; onboarding trust flow | TM-007 |
-| `Sources/TypingPet/PetPreferences.swift` | Central key definitions; guard against raw-literal drift | TM-003 |
-| `.github/workflows/ci.yml` | Supply-chain entry; action pinning and branch protection | TM-006 |
-| `Tests/TypingPetTests/ImageStorageFailureTests.swift` | Proves the traversal defense; keep extended as the guard evolves | TM-003 |
+| `Sources/TypingPet/GlobalKeyMonitor.swift` | Implements low-level `CGEventTap`; core surveillance-grade capability in the codebase | TM-001 |
+| `Sources/TypingPet/UpdateInstaller.swift` | Manages ephemeral network sessions, ditto extraction, spctl notarization, and `install.sh` helper execution | TM-003, TM-004 |
+| `Sources/TypingPet/UpdateManifest.swift` | Implements `UpdateVerifier`, Ed25519 signature checks (`CryptoKit`), SHA-256 digests, and code requirements | TM-003 |
+| `Sources/TypingPet/UpdateController.swift` | Coordinates update check schedule, download staging, and atomic helper launch on termination | TM-003, TM-004 |
+| `Sources/TypingPet/TodoBubbleWindowController.swift` | Enforces Aggressive Focus Surrender invariants to prevent background keystroke leakage into Todo fields | TM-005 |
+| `Sources/TypingPet/TodoStore.swift` | Implements hardened Darwin POSIX file operations (`O_NOFOLLOW`, `0600`, `mkstemp`, `rename`) | TM-010 |
+| `Sources/TypingPet/TodoState.swift` | Enforces schema validation and string length sanitization (`TodoTitlePolicy.maxLength = 120`) | TM-005, TM-010 |
+| `Sources/TypingPet/PetImageLibrary.swift` | Implements `StoredFileName.isSafe`, fail-closed symlink filtering, and `Sets/<UUID>/` directory isolation | TM-006, TM-007, TM-008 |
+| `Sources/TypingPet/PetPacks.swift` | Manages unified Pet Pack configuration deserialization, playback cursors, and preset asset paths | TM-006, TM-007 |
+| `Sources/TypingPet/Resources/TypingPet.entitlements` | Defines Hardened Runtime security posture (JIT disabled, unsigned memory disabled, library validation active) | TM-001, TM-002 |
+| `scripts/build_app.sh` | Controls codesigning, Developer ID identity resolution, `-D TYPINGPET_DISTRIBUTION`, symbol stripping, and packaging | TM-001, TM-002, TM-012 |
+| `scripts/release.py` & `scripts/test_release.py` | Enforces binary-level `/Users/<name>/` path rejection, private key/token scanning (`SECRET_PATTERNS`), and release guards | TM-001, TM-003, TM-012 |
+| `scripts/publish_update.sh` & `update_keys.swift` | Generates Ed25519 signatures for release archives and checks notarization before publishing feed | TM-003 |
+| `README.md`, `README.txt` | Contains `xattr -cr` instructions and integrity verification guidance that directly shape user security behavior | TM-002 |
 
 ## Notes on use
 
-- This model assumes the **shipped app matches this source**. Reviewers should confirm the published `.app` is built from this commit (compare embedded `CFBundleShortVersionString`/`CFBundleVersion` in `build_app.sh:47-50` and the release provenance).
-- The strongest controls here are *architectural* (no network, `.listenOnly`, pass-through, single filename guard with tests). Preserve them: any future addition of networking, telemetry, a helper/XPC process, or auto-update would invalidate the "no remote attacker" non-capability and should trigger a re-model.
-- Reported secrets: **none found** — no keys, tokens, passwords, or credentials in `Sources/` or scripts.
-
-## Open questions
-
-1. **Developer ID & Notarization Cadence**: Will official releases strictly require Developer ID signing and Apple notarization via `scripts/notarize_release.sh`, deprecating unsigned/ad-hoc distributed zips? (If yes, TM-001 and TM-002 drop from Medium to Low, and `xattr -cr` can be removed from user-facing documentation).
-2. **Future Auto-Updater Risk**: Is there any plan to integrate an in-app updater (such as Sparkle)? *Security note: adding an auto-updater would introduce network I/O and binary replacement capabilities, fundamentally invalidating the "zero network / no remote attack surface" posture for an application holding `ListenEvent` TCC permissions.*
-
+- **Shipped provenance verification:** Security reviewers must ensure distributed `.app` bundles correspond directly to verified commits (confirming `CFBundleShortVersionString` and `CFBundleVersion` in `version.json` match release tags).
+- **Architectural boundaries preservation:** The application's threat posture relies on two hard isolation boundaries:
+  1. The core desktop pet and keystroke monitor remain strictly offline with zero network code.
+  2. The auto-update subsystem is strictly constrained to ephemeral HTTPS requests, Ed25519 cryptographic verification, and detached atomic helper replacement.
+  Any proposal to introduce analytics, cloud sync, or third-party web frameworks into the core pet runtime would invalidate these assumptions and require a fundamental re-assessment of the threat model.
+- **Secrets audit:** Static inspection and `scripts/release.py` (`SECRET_PATTERNS`) confirm zero embedded API tokens, passwords, or private signing keys in `Sources/` or repository scripts. Ed25519 signing keys are loaded strictly from external maintainer configuration paths (`~/.config/typingpet/update-keys/`).
