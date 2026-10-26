@@ -73,6 +73,10 @@ private final class WorkspaceNavigation: ObservableObject {
     }
 }
 
+private final class SettingsSplitView: NSSplitView {
+    override func drawDivider(in rect: NSRect) {}
+}
+
 /// AppKit owns the actual window, toolbar, split divider, and sidebar selection.
 /// The integrated preset gallery and keyboard editor are native SwiftUI views.
 @MainActor
@@ -90,6 +94,7 @@ final class SettingsWorkspaceController: NSSplitViewController, NSToolbarDelegat
         editor = PackEditorModel(store: model.packStore, onChange: { reload in model.packDidChange(reload: reload) })
         navigation = WorkspaceNavigation(initialSetID: editor.selectedSetID)
         super.init(nibName: nil, bundle: nil)
+        splitView = SettingsSplitView()
         let sidebar = NSSplitViewItem(sidebarWithViewController: WorkspaceSidebarController(editor: editor, navigation: navigation))
         sidebar.minimumThickness = 240
         sidebar.maximumThickness = 320
@@ -104,7 +109,6 @@ final class SettingsWorkspaceController: NSSplitViewController, NSToolbarDelegat
         addSplitViewItem(content)
         splitView.isVertical = true
         splitView.dividerStyle = .thin
-        splitView.delegate = self
         splitView.autosaveName = NSSplitView.AutosaveName("TypingPetSettingsSidebar")
         navigation.$history.sink { [weak self] history in
             guard let self else { return }
@@ -133,8 +137,6 @@ final class SettingsWorkspaceController: NSSplitViewController, NSToolbarDelegat
         }.store(in: &subscriptions)
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
-
-    func splitView(_ splitView: NSSplitView, drawDividerIn rect: NSRect) {}
 
     override func viewWillAppear() {
         super.viewWillAppear()

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.19.3 - 2026-10-27
+
+- Remove the visible vertical divider between the Settings sidebar and main content.
+
 ## 0.19.2 - 2026-10-26
 
 - Remove the visible divider line between the Settings sidebar and its content.
