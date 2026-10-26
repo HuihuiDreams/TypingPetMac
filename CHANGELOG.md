@@ -1,9 +1,5 @@
 # Changelog
 
-## 0.18.2 - 2026-10-26
-
-- Remove the visible divider line between the Settings sidebar and its content.
-
 ## 0.18.1 - 2026-10-25
 
 - Drag preset images onto keyboard keys to assign them, with a glow on the active drop target; drop image files into the gallery to import them.

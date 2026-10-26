@@ -31,7 +31,7 @@ private final class WorkspaceNavigation: ObservableObject {
 /// AppKit owns the actual window, toolbar, split divider, and sidebar selection.
 /// The integrated preset gallery and keyboard editor are native SwiftUI views.
 @MainActor
-final class SettingsWorkspaceController: NSSplitViewController, NSToolbarDelegate, NSSplitViewDelegate {
+final class SettingsWorkspaceController: NSSplitViewController, NSToolbarDelegate {
     private let editor: PackEditorModel
     private let navigation = WorkspaceNavigation()
     private let sidebarToggleID = NSToolbarItem.Identifier("TypingPetSidebarToggle")
@@ -51,7 +51,6 @@ final class SettingsWorkspaceController: NSSplitViewController, NSToolbarDelegat
         addSplitViewItem(content)
         splitView.isVertical = true
         splitView.dividerStyle = .thin
-        splitView.delegate = self
         splitView.autosaveName = NSSplitView.AutosaveName("TypingPetSettingsSidebar")
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -60,8 +59,6 @@ final class SettingsWorkspaceController: NSSplitViewController, NSToolbarDelegat
         let native = super.splitView(splitView, effectiveRect: proposedEffectiveRect, forDrawnRect: drawnRect, ofDividerAt: dividerIndex)
         return native.isEmpty ? native : native.insetBy(dx: -3, dy: 0)
     }
-
-    func splitView(_ splitView: NSSplitView, drawDividerIn rect: NSRect) {}
 
     func installToolbar(on window: NSWindow) {
         let toolbar = NSToolbar(identifier: "TypingPetSettingsToolbar")
