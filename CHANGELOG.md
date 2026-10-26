@@ -1,5 +1,41 @@
 # 更新日志
 
+## [0.19.1] - 2026-10-26
+
+### Fixed
+
+- 移除设置面板中自动更新开关下方的多余分割线。
+
+## [0.19.0] - 2026-10-26
+
+### Added
+
+- 设置窗口常驻侧边栏与前进/后退导航支持，标题在滚动时常驻窗口工具栏。
+- 更新说明支持五种语言（韩语、英语、日语、简体中文、繁体中文），并在发布前进行完整性校验。
+
+### Changed
+
+- 设置界面全面采用原生开关与分组行布局，对齐选择控件与操作按钮，统一“复制”与图集菜单按钮高度，修复新建图集弹窗小箭头居中对齐。
+- 设置控件、预设选择项、活跃图集指示器及键盘高亮全面遵循 macOS 系统强调色。
+- 内置图集与预设名称动态跟随当前应用语言展示，不覆写已保存数据；移除冗余的图片导入与修饰键多选提示文案。
+
+## [0.18.2] - 2026-10-26
+
+### Security
+
+- 强化待办与图片存储安全边界：校验预设、休息及打字反应中的存储文件名与目录安全，拦截符号链接与非普通文件。
+- 待办数据落盘使用专用权限与原子替换，强化读写文件 10 MiB 大小限制，严格限制长文本输入边界。
+- 窗口失焦、锁屏或休眠时主动释放待办输入焦点，并将启动调试参数限制在 DEBUG 模式下。
+
+## [0.18.1] - 2026-10-25
+
+### Added
+
+- 支持将预设图片直接拖拽至键盘按键完成绑定（悬停目标显示光晕反馈）；支持将图片文件直接拖入画廊完成导入。
+- 侧边栏支持展示预设图集封面艺术图，支持双击激活图集，并提供包含使用、重命名及删除的上下文右键菜单。
+- 内置图集新增默认键盘映射，并在键盘布局中将 Touch ID/电源键展示为禁用状态。
+- 设置面板底部新增作者主页链接与预填充系统诊断信息的反馈邮件草稿按钮。
+
 ## [0.18.0-zh] - 2026-10-25
 
 ### Added
@@ -101,6 +137,35 @@
 - 隐私与健壮性防护：修复 Release 二进制中的本地路径泄漏（`#filePath` 仅在 DEBUG 模式下作为开发回退），消除不安全的强制解包。
 - 架构解耦与重构：集中收敛 UserDefaults 配置键 (`PetPreferences`)，彻底消除 `PetImageLibrary` 与 `KeyReactionStore` 的本地重复键；在 `GlobalKeyMonitor` 销毁与注销时显式失效 MachPort；为按键弹跳动画添加安全越界守卫；将 1397 行的巨石 `main.swift` 拆解为 `PetViews`, `GlobalKeyMonitor`, `PetController`, `AppDelegate` 与 11 行极简启动入口，并新增 ADR-001 决策记录。
 - 现代测试迁移：将单元测试全面迁移至原生 Swift Testing 框架，新增磁盘物理清理、缓存失效生命周期以及首选项存储契约 (`PetPreferencesContractTests`) 测试套件。
+
+## 0.19.1 - 2026-10-26
+
+- Remove the extra divider below the automatic update switch in Settings.
+
+## 0.19.0 - 2026-10-26
+
+- Keep the Settings sidebar visible and add Back/Forward navigation with a title that stays in place while scrolling.
+- Use native switches and grouped settings rows. Align selection controls and action buttons, match Duplicate and set-menu button heights, and fix the New Set popover arrow.
+- Follow the macOS accent color for controls, preset selections, active-set indicators, and keyboard highlights.
+- Display the built-in set and preset names in the selected app language without rewriting saved data or translating custom names. Remove redundant image-import and modifier-selection hints.
+- Support update release notes in Korean, English, Japanese, Simplified Chinese, and Traditional Chinese, with English and legacy-feed fallbacks. Validate all translations before publishing.
+
+## 0.18.2 - 2026-10-26
+
+- Validate stored image filenames and set folders across preset, resting, and typing-reaction lookups; reject symbolic links and non-regular files when importing images.
+- Save Todo records with owner-only permissions before atomically replacing the original. Permission or write failures preserve the previous records, and reads and writes enforce a 10 MiB file limit.
+- Bound long text input before processing and reject invalid stored Todo titles.
+- Release Todo input focus when clicking another app, locking the screen, or sleeping, and limit the settings launch shortcut to debug builds.
+
+Thanks to @HuihuiDreams for contributing the input and storage hardening in #5.
+
+## 0.18.1 - 2026-10-25
+
+- Drag preset images onto keyboard keys to assign them, with a glow on the active drop target; drop image files into the gallery to import them.
+- Improve set management with preset artwork in the sidebar, double-click activation, and a context menu for using, renaming, and deleting sets. Deleting the active set switches to the set above it.
+- Add default keyboard mappings for the built-in set and show the Touch ID/power button as a disabled key.
+- Add creator links and a support email draft with basic system details to the Settings footer, alongside the app version and DEV/production badge.
+- Refine preset cards, hover feedback, and the update-check settings copy.
 
 ## 0.18.0 - 2026-10-25
 

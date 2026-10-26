@@ -38,6 +38,14 @@ export function mountTheme(onModeChange: (mode: ThemeMode) => void) {
       try { localStorage.setItem(storageKey, next); } catch {}
       update(next);
     },
+    toggle() {
+      const next = mode === 'system' ? (media.matches ? 'light' : 'dark') : 'system';
+      try {
+        if (next === 'system') localStorage.removeItem(storageKey);
+        else localStorage.setItem(storageKey, next);
+      } catch {}
+      update(next);
+    },
     destroy() {
       media.removeEventListener('change', systemChanged);
       window.removeEventListener('storage', storageChanged);

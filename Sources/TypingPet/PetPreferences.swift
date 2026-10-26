@@ -43,6 +43,9 @@ enum AppPreferencesKey {
     /// Custom image pack order (`[String]`).
     static let imagePackOrder = "imagePackOrder-v1"
 
+    /// Whether default keyboard mappings have been applied to the built-in pack (`Bool`).
+    static let builtInKeyboardDefaultsApplied = "builtInKeyboardDefaultsApplied-v1"
+
     /// JSON encoded key reaction rules mapping key strokes to custom images (`Data`).
     static let keyReactionRules = "keyReactionRules-v1"
 
@@ -142,6 +145,7 @@ enum AppPreferencesDefault {
 
     // MARK: - Updates & Onboarding Defaults
     static let automaticUpdateChecks: Bool = true
+    static let builtInKeyboardDefaultsApplied: Bool = false
     static let inputMonitoringWelcomeShown: Bool = false
     static let inputMonitoringSetupPending: Bool = false
 }

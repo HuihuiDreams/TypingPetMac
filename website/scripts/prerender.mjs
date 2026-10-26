@@ -10,13 +10,15 @@ const origin = 'https://typing-pet.miel.ing';
 const escape = s => s.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;');
 const paths = [];
 for (const locale of locales) {
-  for (const page of ['home', 'changelog']) {
-    const suffix = page === 'home' ? '' : 'changelog/';
+  for (const page of ['home', 'changelog', 'unsubscribe']) {
+    const suffix = page === 'home' ? '' : `${page}/`;
     const path = `/${locale}/${suffix}`;
     const t = content[locale];
-    const title = page === 'home' ? t.title : `${t.nav[2]} — Typing Pet for Mac`;
+    const title = page === 'home' ? t.title : page === 'changelog' ? `${t.nav[2]} — Typing Pet for Mac` : t.title;
     const description = page === 'home' ? t.description : t.notesPageBody;
+    const noIndex = page === 'unsubscribe' ? '<meta name="robots" content="noindex,follow" />' : '';
     const meta = `<meta name="description" content="${escape(description)}" />
+    ${noIndex}
     <link rel="canonical" href="${origin}${path}" />
     ${locales.map(language => `<link rel="alternate" hreflang="${language}" href="${origin}/${language}/${suffix}" />`).join('\n    ')}
     <link rel="alternate" hreflang="x-default" href="${origin}/ko/${suffix}" />
@@ -47,7 +49,7 @@ for (const locale of locales) {
       .replace('<div id="root"></div>', `<div id="root">${render(locale, page)}</div>`);
     await mkdir(`dist${path}`, { recursive: true });
     await writeFile(`dist${path}index.html`, html);
-    paths.push(`${origin}${path}`);
+    if (page !== 'unsubscribe') paths.push(`${origin}${path}`);
   }
 }
 // A readable Korean fallback also works when JavaScript is disabled.

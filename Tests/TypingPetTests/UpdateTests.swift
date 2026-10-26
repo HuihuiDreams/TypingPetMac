@@ -42,7 +42,8 @@ import Testing
         ).get()
     }
 
-    private func manifest(for data: Data, build: Int = 19, url: String = "http://127.0.0.1:8787/a.zip") throws -> UpdateManifest {
+    private func manifest(for data: Data, build: Int = 19, url: String = "http://127.0.0.1:8787/a.zip",
+                          notes: String? = nil, localizedNotes: [String: String]? = nil) throws -> UpdateManifest {
         UpdateManifest(
             version: "0.13.0",
             build: build,
@@ -51,7 +52,8 @@ import Testing
             size: data.count,
             sha256: SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined(),
             signature: try key.signature(for: data).base64EncodedString(),
-            notes: nil
+            notes: notes,
+            localizedNotes: localizedNotes
         )
     }
 
@@ -67,9 +69,42 @@ import Testing
         let manifest = try JSONDecoder().decode(UpdateManifest.self, from: Data(json.utf8))
         #expect(manifest.build == 19)
         #expect(manifest.notes == "- New")
+        #expect(manifest.localizedNotes == nil)
+        #expect(manifest.releaseNotes(language: "ko") == "- New")
         #expect(manifest.isNewer(than: 18))
         #expect(!manifest.isNewer(than: 19))
         #expect(!manifest.isNewer(than: 20))
+    }
+
+    @Test func localizedReleaseNotesDecodeAndFollowEveryAppLanguage() throws {
+        let translations = ["ko": "한국어 변경 내역", "en": "English changes", "ja": "日本語の更新内容",
+                            "zh-Hans": "简体更新内容", "zh-Hant": "繁體更新內容"]
+        let original = try manifest(for: Data("archive".utf8), notes: "Legacy English", localizedNotes: translations)
+        let decoded = try JSONDecoder().decode(UpdateManifest.self, from: JSONEncoder().encode(original))
+        #expect(decoded.localizedNotes == translations)
+        for mode in AppLanguageMode.allCases where mode != .system {
+            let selectedLanguage = mode.resolvedLanguage()
+            #expect(decoded.releaseNotes(language: selectedLanguage) == translations[selectedLanguage])
+        }
+        for (region, expected) in [("ko-KR", "ko"), ("en_US", "en"), ("ja-JP", "ja"),
+                                   ("zh-CN", "zh-Hans"), ("zh_Hans_HK", "zh-Hans"),
+                                   ("zh-TW", "zh-Hant"), ("zh-Hant-CN", "zh-Hant")] {
+            #expect(decoded.releaseNotes(language: region) == translations[expected])
+        }
+    }
+
+    @Test func releaseNotesFallbackToEnglishThenLegacyForMissingOrBlankTranslation() throws {
+        let partial = try manifest(for: Data(), notes: "Legacy English", localizedNotes: ["ko": " \n ", "en": "English changes"])
+        #expect(partial.releaseNotes(language: "ko") == "English changes")
+        #expect(partial.releaseNotes(language: "ja") == "English changes")
+        #expect(partial.releaseNotes(language: "fr") == "English changes")
+        let legacy = try manifest(for: Data(), notes: "Legacy English", localizedNotes: ["en": " \n "])
+        #expect(legacy.releaseNotes(language: "zh-Hant") == "Legacy English")
+    }
+
+    @Test func releaseNotesAreAbsentWhenEveryFallbackIsMissingOrBlank() throws {
+        #expect(try manifest(for: Data()).releaseNotes(language: "ko") == nil)
+        #expect(try manifest(for: Data(), notes: " \n ", localizedNotes: ["en": " "]).releaseNotes(language: "ja") == nil)
     }
 
     @Test func minimumSystemVersionComparesEachComponent() throws {

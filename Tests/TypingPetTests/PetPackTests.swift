@@ -3,6 +3,37 @@ import Testing
 @testable import TypingPet
 
 @Suite struct PetPackTests {
+    @Test @MainActor
+    func builtInNamesFollowLanguageWithoutChangingMappingsOrStoredData() throws {
+        let f = try Fixture(); defer { f.cleanup() }
+        let localization = AppLocalization(defaults: f.defaults)
+        localization.setMode(.korean)
+        let store = PetPackStore(library: f.library, keyStore: f.keys, localization: localization)
+        let editor = PackEditorModel(store: store)
+        let original = store.activeConfiguration
+        let bytes = try Data(contentsOf: f.library.packConfigurationsURL)
+        for mode in AppLanguageMode.allCases where mode != .system {
+            localization.setMode(mode)
+            let language = mode.resolvedLanguage()
+            let displayed = editor.displayConfiguration
+            #expect(displayed.name == AppLocalization.string("Default Set", language: language))
+            #expect(displayed.mappings == original.mappings)
+            #expect(displayed.presets.map(\.id) == original.presets.map(\.id))
+            for preset in displayed.presets {
+                let key = try #require(PetImagePreset.builtInNameKey(fileName: preset.fileName))
+                #expect(preset.name == AppLocalization.string(key, language: language))
+            }
+            #expect(try Data(contentsOf: f.library.packConfigurationsURL) == bytes)
+        }
+        // 在韩语模式下创建的草稿在切换到其他语言后仍可保存按键映射修改。
+        #expect(throws: Never.self) { try store.save(original, for: f.library.activeSet) }
+
+        let custom = try store.createPack(name: "我的自定义套装")
+        editor.refresh()
+        editor.selectSet(custom)
+        localization.setMode(.english)
+        #expect(editor.displayConfiguration.name == "我的自定义套装")
+    }
     @MainActor private struct Fixture {
         let root: URL
         let defaults: UserDefaults

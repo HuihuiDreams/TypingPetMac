@@ -25,12 +25,21 @@ Ad-hoc 生产构建没有 Team ID，因此它只信任 Ed25519 签名，可以�
   "size": 7191671,
   "sha256": "…",
   "signature": "base64 编码的 zip 字节 Ed25519 签名",
-  "notes": "- 更新内容说明"
+  "notes": "- 更新内容说明",
+  "localizedNotes": {
+    "ko": "업데이트 내역\n\n• 변경 내용",
+    "en": "Release notes\n\n• Changes",
+    "ja": "更新内容\n\n• 変更点",
+    "zh-Hans": "更新内容\n\n• 更改",
+    "zh-Hant": "更新內容\n\n• 變更"
+  }
 }
 ```
 
 `build` 对应 `CFBundleVersion`。仅当 feed 中的 build 大于当前运行应用的 build 时才提示更新。
 zip 归档内部仅包含一个 `.app` bundle。
+
+更新弹窗会根据应用当前语言设置（包括跟随系统）选择 `localizedNotes` 中的对应语言说明。若对应语言缺失或为空，则回退到英语，最后回退到传统的 `notes` 字段。旧版客户端会忽略新增的该字段并继续展示 `notes`。已安装旧版客户端的应用需先完成一次客户端更新后才能支持多语言发行说明显示。
 
 ## 安装流程
 
@@ -77,9 +86,12 @@ TYPINGPET_BUILD_CHANNEL=production TYPINGPET_VERSION=0.14.3 TYPINGPET_BUILD=23 .
 ```
 
 `deploy_update.sh` 要求提供原始更新私钥、经过 Apple 公证的 Developer ID app 以及本地静态更新服务目录 `~/TypingPetUpdate`（可用 `TYPINGPET_UPDATE_ROOT` 或第三参数指定）。它会生成带签名的 zip 和 manifest，拒绝降级或覆写已发布版本，先拷贝 zip，最后原子替换 `latest.json`。之后会发起 HTTP 请求验证公网 URL 与本地文件的一致性。
+若公网校验失败，重试前先检查服务器状态；本地 feed 可能已经完成更新。
 已发布构建具备不可变性。下次发布必须自增 `CFBundleVersion`。
 `latest.json` 需配置禁用 CDN 缓存。
 更新日志来自 `CHANGELOG.md` 对应版本段落或 `UPDATE_NOTES`。
+该兼容字段继续服务于旧版本客户端。`localizedNotes` 则从 `website/src/releases.json` 中匹配的版本自动生成（使用纯文本形式的标题与变更项）。
+生产预检和正式发布在发布新 feed 前，均要求所有五种支持的语言都具备非空的说明内容（即使是仅在更新服务器发布的版本也是如此）。
 
 注意：0.14.2 版本因旧私钥丢失轮换了生产密钥。0.14.1 及更早版本内嵌的是旧公钥，无法直接通过 feed 升级到 0.14.2，需要手动重新下载安装一次；此后的版本均可正常自动升级。
 

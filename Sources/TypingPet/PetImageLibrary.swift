@@ -4,7 +4,7 @@ import Foundation
 /// 应用存储中的文件或目录名只允许单级名称，防止读取或删除时越出存储目录。
 enum StoredFileName {
     static func isSafe(_ name: String) -> Bool {
-        !name.isEmpty && name != "." && name != ".." && !name.contains("/")
+        !name.isEmpty && name != "." && name != ".." && !name.contains("/") && !name.contains("\0")
     }
 }
 
@@ -309,6 +309,9 @@ final class PetImageLibrary {
     }
 
     private func resolvedURL(fileName: String, set: PetImageSet) -> URL? {
+        // All idle, reaction, and preset lookups pass through this check before constructing a path.
+        guard StoredFileName.isSafe(fileName),
+              set.storageFolder.map(StoredFileName.isSafe) != false else { return nil }
         if set.isBuiltIn {
             return builtInResourceURL(fileName: fileName)
         }

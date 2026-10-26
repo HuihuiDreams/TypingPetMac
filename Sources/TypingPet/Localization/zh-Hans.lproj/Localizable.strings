@@ -65,7 +65,6 @@
 "Check for updates automatically" = "自动检查更新";
 "Checking for Updates…" = "正在检查更新…";
 "Checking for updates…" = "正在检查更新…";
-"Checks pet.miel.ing once a day. Only the app version is sent, and only updates with a verified signature are installed." = "每天检查一次 pet.miel.ing。仅发送应用版本，且仅安装签名验证通过的更新。";
 "Choose" = "选择";
 "Choose Idle Image" = "选择待机图片";
 "Choose Key Reaction Image" = "选择按键反应图片";
@@ -306,6 +305,25 @@
 "Unsupported image format: %1$@" = "不支持的图片格式：%1$@";
 "Updated to %1$@." = "已更新至 %1$@。";
 "Updates" = "更新";
+"Creator" = "作者";
+"Creator: Miel" = "作者：Miel";
+"Website" = "主页";
+"GitHub" = "GitHub";
+"Repository" = "代码仓库";
+"X" = "X";
+"Bug report or question" = "问题反馈或咨询";
+"The email draft includes basic app and system details." = "邮件草稿会附带基本的应用和系统信息。";
+"Write an email" = "撰写邮件";
+"Email copied" = "已复制邮箱地址";
+"Copy email address" = "复制邮箱地址";
+"Typing Pet feedback" = "Typing Pet 问题反馈或咨询";
+"Unknown" = "未知";
+"Describe the bug or question here." = "请在此描述问题或咨询内容。";
+"App" = "应用";
+"Device model" = "设备型号";
+"Architecture" = "架构";
+"Development" = "开发版";
+"Production" = "正式版";
 "Updates are only available when running an app bundle." = "仅在运行应用包时可使用更新。";
 "Use the DEV app in the menu bar. Quit the existing Dev app before launching again." = "请使用菜单栏中的 DEV 应用。再次启动前，请退出已有的 Dev 应用。";
 "Version %1$@ is available." = "版本 %1$@ 现已可用。";
@@ -366,6 +384,7 @@
 "Enter a name for the pack and each preset." = "请输入包和每个预设的名称。";
 "Give presets any name and reuse them across keys and reactions." = "为预设自由命名，并用于多个按键和反应。";
 "Image Presets" = "图片预设";
+"No supported image files were dropped." = "请放入受支持的图片文件。";
 "Image Presets · Select Multiple" = "图片预设 · 可多选";
 "Import Image Pack" = "导入图片包";
 "In Use" = "使用中";
@@ -404,20 +423,20 @@
 "Unassigned" = "未分配";
 "Unsaved Changes" = "未保存的更改";
 "Uses Unassigned settings" = "使用未分配设置";
-"Your Little Companion" = "你的小伙伴";
 
 // Native pack workspace
 "%1$@ presets" = "%1$@ 个预设";
 "A pack with this name already exists." = "已存在同名图片包。";
 "Add an image before using this pack." = "请先添加图片再使用此图片包。";
 "Add the first image to this pack." = "为此图片包添加第一张图片。";
-"Changes saved automatically." = "更改会自动保存。";
+"Changes saved automatically." = "更改会立即生效。";
 "Check Again" = "重新检查";
 "Close" = "关闭";
 "Create" = "创建";
 "Create Pack" = "创建图片包";
 "Create an empty pack, then add your images." = "先创建空图片包，再添加图片。";
 "Delete Image" = "删除图片";
+"Deleting the active set switches to “%1$@”. Original images will not be changed." = "删除当前使用的套装后将切换到“%1$@”。不会更改原始图片。";
 "Delete preset “%1$@”?" = "删除预设“%1$@”？";
 "Edit Presets" = "编辑预设";
 "Empty Pack" = "空图片包";
@@ -428,7 +447,7 @@
 "Select %1$@" = "选择 %1$@";
 "The first image is used for Unassigned and IDLE. You can change them in Keyboard Mapping." = "第一张图片用于“未分配”和 IDLE，可在键盘映射中更改。";
 "Toggle Sidebar" = "显示或隐藏侧边栏";
-"Use Set" = "使用此套组";
+"Use This Set" = "使用此套组";
 "Use another pack before deleting the last image in the active pack." = "删除当前图片包的最后一张图片前，请先使用其他图片包。";
 "Using %1$@" = "正在使用 %1$@";
 
@@ -445,11 +464,15 @@
 "Built-in presets are fixed. Duplicate to edit them." = "默认预设不可修改。复制后即可编辑。";
 "No images yet" = "尚无图片";
 "The first image is used while typing and while resting." = "第一张图片用于输入时和休息时。";
+"Touch ID / Power Button" = "Touch ID／电源按钮";
 "When Resting" = "休息时";
 "Multiple selections allowed" = "可多选";
-"Common Keys" = "常用按键";
 "Space" = "空格";
 "Enter" = "回车";
-"Quick setup for %1$@" = "快速设置 %1$@";
 "Click a key to edit its presets." = "点击按键以编辑预设。";
 "Edit %1$@" = "编辑 %1$@";
+
+/* Settings navigation */
+"Back" = "后退";
+"Forward" = "前进";
+"Navigate Settings" = "设置导航";

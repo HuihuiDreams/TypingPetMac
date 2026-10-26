@@ -13,6 +13,17 @@ struct PetImagePreset: Codable, Identifiable, Equatable {
     var name: String
     var fileName: String
     var source: PresetImageSource = .imageSet
+
+    static func builtInNameKey(fileName: String) -> String? {
+        switch fileName {
+        case "pet-idle.png", "basic.png": "Basic Expression"
+        case "pet-left.png", "left.png": "Left Hand"
+        case "pet-right.png", "right.png": "Right Hand"
+        case "pet-question.png": "Curious"
+        case "pet-exclamation.png": "Surprised"
+        default: nil
+        }
+    }
 }
 
 struct PresetSelection: Codable, Equatable {
@@ -37,6 +48,18 @@ struct PetPackConfiguration: Codable, Equatable {
 
     func selection(for stroke: KeyStroke?) -> PresetSelection {
         stroke.flatMap { key in mappings.first { $0.stroke == key }?.selection } ?? unassigned
+    }
+
+    func localizingBuiltInNames(language: String) -> Self {
+        var result = self
+        result.name = AppLocalization.string("Default Set", language: language)
+        for index in result.presets.indices {
+            let preset = result.presets[index]
+            if preset.source == .imageSet, let key = PetImagePreset.builtInNameKey(fileName: preset.fileName) {
+                result.presets[index].name = AppLocalization.string(key, language: language)
+            }
+        }
+        return result
     }
 }
 
@@ -98,16 +121,19 @@ final class PetPackStore {
         var version = 1
         var packs: [String: PetPackConfiguration]
     }
+    private static let builtInKeyboardDefaultsAppliedKey = AppPreferencesKey.builtInKeyboardDefaultsApplied
     let library: PetImageLibrary
     private let legacyKeys: KeyReactionStore
     private let fileManager: FileManager
+    private let localization: AppLocalization
     private var configurations: [String: PetPackConfiguration] = [:]
     private(set) var loadError: Error?
 
-    init(library: PetImageLibrary, keyStore: KeyReactionStore, fileManager: FileManager = .default) {
+    init(library: PetImageLibrary, keyStore: KeyReactionStore, fileManager: FileManager = .default, localization: AppLocalization = .shared) {
         self.library = library
         legacyKeys = keyStore
         self.fileManager = fileManager
+        self.localization = localization
         let url = library.packConfigurationsURL
         if fileManager.fileExists(atPath: url.path) {
             do {
@@ -123,7 +149,10 @@ final class PetPackStore {
     }
 
     func configuration(for set: PetImageSet) -> PetPackConfiguration {
-        configurations[set.id.uuidString] ?? makeConfiguration(for: set, includeLegacyKeys: loadError != nil)
+        displayConfiguration(configurations[set.id.uuidString] ?? makeConfiguration(for: set, includeLegacyKeys: loadError != nil), for: set)
+    }
+    func displayConfiguration(_ pack: PetPackConfiguration, for set: PetImageSet) -> PetPackConfiguration {
+        set.isBuiltIn ? pack.localizingBuiltInNames(language: localization.language) : pack
     }
     var activeConfiguration: PetPackConfiguration { configuration(for: library.activeSet) }
 
@@ -142,10 +171,19 @@ final class PetPackStore {
     }
 
     func save(_ pack: PetPackConfiguration, for set: PetImageSet) throws {
-        if set.isBuiltIn && pack.presets != configuration(for: set).presets {
-            throw PetPackError.builtInPresetsReadOnly
+        let displayed = displayConfiguration(pack, for: set)
+        if set.isBuiltIn {
+            let namesAreUnchanged = pack.presets.allSatisfy { preset in
+                guard preset.source == .imageSet, let key = PetImagePreset.builtInNameKey(fileName: preset.fileName) else {
+                    return configuration(for: set).presets.first(where: { $0.id == preset.id })?.name == preset.name
+                }
+                return AppLanguageMode.supportedLanguages.contains { AppLocalization.string(key, language: $0) == preset.name }
+            }
+            guard namesAreUnchanged, displayed.presets == configuration(for: set).presets else {
+                throw PetPackError.builtInPresetsReadOnly
+            }
         }
-        try persistConfiguration(pack, for: set)
+        try persistConfiguration(displayed, for: set)
     }
 
     private func persistConfiguration(_ pack: PetPackConfiguration, for set: PetImageSet) throws {
@@ -162,6 +200,20 @@ final class PetPackStore {
         guard pack.isUsable else { throw PetPackError.emptyPack }
         try validate(pack, in: set)
         try library.activateSet(id: set.id)
+    }
+
+    func applyBuiltInKeyboardDefaultsIfNeeded() {
+        let defaults = AppEnvironment.defaults
+        guard !defaults.bool(forKey: Self.builtInKeyboardDefaultsAppliedKey),
+              loadError == nil,
+              let builtIn = library.imageSets.first(where: \.isBuiltIn) else { return }
+        let pack = applyingBuiltInKeyboardDefaults(to: configuration(for: builtIn))
+        do {
+            try save(pack, for: builtIn)
+            defaults.set(true, forKey: Self.builtInKeyboardDefaultsAppliedKey)
+        } catch {
+            // Keep the migration eligible for the next launch if the saved pack cannot be updated.
+        }
     }
 
     func createPack(name: String) throws -> PetImageSet {
@@ -322,16 +374,32 @@ final class PetPackStore {
         return pack
     }
 
-    private static func presetName(_ fileName: String) -> String {
-        switch fileName {
-        case "basic.png", "pet-idle.png": return L("Basic Expression")
-        case "left.png", "pet-left.png": return L("Left Hand")
-        case "right.png", "pet-right.png": return L("Right Hand")
-        case "pet-question.png": return L("Curious")
-        case "pet-exclamation.png": return L("Surprised")
-        default:
-            let base = URL(fileURLWithPath: fileName).deletingPathExtension().lastPathComponent
-            return base.count > 37 && UUID(uuidString: String(base.prefix(36))) != nil ? String(base.dropFirst(37)) : base
+    private func applyingBuiltInKeyboardDefaults(to original: PetPackConfiguration) -> PetPackConfiguration {
+        var pack = original
+        let idle = "pet-idle.png"
+        let typingPresets = [idle, "pet-left.png", "pet-right.png"]
+        let surprised = "pet-exclamation.png"
+        guard typingPresets.allSatisfy({ id in pack.presets.contains(where: { $0.id == id }) }),
+              pack.presets.contains(where: { $0.id == surprised }) else { return pack }
+
+        pack.idle = PresetSelection(presetIDs: [idle], mode: .cycle)
+        pack.unassigned = PresetSelection(presetIDs: typingPresets, mode: .cycle)
+
+        let space = KeyStroke(keyCode: 49, modifiers: [])
+        let enter = KeyStroke(keyCode: 36, modifiers: [])
+        pack.mappings.removeAll()
+        for stroke in [space, enter] {
+            pack.mappings.append(PresetKeyMapping(
+                stroke: stroke,
+                selection: PresetSelection(presetIDs: [surprised], mode: .cycle)
+            ))
         }
+        return pack
+    }
+
+    private static func presetName(_ fileName: String) -> String {
+        if let key = PetImagePreset.builtInNameKey(fileName: fileName) { return L(key) }
+        let base = URL(fileURLWithPath: fileName).deletingPathExtension().lastPathComponent
+        return base.count > 37 && UUID(uuidString: String(base.prefix(36))) != nil ? String(base.dropFirst(37)) : base
     }
 }

@@ -215,7 +215,7 @@ final class UpdateController: ObservableObject {
     }
 
     private func offerInstall(_ manifest: UpdateManifest) -> Bool {
-        let notes = manifest.notes.map { "\n\n\($0)" } ?? ""
+        let notes = manifest.releaseNotes(language: AppLocalization.shared.language).map { "\n\n\($0)" } ?? ""
         let response = alert(
             L("%1$@ %2$@ is available", AppEnvironment.displayName, manifest.version),
             L("You are currently using %1$@.%2$@", currentVersionText, notes),

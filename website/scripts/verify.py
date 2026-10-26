@@ -61,7 +61,7 @@ def main():
     urllib.request.install_opener(opener)
     metadata = json.loads((Path(__file__).resolve().parents[1] / 'src/generated/release.json').read_text())
     locales = json.loads((Path(__file__).resolve().parents[1] / 'src/locales.json').read_text())
-    headings = {'ko': '타닥타닥.', 'en': 'Tap, tap.', 'ja': 'カタカタ。', 'zh-Hans': '独处的时光，', 'zh-Hant': '獨處的時光，'}
+    headings = {'ko': '언제까지나', 'en': 'Always', 'ja': 'いつまでも', 'zh-Hans': '一直', 'zh-Hant': '一直'}
     note_titles = {note['version']: note for note in json.loads((Path(__file__).resolve().parents[1] / 'src/releases.json').read_text())}
     result = {'checked_at': datetime.now(timezone.utc).isoformat(),
               'network_scope': 'Requests from this Mac; independent external checks are separate.',
@@ -96,8 +96,8 @@ def main():
             require(metadata['version'] in html and email_present and 'Jongkeun Choi' in html, f'Missing release or contact details: {path}')
             theme_script = re.search(r'<script src="(/assets/theme-([a-f0-9]{12})\.js)"></script>', html)
             require(theme_script is not None and 'class="theme-toggle"' in html
-                    and html.count('aria-haspopup="menu"') == 2, f'Missing header menus: {path}')
-            require('role="combobox"' in html and html.count('role="checkbox"') == 2
+                    and html.count('aria-haspopup="menu"') == 1, f'Missing header controls: {path}')
+            require('role="combobox"' in html and html.count('role="checkbox"') == 1
                     and 'role="switch"' in html, f'Missing accessible form controls: {path}')
             require(theme_script.start() < html.index('rel="stylesheet"'), f'Late theme bootstrap: {path}')
             result['pages'][path] = {'status': status, 'cache_control': cache,

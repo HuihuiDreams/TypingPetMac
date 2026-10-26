@@ -69,6 +69,7 @@ private final class ImageStorageFixture {
             applyScale: { _ in }, applyRestingOpacity: { _ in }, applyHoverOpacity: { _ in },
             applyShake: { _ in }, applyAlwaysOnTop: { _ in }, applyPositionLock: { _ in },
             currentPositionLock: currentPositionLock, applyPointerAvoidance: { _ in },
+            applyAppearance: { _ in },
             reloadPet: {}, openInputMonitoringSettings: {}
         )
     }

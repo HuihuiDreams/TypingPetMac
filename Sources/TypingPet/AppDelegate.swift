@@ -8,7 +8,11 @@ import ServiceManagement
 internal final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let imageLibrary = PetImageLibrary()
     private let keyReactionStore = KeyReactionStore()
-    private lazy var packStore = PetPackStore(library: imageLibrary, keyStore: keyReactionStore)
+    private lazy var packStore: PetPackStore = {
+        let store = PetPackStore(library: imageLibrary, keyStore: keyReactionStore)
+        store.applyBuiltInKeyboardDefaultsIfNeeded()
+        return store
+    }()
     private let todoStore: TodoStore = {
         #if DEBUG
         if let path = ProcessInfo.processInfo.environment["TYPINGPET_TODO_TEST_PATH"] {
@@ -72,6 +76,9 @@ internal final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegat
             if shouldResumeSetup { showInputMonitoringGuide() }
         }
         if ProcessInfo.processInfo.arguments.contains("--show-todos") { showTodos() }
+        if ProcessInfo.processInfo.arguments.contains("--show-settings") {
+            DispatchQueue.main.async { [weak self] in self?.showSettings() }
+        }
         if ProcessInfo.processInfo.arguments.contains("--install-update-now") { updater.installNowForChecks() }
         if ProcessInfo.processInfo.arguments.contains("--show-input-guide") { showInputMonitoringGuide() }
         if let index = ProcessInfo.processInfo.arguments.firstIndex(of: "--input-guide-preview"),
@@ -199,6 +206,7 @@ internal final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegat
                 applyPositionLock: { [weak self] in self?.petController.isPositionLocked = $0 },
                 currentPositionLock: { [weak self] in self?.petController.isPositionLocked == true },
                 applyPointerAvoidance: { [weak self] in self?.petController.avoidsPointerWhenLocked = $0 },
+                applyAppearance: { [weak self] in self?.todoBubble?.setAppearanceMode($0) },
                 reloadPet: { [weak self] in self?.petController.reloadImages() },
                 openInputMonitoringSettings: { [weak self] in self?.openInputMonitoringSettings() },
                 monitoringIsRunning: { [weak self] in self?.keyMonitor?.isRunning == true },

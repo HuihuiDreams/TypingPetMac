@@ -81,7 +81,7 @@ final class TodoBubbleWindowController {
     let store: TodoStore
     let panel: TodoPanel
     let layout = TodoBubbleLayout()
-    private let entry: TodoPanel
+    let entry: TodoPanel
     private weak var pet: NSWindow?
     private var subscriptions: Set<AnyCancellable> = []
     private var timer: Timer?
@@ -99,12 +99,12 @@ final class TodoBubbleWindowController {
     private var bouncesLeft = 0
     private var bounceWork: DispatchWorkItem?
 
-    init(store: TodoStore, pet: NSWindow) {
+    init(store: TodoStore, pet: NSWindow, defaults: UserDefaults = AppEnvironment.defaults) {
         self.store = store
         self.pet = pet
         panel = Self.makePanel(size: NSSize(width: 320, height: 240))
         entry = Self.makePanel(size: TodoBubbleGeometry.entrySize)
-        setAppearanceMode(SettingsAppearanceMode.load(from: AppEnvironment.defaults))
+        setAppearanceMode(SettingsAppearanceMode.load(from: defaults))
         panel.contentView = NSHostingView(rootView: TodoBubbleView(store: store, layout: layout))
         entry.contentView = NSHostingView(rootView: TodoEntryButton { [weak self] in self?.show() })
         layout.window = panel

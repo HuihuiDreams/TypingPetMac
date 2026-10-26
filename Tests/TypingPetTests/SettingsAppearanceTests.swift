@@ -16,10 +16,13 @@ import Testing
         let controller = TodoBubbleWindowController(store: store, pet: NSWindow())
         controller.setAppearanceMode(.dark)
         #expect(controller.panel.appearance?.name == .darkAqua)
+        #expect(controller.entry.appearance?.name == .darkAqua)
         controller.setAppearanceMode(.light)
         #expect(controller.panel.appearance?.name == .aqua)
+        #expect(controller.entry.appearance?.name == .aqua)
         controller.setAppearanceMode(.system)
         #expect(controller.panel.appearance == nil)
+        #expect(controller.entry.appearance == nil)
     }
 
     @Test func storedAppearanceAndInvalidValue() throws {
@@ -53,6 +56,7 @@ import Testing
             alwaysOnTop: false, positionLocked: false, avoidsPointerWhenLocked: false,
             applyScale: { _ in }, applyRestingOpacity: { _ in }, applyHoverOpacity: { _ in }, applyShake: { _ in },
             applyAlwaysOnTop: { _ in }, applyPositionLock: { _ in }, applyPointerAvoidance: { _ in },
+            applyAppearance: { _ in },
             reloadPet: {}, openInputMonitoringSettings: {},
             monitoringIsRunning: { connected }, retryMonitoring: { retryCount += 1; connected = true },
             inputMonitoringAuthorized: { granted }, defaults: defaults)
@@ -73,7 +77,7 @@ import Testing
     }
 
     @Test @MainActor
-    func changingModePersistsAndUpdatesWindowAppearance() throws {
+    func changingModeUpdatesSettingsBubbleAndCollapsedEntryWithoutRestarting() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("TypingPetAppearance-\(UUID())")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
@@ -81,6 +85,8 @@ import Testing
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
 
+        let store = TodoStore(url: root.appendingPathComponent("todos.json"), defaults: defaults)
+        let bubble = TodoBubbleWindowController(store: store, pet: NSWindow(), defaults: defaults)
         let model = TypingPetSettingsModel(
             library: PetImageLibrary(defaults: defaults, imagesDirectory: root.appendingPathComponent("Images")),
             keyStore: KeyReactionStore(defaults: defaults, directory: root.appendingPathComponent("Keys")),
@@ -98,21 +104,30 @@ import Testing
             applyAlwaysOnTop: { _ in },
             applyPositionLock: { _ in },
             applyPointerAvoidance: { _ in },
+            applyAppearance: { bubble.setAppearanceMode($0) },
             reloadPet: {},
             openInputMonitoringSettings: {},
             defaults: defaults
         )
-        let window = NSWindow()
-        model.onAppearanceChanged = { window.appearance = $0.windowAppearance }
         let settings = SettingsWindowController(
             model: model,
-            todoStore: TodoStore(url: root.appendingPathComponent("todos.json"), defaults: defaults),
+            todoStore: store,
             updater: UpdateController(defaults: defaults)
         )
 
         #expect(settings.window?.contentViewController is NSSplitViewController)
-        #expect(try !#require(settings.window).styleMask.contains(.fullSizeContentView))
+        let window = try #require(settings.window)
+        #expect(window.styleMask.contains(.fullSizeContentView))
+        #expect(!window.titlebarAppearsTransparent)
         let split = try #require(settings.window?.contentViewController as? NSSplitViewController)
+        #expect(!split.splitViewItems[0].canCollapse)
+        #expect(!split.splitViewItems[0].canCollapseFromWindowResize)
+        #expect(split.splitViewItems[0].allowsFullHeightLayout)
+        split.toggleSidebar(nil)
+        #expect(!split.splitViewItems[0].isCollapsed)
+        let toolbar = try #require(settings.window?.toolbar)
+        #expect(toolbar.items.contains { $0 is NSTrackingSeparatorToolbarItem })
+        #expect(settings.window?.titlebarSeparatorStyle == NSTitlebarSeparatorStyle.none)
         split.view.layoutSubtreeIfNeeded()
         split.splitView.setPosition(270, ofDividerAt: 0)
         split.view.layoutSubtreeIfNeeded()
@@ -123,18 +138,35 @@ import Testing
         #expect(!hitArea.isEmpty)
         #expect(hitArea.contains(NSPoint(x: divider.midX, y: divider.midY)))
 
+        settings.window?.setContentSize(SettingsWindowSizing.minimumSize())
+        split.view.layoutSubtreeIfNeeded()
+        #expect(!split.splitViewItems[0].isCollapsed)
+        #expect(split.splitViewItems[0].viewController.view.frame.width >= 240)
+        #expect(split.splitViewItems[1].viewController.view.frame.width >= 530)
+
         model.setAppearanceMode(.dark)
         #expect(defaults.string(forKey: SettingsAppearanceMode.defaultsKey) == "dark")
-        #expect(window.appearance?.name == .darkAqua)
+        #expect(bubble.panel.appearance?.name == .darkAqua)
+        #expect(bubble.entry.appearance?.name == .darkAqua)
+        #expect(bubble.panel.contentView?.effectiveAppearance.name == .darkAqua)
+        #expect(bubble.entry.contentView?.effectiveAppearance.name == .darkAqua)
         #expect(settings.window?.appearance?.name == .darkAqua)
         #expect(SettingsAppearanceMode.load(from: defaults) == .dark)
 
+        let reopened = TodoBubbleWindowController(store: store, pet: NSWindow(), defaults: defaults)
+        #expect(reopened.panel.appearance?.name == .darkAqua)
+        #expect(reopened.entry.appearance?.name == .darkAqua)
+
         model.setAppearanceMode(.light)
-        #expect(window.appearance?.name == .aqua)
+        #expect(bubble.panel.appearance?.name == .aqua)
+        #expect(bubble.entry.appearance?.name == .aqua)
+        #expect(bubble.panel.contentView?.effectiveAppearance.name == .aqua)
+        #expect(bubble.entry.contentView?.effectiveAppearance.name == .aqua)
         #expect(settings.window?.appearance?.name == .aqua)
 
         model.setAppearanceMode(.system)
-        #expect(window.appearance == nil)
+        #expect(bubble.panel.appearance == nil)
+        #expect(bubble.entry.appearance == nil)
         #expect(settings.window?.appearance == nil)
     }
 }

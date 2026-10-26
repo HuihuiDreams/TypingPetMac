@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import Darwin
 @testable import TypingPet
 
 private final class TestClock {
@@ -417,6 +418,84 @@ private final class TestClock {
 
         let link = folder.appendingPathComponent("symlink.json")
         try FileManager.default.createSymbolicLink(at: link, withDestinationURL: file)
-        #expect(throws: TodoDataError.self) { _ = try TodoFileStorage(url: link).load() }
+        #expect(throws: (any Error).self) { _ = try TodoFileStorage(url: link).load() }
+    }
+
+    @Test func saveCreatesAndReplacesWithOwnerOnlyPermissions() throws {
+        let (file, folder) = try temporaryFile()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let storage = TodoFileStorage(url: file)
+        var state = TodoState(todos: [TodoItem(title: "First", createdAt: Date())])
+        try storage.save(state)
+        #expect(try FileManager.default.attributesOfItem(atPath: file.path)[.posixPermissions] as? Int == 0o600)
+
+        try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: file.path)
+        state.todos[0].title = "Replacement"
+        try storage.save(state)
+        #expect(try FileManager.default.attributesOfItem(atPath: file.path)[.posixPermissions] as? Int == 0o600)
+        #expect(try storage.load().todos[0].title == "Replacement")
+        #expect(try FileManager.default.contentsOfDirectory(atPath: file.deletingLastPathComponent().path) == [file.lastPathComponent])
+    }
+
+    @Test func permissionFailurePreservesOriginalAndRemovesTemporaryFile() throws {
+        let (file, folder) = try temporaryFile()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let original = TodoState(todos: [TodoItem(title: "Keep me", createdAt: Date())])
+        try TodoFileStorage(url: file).save(original)
+        let bytes = try Data(contentsOf: file)
+        let storage = TodoFileStorage(url: file, setPrivatePermissions: { descriptor in
+            var attributes = stat()
+            #expect(fstat(descriptor, &attributes) == 0)
+            #expect(attributes.st_size == 0)
+            throw POSIXError(.EPERM)
+        })
+        #expect(throws: (any Error).self) { try storage.save(TodoState()) }
+        #expect(try Data(contentsOf: file) == bytes)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: file.deletingLastPathComponent().path) == [file.lastPathComponent])
+    }
+
+    @Test func oversizedSaveDoesNotReplaceReadableRecords() throws {
+        let (file, folder) = try temporaryFile()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let storage = TodoFileStorage(url: file)
+        try storage.save(TodoState())
+        let original = try Data(contentsOf: file)
+        let title = String(repeating: "🔒", count: 1000)
+        let oversized = TodoState(todos: (0..<3000).map { _ in TodoItem(title: title, createdAt: Date()) })
+        #expect(throws: (any Error).self) { try storage.save(oversized) }
+        #expect(try Data(contentsOf: file) == original)
+        #expect(try storage.load() == TodoState())
+    }
+
+    @Test @MainActor func unsafeRecordFilesBlockLoadingWithoutOverwritingThem() throws {
+        let (file, folder) = try temporaryFile()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let fifo = file.deletingLastPathComponent().appendingPathComponent("fifo.json")
+        #expect(mkfifo(fifo.path, 0o600) == 0)
+        #expect(throws: (any Error).self) { try TodoFileStorage(url: fifo).load() }
+
+        let dangling = file.deletingLastPathComponent().appendingPathComponent("dangling.json")
+        try FileManager.default.createSymbolicLink(at: dangling, withDestinationURL: file)
+        #expect(throws: (any Error).self) { try TodoFileStorage(url: dangling).load() }
+
+        #expect(FileManager.default.createFile(atPath: file.path, contents: nil))
+        let handle = try FileHandle(forWritingTo: file)
+        try handle.truncate(atOffset: UInt64(TodoFileStorage.maximumFileSize + 1))
+        try handle.close()
+        let suite = "TypingPetOversizedRecords.\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = TodoStore(url: file, defaults: defaults)
+        #expect(store.loadBlocked)
+        store.change { _ = $0.addTodo("Must not overwrite") }
+        store.persist()
+        #expect(try FileManager.default.attributesOfItem(atPath: file.path)[.size] as? Int == TodoFileStorage.maximumFileSize + 1)
+    }
+
+    @Test func persistedTitlesRejectEveryNewlineKind() {
+        for newline in ["\n", "\r", "\r\n", "\u{0085}", "\u{2028}", "\u{2029}"] {
+            let state = TodoState(todos: [TodoItem(title: "First\(newline)Second", createdAt: Date())])
+            #expect(throws: (any Error).self) { try state.validate() }
+        }
     }
 }

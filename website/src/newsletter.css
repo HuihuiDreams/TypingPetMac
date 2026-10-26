@@ -9,3 +9,6 @@
 @media(max-width:1050px){.newsletter-section{gap:40px}.newsletter-copy h2{font-size:36px}}
 @media(max-width:760px){.newsletter-section{grid-template-columns:1fr;gap:28px;padding-block:45px 55px}.newsletter-copy h2{font-size:32px}.newsletter-card{padding:23px}.newsletter-copy>p{font-size:13px}.newsletter-note{font-size:10px;margin-top:18px}}
 @media(max-width:390px){.newsletter-fields{grid-template-columns:1fr;gap:17px}.newsletter-card{padding:20px}}
+.newsletter-privacy h4{font-size:11px;line-height:1.6;margin:13px 0 4px}
+.newsletter-privacy ul{margin:5px 0 10px;padding-left:20px;display:grid;gap:3px;font-size:11px;line-height:1.65}
+.newsletter-privacy a{font-weight:650;text-decoration:underline;text-underline-offset:2px}

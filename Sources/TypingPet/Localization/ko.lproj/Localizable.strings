@@ -65,7 +65,25 @@
 "Check for updates automatically" = "자동으로 업데이트 확인";
 "Checking for Updates…" = "업데이트 확인 중…";
 "Checking for updates…" = "업데이트를 확인하는 중이에요…";
-"Checks pet.miel.ing once a day. Only the app version is sent, and only updates with a verified signature are installed." = "하루에 한 번 pet.miel.ing에서 새 버전을 확인합니다. 앱 버전 외의 정보는 보내지 않으며, 서명을 확인한 업데이트만 설치합니다.";
+"Creator" = "제작자";
+"Creator: Miel" = "제작자: 미엘";
+"Website" = "홈페이지";
+"GitHub" = "GitHub";
+"Repository" = "저장소";
+"X" = "X";
+"Bug report or question" = "버그 리포트 또는 문의";
+"The email draft includes basic app and system details." = "메일 초안에 앱과 시스템의 기본 정보가 포함됩니다.";
+"Write an email" = "메일 문의";
+"Email copied" = "이메일 주소를 복사했어요";
+"Copy email address" = "이메일 주소 복사";
+"Typing Pet feedback" = "Typing Pet 버그 리포트 또는 문의";
+"Unknown" = "알 수 없음";
+"Describe the bug or question here." = "버그나 문의 내용을 여기에 작성해 주세요.";
+"App" = "앱";
+"Device model" = "기기 모델";
+"Architecture" = "아키텍처";
+"Development" = "DEV";
+"Production" = "정식";
 "Choose" = "선택";
 "Choose Idle Image" = "대기 이미지 선택";
 "Choose Key Reaction Image" = "키 반응 이미지 선택";
@@ -366,6 +384,7 @@
 "Enter a name for the pack and each preset." = "팩과 각 프리셋의 이름을 입력해 주세요.";
 "Give presets any name and reuse them across keys and reactions." = "프리셋 이름을 자유롭게 지정하고 여러 키와 반응에 사용하세요.";
 "Image Presets" = "이미지 프리셋";
+"No supported image files were dropped." = "지원하는 이미지 파일을 놓아 주세요.";
 "Image Presets · Select Multiple" = "이미지 프리셋 · 여러 개 선택 가능";
 "Import Image Pack" = "이미지 팩 불러오기";
 "In Use" = "사용 중";
@@ -404,20 +423,20 @@
 "Unassigned" = "입력 중일 때";
 "Unsaved Changes" = "저장되지 않은 변경";
 "Uses Unassigned settings" = "‘입력 중일 때’ 설정을 사용합니다";
-"Your Little Companion" = "나의 작은 친구";
 
 // Native pack workspace
 "%1$@ presets" = "프리셋 %1$@개";
 "A pack with this name already exists." = "같은 이름의 팩이 이미 있습니다.";
 "Add an image before using this pack." = "이 팩을 사용하려면 먼저 이미지를 추가하세요.";
 "Add the first image to this pack." = "팩에 첫 이미지를 추가해 주세요.";
-"Changes saved automatically." = "변경사항이 자동으로 저장됩니다.";
+"Changes saved automatically." = "변경사항이 바로 적용됩니다.";
 "Check Again" = "다시 확인";
 "Close" = "닫기";
 "Create" = "만들기";
 "Create Pack" = "새 세트 만들기";
 "Create an empty pack, then add your images." = "빈 세트를 만든 뒤 이미지를 추가합니다.";
 "Delete Image" = "이미지 삭제";
+"Deleting the active set switches to “%1$@”. Original images will not be changed." = "사용 중인 세트를 삭제하면 ‘%1$@’ 세트로 전환됩니다. 원본 이미지는 변경되지 않습니다.";
 "Delete preset “%1$@”?" = "프리셋 “%1$@”을 삭제할까요?";
 "Edit Presets" = "프리셋 수정";
 "Empty Pack" = "빈 팩";
@@ -428,7 +447,7 @@
 "Select %1$@" = "%1$@ 선택";
 "The first image is used for Unassigned and IDLE. You can change them in Keyboard Mapping." = "첫 이미지는 입력 중일 때와 쉬고 있을 때에 사용됩니다. 키보드 매핑에서 바꿀 수 있습니다.";
 "Toggle Sidebar" = "사이드바 보기/가리기";
-"Use Set" = "세트 사용";
+"Use This Set" = "이 세트 사용";
 "Use another pack before deleting the last image in the active pack." = "사용 중인 팩의 마지막 이미지를 삭제하려면 먼저 다른 팩을 사용하세요.";
 "Using %1$@" = "%1$@ 사용 중";
 
@@ -445,11 +464,15 @@
 "Built-in presets are fixed. Duplicate to edit them." = "기본 프리셋은 고정되어 있어요. 복제해서 수정할 수 있어요.";
 "No images yet" = "아직 이미지가 없어요";
 "The first image is used while typing and while resting." = "첫 이미지는 ‘입력 중일 때’와 ‘쉬고 있을 때’에 사용됩니다.";
+"Touch ID / Power Button" = "Touch ID / 전원 버튼";
 "When Resting" = "쉬고 있을 때";
 "Multiple selections allowed" = "여러 개 선택 가능";
-"Common Keys" = "자주 쓰는 키";
 "Space" = "스페이스";
 "Enter" = "엔터";
-"Quick setup for %1$@" = "%1$@ 빠른 설정";
 "Click a key to edit its presets." = "키를 클릭하면 프리셋 설정이 열립니다.";
 "Edit %1$@" = "%1$@ 프리셋 수정";
+
+/* Settings navigation */
+"Back" = "뒤로";
+"Forward" = "앞으로";
+"Navigate Settings" = "설정 탐색";

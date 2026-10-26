@@ -94,10 +94,31 @@ private struct PopoverCoordinateRoot: NSViewRepresentable {
     func updateNSView(_ nsView: NSView, context: Context) { controller.registerCoordinateView(nsView) }
 }
 
+private struct CursorRegion: NSViewRepresentable {
+    let cursor: NSCursor
+    func makeNSView(context: Context) -> CursorRegionView { CursorRegionView(cursor: cursor) }
+    func updateNSView(_ view: CursorRegionView, context: Context) {
+        view.cursor = cursor
+        view.window?.invalidateCursorRects(for: view)
+    }
+}
+
+@MainActor
+private final class CursorRegionView: NSView {
+    var cursor: NSCursor
+    init(cursor: NSCursor) { self.cursor = cursor; super.init(frame: .zero) }
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+    override func resetCursorRects() { addCursorRect(bounds, cursor: cursor) }
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+}
+
 struct NativeSetWorkspace: View {
     @ObservedObject private var localization = AppLocalization.shared
     @ObservedObject var editor: PackEditorModel
     @StateObject private var popovers: PackPopoverController
+    @State private var isGalleryDropTargeted = false
+    @State private var hoveredPresetID: String?
+    @State private var targetedKeyCodes = Set<UInt16>()
     init(editor: PackEditorModel) {
         self.editor = editor
         _popovers = StateObject(wrappedValue: PackPopoverController(editor: editor))
@@ -115,7 +136,6 @@ struct NativeSetWorkspace: View {
         .background(Color(nsColor: .windowBackgroundColor))
         .background(PopoverCoordinateRoot(controller: popovers))
         .coordinateSpace(name: "set-workspace")
-        .tint(.teal)
         .environment(\.locale, localization.locale)
         .onChange(of: editor.selectedSetID) { _ in popovers.close() }
         .onChange(of: editor.modifiers) { _ in popovers.updateModifiers() }
@@ -131,27 +151,32 @@ struct NativeSetWorkspace: View {
         HStack(alignment: .center, spacing: 14) {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 8) {
-                    Text(editor.draft.name).font(.system(size: 22, weight: .semibold)).lineLimit(2)
-                    if editor.isActive { Label(L("In Use"), systemImage: "checkmark.circle.fill").font(.caption).foregroundStyle(.teal).fixedSize() }
+                    Text(editor.displayConfiguration.name).font(.system(size: 22, weight: .semibold)).lineLimit(2)
+                    if editor.isActive { Label(L("In Use"), systemImage: "checkmark.circle.fill").font(.caption).foregroundStyle(Color.accentColor).fixedSize() }
+                    Button {
+                        popovers.close()
+                        do { try editor.duplicatePack() } catch { editor.errorMessage = error.localizedDescription }
+                    } label: { Label(L("Duplicate"), systemImage: "plus.square.on.square") }
+                    .buttonStyle(.bordered)
+                    .controlSize(.regular)
+                    .disabled(!editor.canEdit)
+                    if !editor.selectedSet.isBuiltIn {
+                        Menu {
+                            Button(L("Rename")) { popovers.close(); editor.renamePack(editor.selectedSet) }
+                            Button(L("Delete")) { popovers.close(); editor.removePack(editor.selectedSet) }
+                        } label: { Image(systemName: "ellipsis") }
+                        .menuStyle(.borderedButton).controlSize(.regular).fixedSize().accessibilityLabel(L("Set Options"))
+                    }
                 }
-                Text(editor.isActive ? L("Changes apply immediately.") : L("Changes saved automatically."))
+                Text(L("Changes saved automatically."))
                     .font(.caption).foregroundStyle(.secondary)
             }
             Spacer(minLength: 8)
             if !editor.isActive {
-                Button(L("Use Set")) { editor.activate(editor.selectedSet) }.disabled(!editor.canEdit || !editor.draft.isUsable)
-            }
-            Button {
-                popovers.close()
-                do { try editor.duplicatePack() } catch { editor.errorMessage = error.localizedDescription }
-            } label: { Label(L("Duplicate"), systemImage: "plus.square.on.square") }
-            .disabled(!editor.canEdit)
-            if !editor.selectedSet.isBuiltIn {
-                Menu {
-                    Button(L("Rename")) { popovers.close(); editor.renamePack(editor.selectedSet) }
-                    Button(L("Delete")) { popovers.close(); editor.removePack(editor.selectedSet) }.disabled(editor.isActive)
-                } label: { Image(systemName: "ellipsis") }
-                .menuStyle(.borderlessButton).fixedSize().accessibilityLabel(L("Set Options"))
+                Button(L("Use This Set")) { editor.activate(editor.selectedSet) }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    .disabled(!editor.canEdit || !editor.draft.isUsable)
             }
         }
     }
@@ -173,17 +198,38 @@ struct NativeSetWorkspace: View {
                 .frame(maxWidth: .infinity).padding(30).modifier(SetSurface(radius: 14))
             } else {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 100, maximum: 180))], spacing: 10) {
-                    ForEach(editor.draft.presets) { preset in
+                    ForEach(editor.displayConfiguration.presets) { preset in
                         Group {
-                            if editor.selectedSet.isBuiltIn { galleryTile(preset) }
+                            if editor.selectedSet.isBuiltIn {
+                                galleryTile(preset, hovered: hoveredPresetID == preset.id)
+                                    .onHover { hovering in updatePresetHover(preset.id, hovering: hovering) }
+                                    .onDrag { Self.presetProvider(preset.id) }
+                            }
                             else {
-                                Button { popovers.toggle(.preset(preset.id), anchor: "preset:" + preset.id) } label: { galleryTile(preset) }
+                                Button { popovers.toggle(.preset(preset.id), anchor: "preset:" + preset.id) } label: { galleryTile(preset, hovered: hoveredPresetID == preset.id) }
                                     .buttonStyle(.plain).disabled(!editor.canEdit)
                                     .background(PopoverAnchor(id: "preset:" + preset.id, controller: popovers))
                                     .accessibilityLabel(L("Edit %1$@", preset.name))
+                                    .onHover { hovering in updatePresetHover(preset.id, hovering: hovering) }
+                                    .onDrag { Self.presetProvider(preset.id) }
                             }
                         }
-                        .onDrag { NSItemProvider(object: preset.id as NSString) }
+                    }
+                    if editor.canEditPresets {
+                        Button { popovers.close(); editor.addPresets() } label: {
+                            VStack(spacing: 9) {
+                                Image(systemName: "plus").font(.system(size: 25, weight: .medium))
+                                Text(L("Add Images…")).font(.caption)
+                            }
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 122)
+                            .background(RoundedRectangle(cornerRadius: 10).fill(Color.primary.opacity(0.025)))
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.secondary.opacity(0.5), style: StrokeStyle(lineWidth: 1, dash: [5, 4])))
+                            .contentShape(RoundedRectangle(cornerRadius: 10))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(L("Add Images…"))
                     }
                 }
                 .padding(13).modifier(SetSurface(radius: 14))
@@ -193,34 +239,107 @@ struct NativeSetWorkspace: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
         }
+        .overlay {
+            if isGalleryDropTargeted {
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(Color.accentColor, style: StrokeStyle(lineWidth: 2, dash: [7, 5]))
+                    .allowsHitTesting(false)
+            }
+        }
+        .onDrop(of: [UTType.fileURL], isTargeted: $isGalleryDropTargeted, perform: importDroppedImages)
     }
-    private func galleryTile(_ preset: PetImagePreset) -> some View {
+
+    private func importDroppedImages(_ providers: [NSItemProvider]) -> Bool {
+        guard editor.canEditPresets else { return false }
+        let fileProviders = providers.filter { $0.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) }
+        guard !fileProviders.isEmpty else { return false }
+
+        let group = DispatchGroup()
+        let lock = NSLock()
+        var urls = Array<URL?>(repeating: nil, count: fileProviders.count)
+        for (index, provider) in fileProviders.enumerated() {
+            group.enter()
+            provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
+                defer { group.leave() }
+                guard let url = Self.fileURL(from: item),
+                      FolderImageSelection.supportedExtensions.contains(url.pathExtension.lowercased()) else { return }
+                lock.lock()
+                urls[index] = url
+                lock.unlock()
+            }
+        }
+        group.notify(queue: .main) {
+            lock.lock()
+            let images = urls.compactMap { $0 }
+            lock.unlock()
+            guard !images.isEmpty else {
+                editor.errorMessage = L("No supported image files were dropped.")
+                return
+            }
+            let scoped = images.map { ($0, $0.startAccessingSecurityScopedResource()) }
+            editor.addPresets(from: images)
+            scoped.forEach { url, started in if started { url.stopAccessingSecurityScopedResource() } }
+            popovers.close()
+        }
+        return true
+    }
+
+    private static func fileURL(from item: NSSecureCoding?) -> URL? {
+        if let url = item as? URL { return url }
+        if let url = item as? NSURL { return url as URL }
+        if let data = item as? Data { return URL(dataRepresentation: data, relativeTo: nil) }
+        if let string = item as? String { return URL(string: string) }
+        return nil
+    }
+    private func galleryTile(_ preset: PetImagePreset, hovered: Bool) -> some View {
         VStack(spacing: 7) {
             SetArtwork(image: editor.image(for: preset)).frame(height: 64)
-            Text(preset.name).font(.caption).lineLimit(2)
+            Text(preset.name).font(.caption).lineLimit(2).frame(height: 30)
         }
-        .padding(10).frame(maxWidth: .infinity).contentShape(Rectangle())
+        .padding(10).frame(maxWidth: .infinity).frame(height: 122).contentShape(RoundedRectangle(cornerRadius: 10))
+        .background(CursorRegion(cursor: .pointingHand))
+        .background(RoundedRectangle(cornerRadius: 10).fill(hovered ? Color.accentColor.opacity(0.09) : Color.clear))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(hovered ? Color.accentColor.opacity(0.45) : Color.primary.opacity(0.07), lineWidth: 1))
+        .animation(.easeOut(duration: 0.12), value: hovered)
+    }
+    private func dropTargetBinding(for key: KeyboardLayoutKey) -> Binding<Bool> {
+        guard let code = key.code else { return .constant(false) }
+        return Binding(
+            get: { targetedKeyCodes.contains(code) },
+            set: { targeted in
+                if targeted { targetedKeyCodes.insert(code) }
+                else { targetedKeyCodes.remove(code) }
+            }
+        )
+    }
+    private func updatePresetHover(_ id: String, hovering: Bool) {
+        if hovering {
+            hoveredPresetID = id
+        } else {
+            if hoveredPresetID == id { hoveredPresetID = nil }
+        }
+    }
+    private static func presetProvider(_ id: String) -> NSItemProvider {
+        let provider = NSItemProvider()
+        provider.registerDataRepresentation(forTypeIdentifier: UTType.plainText.identifier, visibility: .all) { completion in
+            completion(id.data(using: .utf8), nil)
+            return nil
+        }
+        return provider
     }
     private var mapping: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text(L("Keyboard Mapping")).font(.headline)
             HStack(spacing: 10) { behavior(.unassigned); behavior(.idle) }
-            SetToolsLayout {
-                VStack(alignment: .leading, spacing: 7) {
-                    HStack(spacing: 7) {
-                        Text(L("Modifier Combination"))
-                        Text(L("Multiple selections allowed")).font(.caption)
-                    }.font(.callout).foregroundStyle(.secondary)
-                    HStack(spacing: 10) {
-                        modifier(.control, symbol: "⌃", name: "Control")
-                        modifier(.option, symbol: "⌥", name: "Option")
-                        modifier(.shift, symbol: "⇧", name: "Shift")
-                        modifier(.command, symbol: "⌘", name: "Command")
-                    }
-                }
-                VStack(alignment: .leading, spacing: 7) {
-                    Text(L("Common Keys")).font(.callout).foregroundStyle(.secondary)
-                    HStack(spacing: 7) { quickKey(49, name: L("Space"), symbol: "space"); quickKey(36, name: L("Enter"), symbol: "return") }
+            VStack(alignment: .leading, spacing: 7) {
+                HStack(spacing: 7) {
+                    Text(L("Modifier Combination"))
+                }.font(.callout).foregroundStyle(.secondary)
+                HStack(spacing: 10) {
+                    modifier(.control, symbol: "⌃", name: "Control")
+                    modifier(.option, symbol: "⌥", name: "Option")
+                    modifier(.shift, symbol: "⇧", name: "Shift")
+                    modifier(.command, symbol: "⌘", name: "Command")
                 }
             }
             GeometryReader { geometry in
@@ -239,20 +358,6 @@ struct NativeSetWorkspace: View {
             Text(symbol + " " + name).font(.callout)
         }.toggleStyle(.checkbox).fixedSize().accessibilityLabel(name)
     }
-    private func quickKey(_ code: UInt16, name: String, symbol: String) -> some View {
-        let target = PackEditorTarget.key(KeyStroke(keyCode: code, modifiers: editor.modifiers))
-        let anchor = "quick:\(code)"
-        return Button { popovers.toggle(.mapping(target), anchor: anchor) } label: {
-            HStack(spacing: 6) {
-                if let id = editor.selection(for: target).presetIDs.first { SetArtwork(image: editor.image(id: id)).frame(width: 20, height: 20) }
-                else { Image(systemName: symbol) }
-                Text(name)
-            }
-        }
-        .disabled(!editor.canEdit || editor.draft.presets.isEmpty)
-        .background(PopoverAnchor(id: anchor, controller: popovers))
-        .accessibilityLabel(L("Quick setup for %1$@", editor.modifiers.displayPrefix + name))
-    }
     private func behavior(_ target: PackEditorTarget) -> some View {
         let value = editor.selection(for: target)
         let anchor = target == .idle ? "idle" : "unassigned"
@@ -270,7 +375,7 @@ struct NativeSetWorkspace: View {
                 Image(systemName: "ellipsis").foregroundStyle(.secondary)
             }
             .padding(14).frame(maxWidth: .infinity, minHeight: 68).modifier(SetSurface(radius: 13))
-            .overlay(RoundedRectangle(cornerRadius: 13).stroke(popovers.target == .mapping(target) ? Color.teal : .clear))
+            .overlay(RoundedRectangle(cornerRadius: 13).stroke(popovers.target == .mapping(target) ? Color.accentColor : .clear))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain).disabled(!editor.canEdit || editor.draft.presets.isEmpty)
@@ -289,11 +394,13 @@ struct NativeSetWorkspace: View {
     private func keyboardRow(_ row: [KeyboardLayoutKey], function: Bool) -> some View {
         let flexibleID = row.last(where: { $0.width > 1 })?.id
         let extra = KeyboardMetrics.innerWidth - CGFloat(row.count - 1) * KeyboardMetrics.gap - row.reduce(0) { $0 + $1.width } * KeyboardMetrics.keySize
-        let functionWidth = (KeyboardMetrics.innerWidth - CGFloat(row.count - 1) * KeyboardMetrics.gap) / CGFloat(row.count)
+        let hardwareKey = function ? row.first(where: \.isHardwareKey) : nil
+        let standardFunctionCount = row.count - (hardwareKey == nil ? 0 : 1)
+        let functionWidth = (KeyboardMetrics.innerWidth - CGFloat(row.count - 1) * KeyboardMetrics.gap - (hardwareKey == nil ? 0 : KeyboardMetrics.functionHeight)) / CGFloat(max(standardFunctionCount, 1))
         return HStack(spacing: KeyboardMetrics.gap) {
             ForEach(row) { key in
                 framedKey(key,
-                          width: function ? functionWidth : KeyboardMetrics.keySize * key.width + (key.id == flexibleID ? extra : 0),
+                          width: function ? (key.isHardwareKey ? KeyboardMetrics.functionHeight : functionWidth) : KeyboardMetrics.keySize * key.width + (key.id == flexibleID ? extra : 0),
                           height: function ? KeyboardMetrics.functionHeight : KeyboardMetrics.keySize,
                           function: function)
             }
@@ -328,10 +435,16 @@ struct NativeSetWorkspace: View {
         let target = key.code.map { PackEditorTarget.key(KeyStroke(keyCode: $0, modifiers: editor.modifiers)) }
         let value = target.map(editor.selection)
         let selected = target != nil && popovers.target == target.map(PackPopoverController.Target.mapping)
+        let dropTargeted = key.code.map { targetedKeyCodes.contains($0) } ?? false
         let anchor = "key:" + (key.code.map(String.init) ?? key.label)
         return Button { if let target { popovers.toggle(.mapping(target), anchor: anchor) } } label: {
             Group {
-                if compact {
+                if key.isHardwareKey {
+                    Image(systemName: "touchid")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if compact {
                     HStack(spacing: 2) {
                         Text(key.label).font(.system(size: 11)).foregroundStyle(.secondary)
                         Spacer(minLength: 0)
@@ -351,13 +464,13 @@ struct NativeSetWorkspace: View {
             .padding(4).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .contentShape(Rectangle())
         }
-        .buttonStyle(KeycapButtonStyle(selected: selected)).disabled(target == nil || !editor.canEdit || editor.draft.presets.isEmpty)
-        .accessibilityLabel(target?.title ?? key.label)
+        .buttonStyle(KeycapButtonStyle(selected: selected, dropTargeted: dropTargeted)).disabled(target == nil || !editor.canEdit || editor.draft.presets.isEmpty)
+        .accessibilityLabel(target?.title ?? (key.isHardwareKey ? L("Touch ID / Power Button") : key.label))
         .accessibilityValue(value?.presetIDs.map(editor.name).joined(separator: ", ") ?? "")
-        .onDrop(of: [UTType.plainText], isTargeted: nil) { providers in
+        .onDrop(of: [UTType.plainText], isTargeted: dropTargetBinding(for: key)) { providers in
             guard let code = key.code, let provider = providers.first else { return false }
-            _ = provider.loadObject(ofClass: String.self) { value, _ in
-                guard let value else { return }
+            _ = provider.loadDataRepresentation(forTypeIdentifier: UTType.plainText.identifier) { data, _ in
+                guard let data, let value = String(data: data, encoding: .utf8) else { return }
                 DispatchQueue.main.async {
                     let stroke = KeyStroke(keyCode: code, modifiers: editor.modifiers)
                     editor.assignPreset(value, to: stroke)
@@ -384,37 +497,22 @@ private enum KeyboardMetrics {
 
 private struct KeycapButtonStyle: ButtonStyle {
     let selected: Bool
+    let dropTargeted: Bool
     @Environment(\.isEnabled) private var isEnabled
     @State private var hovering = false
 
     func makeBody(configuration: Configuration) -> some View {
-        let highlighted = isEnabled && (hovering || configuration.isPressed || selected)
+        let highlighted = isEnabled && (hovering || configuration.isPressed || selected || dropTargeted)
         return configuration.label
             .background(RoundedRectangle(cornerRadius: 6).fill(
-                highlighted ? Color.teal.opacity(configuration.isPressed ? 0.22 : selected ? 0.14 : 0.09) : Color(nsColor: .controlBackgroundColor)))
+                dropTargeted ? Color.accentColor.opacity(0.36) : highlighted ? Color.accentColor.opacity(configuration.isPressed ? 0.22 : selected ? 0.14 : 0.09) : Color(nsColor: .controlBackgroundColor)))
             .overlay(RoundedRectangle(cornerRadius: 6).stroke(
-                highlighted ? Color.teal.opacity(selected ? 1 : 0.65) : Color.primary.opacity(0.10), lineWidth: highlighted ? 1.5 : 0.6))
+                dropTargeted ? Color.accentColor : highlighted ? Color.accentColor.opacity(selected ? 1 : 0.65) : Color.primary.opacity(0.10), lineWidth: dropTargeted ? 2 : highlighted ? 1.5 : 0.6))
+            .shadow(color: dropTargeted ? Color.accentColor.opacity(0.85) : .clear, radius: dropTargeted ? 10 : 0)
+            .scaleEffect(dropTargeted ? 1.04 : 1)
+            .animation(.easeInOut(duration: 0.12), value: dropTargeted)
             .opacity(isEnabled ? 1 : 0.4)
             .onHover { hovering = $0 }
-    }
-}
-
-/// Wrap the two control groups without creating duplicate popover anchors.
-private struct SetToolsLayout: Layout {
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
-        let horizontal = sizes.reduce(0) { $0 + $1.width } + 24 <= (proposal.width ?? .infinity)
-        return CGSize(width: proposal.width ?? sizes.reduce(0) { $0 + $1.width } + 24,
-                      height: horizontal ? sizes.map(\.height).max() ?? 0 : sizes.reduce(0) { $0 + $1.height } + 14)
-    }
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
-        let horizontal = sizes.reduce(0) { $0 + $1.width } + 24 <= bounds.width
-        var point = bounds.origin
-        for (index, view) in subviews.enumerated() {
-            view.place(at: point, anchor: .topLeading, proposal: ProposedViewSize(sizes[index]))
-            if horizontal { point.x += sizes[index].width + 24 } else { point.y += sizes[index].height + 14 }
-        }
     }
 }
 
@@ -429,7 +527,7 @@ private struct PackPopoverContent: View {
             case .preset(let id): GalleryPresetPopover(editor: editor, controller: controller, presetID: id).id(id)
             case nil: EmptyView()
             }
-        }.tint(.teal).environment(\.locale, localization.locale)
+        }.environment(\.locale, localization.locale)
     }
 }
 
@@ -454,17 +552,17 @@ private struct MappingPresetPopover: View {
             Text(value.presetIDs.isEmpty ? L("Uses Unassigned settings") : L("%1$@ selected", value.presetIDs.count)).font(.caption).foregroundStyle(.secondary)
             ScrollView {
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4), spacing: 8) {
-                    ForEach(editor.draft.presets) { preset in
+                    ForEach(editor.displayConfiguration.presets) { preset in
                         Button { editor.togglePreset(preset.id, for: target) } label: {
                             VStack(spacing: 5) {
                                 SetArtwork(image: editor.image(for: preset)).frame(height: 44)
                                 Text(preset.name).font(.caption).lineLimit(2)
                             }
                             .padding(8).frame(maxWidth: .infinity)
-                            .background(RoundedRectangle(cornerRadius: 9).fill(value.presetIDs.contains(preset.id) ? Color.teal.opacity(0.13) : Color(nsColor: .controlBackgroundColor)))
-                            .overlay(RoundedRectangle(cornerRadius: 9).stroke(value.presetIDs.contains(preset.id) ? Color.teal : Color.primary.opacity(0.10)))
+                            .background(RoundedRectangle(cornerRadius: 9).fill(value.presetIDs.contains(preset.id) ? Color.accentColor.opacity(0.13) : Color(nsColor: .controlBackgroundColor)))
+                            .overlay(RoundedRectangle(cornerRadius: 9).stroke(value.presetIDs.contains(preset.id) ? Color.accentColor : Color.primary.opacity(0.10)))
                             .overlay(alignment: .topTrailing) {
-                                if value.presetIDs.contains(preset.id) { Image(systemName: "checkmark.circle.fill").font(.caption).foregroundStyle(.teal).padding(4) }
+                                if value.presetIDs.contains(preset.id) { Image(systemName: "checkmark.circle.fill").font(.caption).foregroundStyle(Color.accentColor).padding(4) }
                             }.contentShape(Rectangle())
                         }
                         .buttonStyle(.plain).accessibilityLabel(preset.name).accessibilityAddTraits(value.presetIDs.contains(preset.id) ? .isSelected : [])

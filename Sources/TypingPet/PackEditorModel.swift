@@ -29,6 +29,7 @@ final class PackEditorModel: ObservableObject {
     @Published private(set) var statusMessage = ""
     private let onChange: (Bool) -> Void
     private var imageCache: [URL: NSImage] = [:]
+    var onSelectionChanged: ((UUID) -> Void)?
 
     init(store: PetPackStore, onChange: @escaping (Bool) -> Void = { _ in }) {
         self.store = store
@@ -47,6 +48,7 @@ final class PackEditorModel: ObservableObject {
     var canEdit: Bool { store.loadError == nil }
     var canEditPresets: Bool { canEdit && !selectedSet.isBuiltIn }
     var selectedPreset: PetImagePreset? { draft.presets.first { $0.id == selectedPresetID } }
+    var displayConfiguration: PetPackConfiguration { store.displayConfiguration(draft, for: selectedSet) }
 
     func refresh() {
         sets = store.library.imageSets
@@ -63,10 +65,11 @@ final class PackEditorModel: ObservableObject {
         selectedPresetID = draft.presets.first?.id ?? ""
         expandedTarget = nil
         statusMessage = ""
+        onSelectionChanged?(set.id)
     }
 
     func configuration(for set: PetImageSet) -> PetPackConfiguration {
-        set.id == selectedSetID ? draft : store.configuration(for: set)
+        set.id == selectedSetID ? displayConfiguration : store.configuration(for: set)
     }
 
     func image(for preset: PetImagePreset, in set: PetImageSet? = nil) -> NSImage? {
@@ -83,7 +86,7 @@ final class PackEditorModel: ObservableObject {
         let pack = configuration(for: set)
         return pack.presets.first(where: { $0.id == pack.idle.presetIDs.first }).flatMap { image(for: $0, in: set) }
     }
-    func name(id: String) -> String { draft.presets.first { $0.id == id }?.name ?? "" }
+    func name(id: String) -> String { displayConfiguration.presets.first { $0.id == id }?.name ?? "" }
 
     func selection(for target: PackEditorTarget) -> PresetSelection {
         switch target {
@@ -258,18 +261,30 @@ final class PackEditorModel: ObservableObject {
     }
 
     func removePack(_ set: PetImageSet) {
-        guard !set.isBuiltIn, set.id != activeSetID else { return }
+        guard !set.isBuiltIn else { return }
+        let wasActive = set.id == activeSetID
+        let replacementSet: PetImageSet? = {
+            guard wasActive, let index = sets.firstIndex(where: { $0.id == set.id }) else { return nil }
+            if index > 0 { return sets[index - 1] }
+            return sets.first { $0.id != set.id }
+        }()
         let alert = NSAlert()
         alert.messageText = L("Remove “%1$@” from the list?", configuration(for: set).name)
-        alert.informativeText = L("Original images will not be changed.")
+        alert.informativeText = if let replacementSet {
+            L("Deleting the active set switches to “%1$@”. Original images will not be changed.", configuration(for: replacementSet).name)
+        } else {
+            L("Original images will not be changed.")
+        }
         alert.addButton(withTitle: L("Remove"))
         alert.addButton(withTitle: L("Cancel"))
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         do {
             try store.library.deleteSet(id: set.id)
+            if let replacementSet { try store.library.activateSet(id: replacementSet.id) }
+            activeSetID = store.library.activeSetID
             sets = store.library.imageSets
-            if selectedSetID == set.id { selectSet(store.library.activeSet) }
-            onChange(false)
+            if selectedSetID == set.id { selectSet(replacementSet ?? store.library.activeSet) }
+            onChange(wasActive)
         } catch { errorMessage = error.localizedDescription }
     }
     func renamePack(_ set: PetImageSet) {
@@ -294,9 +309,10 @@ struct KeyboardLayoutKey: Identifiable {
     var code: UInt16?
     var label: String
     var width: CGFloat = 1
+    var isHardwareKey = false
     var id: String { "\(code.map(String.init) ?? label)-\(label)" }
     static let rows: [[KeyboardLayoutKey]] = [
-        [Self(code: 53, label: "esc")] + zip([122,120,99,118,96,97,98,100,101,109,103,111], 1...12).map { Self(code: UInt16($0.0), label: "F\($0.1)") },
+        [Self(code: 53, label: "esc")] + zip([122,120,99,118,96,97,98,100,101,109,103,111], 1...12).map { Self(code: UInt16($0.0), label: "F\($0.1)") } + [Self(code: nil, label: "Touch ID", isHardwareKey: true)],
         [Self(code:50,label:"`"),Self(code:18,label:"1"),Self(code:19,label:"2"),Self(code:20,label:"3"),Self(code:21,label:"4"),Self(code:23,label:"5"),Self(code:22,label:"6"),Self(code:26,label:"7"),Self(code:28,label:"8"),Self(code:25,label:"9"),Self(code:29,label:"0"),Self(code:27,label:"−"),Self(code:24,label:"="),Self(code:51,label:"⌫",width:1.5)],
         [Self(code:48,label:"⇥",width:1.5),Self(code:12,label:"Q"),Self(code:13,label:"W"),Self(code:14,label:"E"),Self(code:15,label:"R"),Self(code:17,label:"T"),Self(code:16,label:"Y"),Self(code:32,label:"U"),Self(code:34,label:"I"),Self(code:31,label:"O"),Self(code:35,label:"P"),Self(code:33,label:"["),Self(code:30,label:"]"),Self(code:42,label:"\\")],
         [Self(code:nil,label:"caps",width:1.8),Self(code:0,label:"A"),Self(code:1,label:"S"),Self(code:2,label:"D"),Self(code:3,label:"F"),Self(code:5,label:"G"),Self(code:4,label:"H"),Self(code:38,label:"J"),Self(code:40,label:"K"),Self(code:37,label:"L"),Self(code:41,label:";"),Self(code:39,label:"'"),Self(code:36,label:"↩",width:1.8)],

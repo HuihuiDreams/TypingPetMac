@@ -65,7 +65,25 @@
 "Check for updates automatically" = "Check for updates automatically";
 "Checking for Updates…" = "Checking for Updates…";
 "Checking for updates…" = "Checking for updates…";
-"Checks pet.miel.ing once a day. Only the app version is sent, and only updates with a verified signature are installed." = "Checks pet.miel.ing once a day. Only the app version is sent, and only updates with a verified signature are installed.";
+"Creator" = "Creator";
+"Creator: Miel" = "Creator: Miel";
+"Website" = "Website";
+"GitHub" = "GitHub";
+"Repository" = "Repository";
+"X" = "X";
+"Bug report or question" = "Bug report or question";
+"The email draft includes basic app and system details." = "The email draft includes basic app and system details.";
+"Write an email" = "Write an email";
+"Email copied" = "Email copied";
+"Copy email address" = "Copy email address";
+"Typing Pet feedback" = "Typing Pet feedback";
+"Unknown" = "Unknown";
+"Describe the bug or question here." = "Describe the bug or question here.";
+"App" = "App";
+"Device model" = "Device model";
+"Architecture" = "Architecture";
+"Development" = "Development";
+"Production" = "Production";
 "Choose" = "Choose";
 "Choose Idle Image" = "Choose Idle Image";
 "Choose Key Reaction Image" = "Choose Key Reaction Image";
@@ -366,6 +384,7 @@
 "Enter a name for the pack and each preset." = "Enter a name for the pack and each preset.";
 "Give presets any name and reuse them across keys and reactions." = "Give presets any name and reuse them across keys and reactions.";
 "Image Presets" = "Image Presets";
+"No supported image files were dropped." = "No supported image files were dropped.";
 "Image Presets · Select Multiple" = "Image Presets · Select Multiple";
 "Import Image Pack" = "Import Image Pack";
 "In Use" = "In Use";
@@ -404,20 +423,20 @@
 "Unassigned" = "Unassigned";
 "Unsaved Changes" = "Unsaved Changes";
 "Uses Unassigned settings" = "Uses Unassigned settings";
-"Your Little Companion" = "Your Little Companion";
 
 // Native pack workspace
 "%1$@ presets" = "%1$@ presets";
 "A pack with this name already exists." = "A pack with this name already exists.";
 "Add an image before using this pack." = "Add an image before using this pack.";
 "Add the first image to this pack." = "Add the first image to this pack.";
-"Changes saved automatically." = "Changes saved automatically.";
+"Changes saved automatically." = "Changes apply immediately.";
 "Check Again" = "Check Again";
 "Close" = "Close";
 "Create" = "Create";
 "Create Pack" = "Create Pack";
 "Create an empty pack, then add your images." = "Create an empty pack, then add your images.";
 "Delete Image" = "Delete Image";
+"Deleting the active set switches to “%1$@”. Original images will not be changed." = "Deleting the active set switches to “%1$@”. Original images will not be changed.";
 "Delete preset “%1$@”?" = "Delete preset “%1$@”?";
 "Edit Presets" = "Edit Presets";
 "Empty Pack" = "Empty Pack";
@@ -428,7 +447,7 @@
 "Select %1$@" = "Select %1$@";
 "The first image is used for Unassigned and IDLE. You can change them in Keyboard Mapping." = "The first image is used for Unassigned and IDLE. You can change them in Keyboard Mapping.";
 "Toggle Sidebar" = "Toggle Sidebar";
-"Use Set" = "Use Set";
+"Use This Set" = "Use This Set";
 "Use another pack before deleting the last image in the active pack." = "Use another pack before deleting the last image in the active pack.";
 "Using %1$@" = "Using %1$@";
 
@@ -445,11 +464,15 @@
 "Built-in presets are fixed. Duplicate to edit them." = "Built-in presets are fixed. Duplicate to edit them.";
 "No images yet" = "No images yet";
 "The first image is used while typing and while resting." = "The first image is used while typing and while resting.";
+"Touch ID / Power Button" = "Touch ID / Power Button";
 "When Resting" = "When Resting";
 "Multiple selections allowed" = "Select multiple";
-"Common Keys" = "Common Keys";
 "Space" = "Space";
 "Enter" = "Enter";
-"Quick setup for %1$@" = "Quick setup for %1$@";
 "Click a key to edit its presets." = "Click a key to edit its presets.";
 "Edit %1$@" = "Edit %1$@";
+
+/* Settings navigation */
+"Back" = "Back";
+"Forward" = "Forward";
+"Navigate Settings" = "Navigate Settings";

@@ -1,23 +1,23 @@
 import { Menu } from '@base-ui/react/menu';
-import { Check, ChevronDown } from 'lucide-react';
+import { Check, ChevronDown, Languages } from 'lucide-react';
 import { content, type Locale } from './content';
 import { locales, localeMetadata } from './localization';
 import { trackSiteEvent } from './analytics';
 
-export default function LanguagePicker({ locale, page }: { locale: Locale; page: 'home' | 'changelog' }) {
+export default function LanguagePicker({ locale, page }: { locale: Locale; page: 'home' | 'changelog' | 'unsubscribe' }) {
   const t = content[locale];
   return <Menu.Root>
     <Menu.Trigger className="language-switch" aria-label={`${t.languageLabel}: ${localeMetadata[locale].label}`}>
-      {localeMetadata[locale].label}<ChevronDown size={14} aria-hidden="true" />
+      <Languages size={15} aria-hidden="true" />{localeMetadata[locale].label}<ChevronDown size={14} aria-hidden="true" />
     </Menu.Trigger>
     <Menu.Portal>
       <Menu.Positioner className="ui-positioner" sideOffset={10} align="end" collisionPadding={12}>
         <Menu.Popup className="ui-popup language-options" aria-label={t.languageLabel}>
           {locales.map(language => <Menu.LinkItem key={language} className="ui-item" closeOnClick
-            href={`/${language}/${page === 'changelog' ? 'changelog/' : ''}`} hrefLang={language} lang={language}
+            href={`/${language}/${page === 'changelog' ? 'changelog/' : page === 'unsubscribe' ? 'unsubscribe/' : ''}`} hrefLang={language} lang={language}
             label={localeMetadata[language].label} aria-current={locale === language ? 'page' : undefined}
             onClick={event => {
-              event.currentTarget.href = `/${language}/${page === 'changelog' ? 'changelog/' : ''}` + window.location.search + window.location.hash;
+              event.currentTarget.href = `/${language}/${page === 'changelog' ? 'changelog/' : page === 'unsubscribe' ? 'unsubscribe/' : ''}` + window.location.search + window.location.hash;
               try { localStorage.setItem('typingpet-language', language); } catch {}
               if (language !== locale) trackSiteEvent({ event: 'language_changed', to_locale: language });
             }}>

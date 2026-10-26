@@ -28,12 +28,12 @@
 
    ```json
    {
-     "version": "0.18.0",
-     "build": 28
+     "version": "0.19.0",
+     "build": 31
    }
    ```
 
-3. 在 `CHANGELOG.md` 顶部添加 `## 0.18.0 - YYYY-MM-DD` 章节与详细变更说明。该段落将作为自动更新弹窗说明与 GitHub Release 发版日志。
+3. 在 `CHANGELOG.md` 顶部添加 `## 0.19.1 - YYYY-MM-DD` 章节与详细变更说明。该段落将作为自动更新弹窗说明与 GitHub Release 发版日志。安装说明中的版本链接也需同步更新。
 4. 提交所有源码、版本与文档（Git commit）。使用 `--github` 时需先将该 commit 推送到 GitHub 远程仓库。脚本不会自动进行源码 commit 或 push。
 5. 先运行只读预检，确认无误后再执行正式发布：
 
@@ -100,6 +100,11 @@
 发布新版本前，需在 `website/src/releases.json` 中添加该版本对应的中、英、日、韩语言标题与变更条目。
 缺少翻译将在构建签名阶段被拦截。
 
+在本机配置好官网部署环境后，在 `--github` 或 `--homebrew` 发布的版本公开后，
+将同步更新 `typing-pet.miel.ing` 的五种语言页面与更新说明。
+发布新版本前，需在 `website/src/releases.json` 中添加该版本对应的韩语、英语、日语、简体中文与繁体中文标题与变更条目。
+缺少翻译将在构建签名阶段被拦截。网站记录从 v0.16.0 开始。
+这些翻译也将同步用于应用更新弹窗中的多语言变更日志。即使不公开到 GitHub 或官网、仅部署至更新服务器时，也需备齐五种语言的变更记录。
 官网统一使用 `https://pet.miel.ing/latest?from=github&type=dmg`（或 zip）的下载跳转模式。
 若发布应用后仅官网部署失败，无需重新编译或发布应用，只需修复原因后在根目录下运行 `./scripts/deploy_website.sh` 即可。
 

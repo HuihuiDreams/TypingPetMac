@@ -92,6 +92,7 @@ struct PetPreferencesContractTests {
             AppPreferencesKey.legacyIdleFile,
             AppPreferencesKey.legacyReactionFiles,
             AppPreferencesKey.imagePackOrder,
+            AppPreferencesKey.builtInKeyboardDefaultsApplied,
             AppPreferencesKey.keyReactionRules,
             AppPreferencesKey.todoBubbleZoom,
             AppPreferencesKey.todoBubbleVisibility,
@@ -111,7 +112,7 @@ struct PetPreferencesContractTests {
             AppPreferencesKey.inputMonitoringSetupPending,
         ]
 
-        #expect(allKeys.count == 30)
+        #expect(allKeys.count == 31)
         let uniqueKeys = Set(allKeys)
         #expect(uniqueKeys.count == allKeys.count)
         for key in allKeys {
