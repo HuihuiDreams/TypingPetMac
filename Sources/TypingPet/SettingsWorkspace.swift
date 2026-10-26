@@ -76,7 +76,7 @@ private final class WorkspaceNavigation: ObservableObject {
 /// AppKit owns the actual window, toolbar, split divider, and sidebar selection.
 /// The integrated preset gallery and keyboard editor are native SwiftUI views.
 @MainActor
-final class SettingsWorkspaceController: NSSplitViewController, NSToolbarDelegate, NSSplitViewDelegate {
+final class SettingsWorkspaceController: NSSplitViewController, NSToolbarDelegate {
     private let editor: PackEditorModel
     private let navigation: WorkspaceNavigation
     private let historyID = NSToolbarItem.Identifier("TypingPetSettingsHistory")
