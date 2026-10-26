@@ -25,7 +25,11 @@ A lightweight native macOS (macOS 13+) desktop typing pet written in Swift (AppK
    - `Sources/TypingPet/main.swift` must stay an ultra-lean `@MainActor` bootstrap entry point (under 20 lines).
    - Decomposed components (`PetViews.swift`, `PetController.swift`, `GlobalKeyMonitor.swift`, `AppDelegate.swift`) should each remain focused, single-responsibility, and under 650 lines. Keep internal members `private` and top-level types `internal`.
 6. **Input Monitoring & Permissions (`CGEventTap`)** — Global keystroke tracking relies on `CGEventTap` (`.listenOnly`), requiring macOS "Input Monitoring" (`ListenEvent`) access. Never write tests that require live hardware key events in CI/headless environments (test event models, state stores, and geometry math instead). For local manual permission testing, reset authorization using `tccutil reset ListenEvent`.
-7. **Version & Bundle Synchronization** — When releasing a new version, update `CFBundleShortVersionString` and `CFBundleVersion` in `scripts/build_app.sh`, keep `CHANGELOG.md` in sync, and execute `./scripts/build_app.sh` to package `dist/TypingPet.app`.
+7. **Version & Bundle Synchronization** — When releasing a new version, update `version` and `build` in `version.json` (consumed by `scripts/build_app.sh` and `scripts/release.py`), promote `## [Unreleased]` in `CHANGELOG.md` to the new version section, and execute `./scripts/build_app.sh` to package `dist/TypingPet.app`.
+8. **Mandatory Post-Edit Synchronization (`CHANGELOG.md`, Tests, & Global Docs)** — After **any** code, script, or documentation change:
+   - **Always update `CHANGELOG.md`**: Record the change under `## [Unreleased]` (using `Added`, `Changed`, `Fixed`, `Security`). Never modify already-tagged release sections unless fixing a historical typo.
+   - **Always check & update tests + standalone CI scripts**: When modifying code or adding/renaming files or symbols, inspect `Tests/TypingPetTests/*` to add or update unit tests, and verify standalone compilation/check scripts in `scripts/` (specifically `./scripts/check_todo.sh`, `python3 -m unittest discover -s scripts -p 'test_release.py'`, and `./scripts/check_publish_update.sh`) so file lists and assertions stay in sync.
+   - **Always check global documentation**: Evaluate whether the change affects architectural components, trust boundaries, domain terms, or user workflows, and synchronously update `docs/architecture.md`, `docs/TypingPetMac-threat-model.md`, `GLOSSARY.md`, `docs/decisions/ADR-*.md`, or `README.md`.
 
 ## Commands
 
@@ -74,15 +78,15 @@ swift test --disable-sandbox
 - **Resources**: `Sources/TypingPet/Resources/` (`AppIcon.icns`, default cat frames `basic.png`, `left.png`, `right.png`).
 - **Tests**: `Tests/TypingPetTests/` (Swift Testing suites: `PetPreferencesContractTests`, `DiskCleanupTests`, `ThumbnailCacheTests`, `PetWindowGeometryTests`, `KeyReactionTests`, `FolderImageSelectionTests`, `ImagePickerTests`).
 - **Scripts**: `scripts/build_app.sh` (standalone bundle packager), `scripts/notarize_release.sh` (Developer ID notarization & stapling).
-- **Docs**: `GLOSSARY.md` (canonical domain terms), `docs/architecture.md`, `docs/decisions/` (ADR records, e.g. `ADR-001` through `ADR-004`), `CHANGELOG.md` (Keep a Changelog format).
+- **Docs**: `GLOSSARY.md` (canonical domain terms), `docs/architecture.md`, `docs/TypingPetMac-threat-model.md`, `docs/decisions/` (ADR records, e.g. `ADR-001` through `ADR-004`), `CHANGELOG.md` (Keep a Changelog format).
 
 ## Style & Engineering Standards
 
 - **Swift 6 & Swift Testing**: Uses Swift Testing framework (`import Testing`, `@Suite`, `@Test`, `#expect`, `#require`) over legacy XCTest.
-- **Zero Third-Party Dependencies**: No external SPM packages. Rely exclusively on Apple system frameworks (`AppKit`, `Foundation`, `CoreGraphics`, `QuartzCore`, `ServiceManagement`).
-- **ADRs**: Architectural decisions recorded in `docs/decisions/` as `ADR-NNN-xxx.md`. Update records when architectural boundaries change.
-- **CHANGELOG**: Maintain `CHANGELOG.md` following strict Keep a Changelog principles (`Added`, `Changed`, `Fixed`, `Security`). Keep updated before finishing tasks or tagging releases.
-- **Execution Loop**: Always follow: `Code edit -> Run tests (swift test) -> Package app (./scripts/build_app.sh) -> Verify -> Update CHANGELOG / ADR`.
+- **Zero Third-Party Dependencies**: No external SPM packages. Rely exclusively on Apple system frameworks (`AppKit`, `Foundation`, `CoreGraphics`, `QuartzCore`, `ServiceManagement`, `CryptoKit`).
+- **ADRs & Global Docs**: Architectural decisions recorded in `docs/decisions/` as `ADR-NNN-xxx.md`. Whenever architectural boundaries, security controls, or domain models change, synchronously update `docs/architecture.md`, `docs/TypingPetMac-threat-model.md`, `GLOSSARY.md`, and relevant ADRs.
+- **CHANGELOG**: Maintain `CHANGELOG.md` following strict Keep a Changelog principles (`Added`, `Changed`, `Fixed`, `Security`). Every unreleased modification must be recorded under `## [Unreleased]` before finishing the task.
+- **Execution Loop**: Always follow: `Code edit -> Check & update Tests/TypingPetTests/* and scripts/check_*.sh -> Run tests (swift test & ./scripts/check_todo.sh) -> Check & update global docs -> Update CHANGELOG.md (## [Unreleased])`.
 
 ## Gotchas
 

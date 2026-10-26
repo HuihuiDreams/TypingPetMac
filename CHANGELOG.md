@@ -1,5 +1,20 @@
 # 更新日志
 
+## [Unreleased]
+
+### Added
+
+- 新增领域模型词汇表（`GLOSSARY.md`）与架构决策记录 `ADR-002`（自研安全自动更新子系统）、`ADR-003`（统一动作包与预设映射模型）、`ADR-004`（双窗口伴生架构与非激活焦点安全不变量）。
+
+### Changed
+
+- 更新系统架构设计文档（`docs/architecture.md`）与威胁模型分析文档（`docs/TypingPetMac-threat-model.md`）至 `0.19.1`（Build 32）基准，完整覆盖自研安全自动更新子系统（ADR-002）、统一动作包模型（ADR-003）、双窗口伴生与非激活焦点安全（ADR-004）及发布管线二进制路径与密钥扫描守卫（`scripts/release.py`）。
+- 在 `AGENTS.md` 中明确每次变更后的强制同步清单：同步更新 `CHANGELOG.md`（`## [Unreleased]`）、核查并同步单元测试（`Tests/TypingPetTests/*`）与独立检查脚本（`scripts/check_*.sh`），以及按需同步全局架构与安全文档。
+
+### Fixed
+
+- 修复 `scripts/check_todo.sh` 独立编译待办检查工具时缺失 `Sources/TypingPet/PetPreferences.swift` 源文件依赖的问题。
+
 ## [0.19.1] - 2026-10-26
 
 ### Fixed
