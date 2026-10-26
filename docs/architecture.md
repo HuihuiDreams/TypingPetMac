@@ -36,6 +36,7 @@
 TypingPetMac/
 ├── Package.swift               # SPM 包定义（Swift 6.0 工具链，最低系统 macOS 13+）
 ├── AGENTS.md                   # Agent 开发指南与工程规范
+├── GLOSSARY.md                 # 领域模型词汇表（规范核心实体与交互术语）
 ├── CHANGELOG.md                # 变更日志（遵循 Keep a Changelog 格式）
 ├── README.md                   # 中文使用说明与下载指引
 ├── README.txt                  # 简要使用说明与启动提示（随包分发）
@@ -80,7 +81,10 @@ TypingPetMac/
 └── docs/
     ├── architecture.md         # [本文件] 整体系统架构与设计说明
     ├── decisions/              # 技术架构决策记录 (ADRs)
-    │   └── ADR-001-main-decomposition.md # 巨石 main.swift 拆分与偏好集中化
+    │   ├── ADR-001-main-decomposition.md                     # 巨石 main.swift 拆分与偏好集中化
+    │   ├── ADR-002-in-house-secure-updater.md                # 自研轻量级安全更新子系统 vs. 第三方框架
+    │   ├── ADR-003-unified-pet-pack-model.md                 # 动作包统一领域模型与预设表情映射
+    │   └── ADR-004-dual-window-companion-and-focus-safety.md # 双窗口伴生架构与非激活焦点安全契约
     └── archive/                # 历史归档文档
         └── fix_plan.md         # 历史代码质量审计与全量修复计划
 ```
@@ -280,6 +284,9 @@ sequenceDiagram
 关于本项目重大技术选择的详细权衡和设计细节，请参阅 **[技术决策记录 (ADRs)](./decisions/)**：
 
 1. **[ADR-001: 巨石 main.swift 模块化拆分与配置中心收敛](./decisions/ADR-001-main-decomposition.md)** — 将 1,397 行单文件解耦为单职责组件、建立 `PetPreferences` 集中配置并设立代码行数预算，彻底解决单元测试隔离与能耗守卫问题。
+2. **[ADR-002: 自研轻量级安全更新子系统 vs. 第三方框架](./decisions/ADR-002-in-house-secure-updater.md)** — 阐明在维持 100% 离线隐私与零外部 SPM 依赖约束下，采用 `URLSession.ephemeral` + `CryptoKit` (Ed25519) + `spctl` 公证与后置原子替换脚本的架构选型。
+3. **[ADR-003: 动作包统一领域模型与预设表情映射](./decisions/ADR-003-unified-pet-pack-model.md)** — 将分散的旧版图集目录与按键规则收敛为统一的 `PetPackConfiguration` 动作包，支持多帧循环/随机播放、独立游标与内置素材只读保护。
+4. **[ADR-004: 双窗口伴生架构与非激活焦点安全契约](./decisions/ADR-004-dual-window-companion-and-focus-safety.md)** — 确立桌宠主窗口（`PetPanel`，绝对非 Key）与伴生待办气泡（`TodoPanel`，临时可 Key）的双窗口分离，结合失焦/锁屏/点击外部主动释放焦点的安全防线，杜绝误截获用户打字。
 
 ---
 

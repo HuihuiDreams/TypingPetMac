@@ -74,7 +74,7 @@ swift test --disable-sandbox
 - **Resources**: `Sources/TypingPet/Resources/` (`AppIcon.icns`, default cat frames `basic.png`, `left.png`, `right.png`).
 - **Tests**: `Tests/TypingPetTests/` (Swift Testing suites: `PetPreferencesContractTests`, `DiskCleanupTests`, `ThumbnailCacheTests`, `PetWindowGeometryTests`, `KeyReactionTests`, `FolderImageSelectionTests`, `ImagePickerTests`).
 - **Scripts**: `scripts/build_app.sh` (standalone bundle packager), `scripts/notarize_release.sh` (Developer ID notarization & stapling).
-- **Docs**: `docs/architecture.md`, `docs/decisions/` (ADR records, e.g. `ADR-001-main-decomposition.md`), `CHANGELOG.md` (Keep a Changelog format).
+- **Docs**: `GLOSSARY.md` (canonical domain terms), `docs/architecture.md`, `docs/decisions/` (ADR records, e.g. `ADR-001` through `ADR-004`), `CHANGELOG.md` (Keep a Changelog format).
 
 ## Style & Engineering Standards
 

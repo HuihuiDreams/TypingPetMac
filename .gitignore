@@ -20,4 +20,8 @@ dist-dev/
 __pycache__/
 
 # Local planning and working drafts. Curated public writing lives in developer-notes/.
-/docs/
+/docs/*
+!/docs/decisions/
+!/docs/architecture.md
+!/docs/TypingPetMac-threat-model.md
+!/docs/archive/
