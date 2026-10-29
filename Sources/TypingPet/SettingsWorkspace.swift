@@ -73,6 +73,11 @@ private final class WorkspaceNavigation: ObservableObject {
     }
 }
 
+/// 自定义 NSSplitView，重写 drawDivider 为空实现，以消除设置侧边栏与主内容之间的竖直分割线。
+private final class SettingsSplitView: NSSplitView {
+    override func drawDivider(in rect: NSRect) {}
+}
+
 /// AppKit owns the actual window, toolbar, split divider, and sidebar selection.
 /// The integrated preset gallery and keyboard editor are native SwiftUI views.
 @MainActor
@@ -90,6 +95,7 @@ final class SettingsWorkspaceController: NSSplitViewController, NSToolbarDelegat
         editor = PackEditorModel(store: model.packStore, onChange: { reload in model.packDidChange(reload: reload) })
         navigation = WorkspaceNavigation(initialSetID: editor.selectedSetID)
         super.init(nibName: nil, bundle: nil)
+        splitView = SettingsSplitView()
         let sidebar = NSSplitViewItem(sidebarWithViewController: WorkspaceSidebarController(editor: editor, navigation: navigation))
         sidebar.minimumThickness = 240
         sidebar.maximumThickness = 320

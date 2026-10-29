@@ -8,12 +8,25 @@
 
 ### Changed
 
-- 更新系统架构设计文档（`docs/architecture.md`）与威胁模型分析文档（`docs/TypingPetMac-threat-model.md`）至 `0.19.1`（Build 32）基准，完整覆盖自研安全自动更新子系统（ADR-002）、统一动作包模型（ADR-003）、双窗口伴生与非激活焦点安全（ADR-004）及发布管线二进制路径与密钥扫描守卫（`scripts/release.py`）。
+- 同步上游原作者更新（v0.19.2、v0.19.3）：通过重写 `NSSplitView.drawDivider`（`SettingsSplitView`）移除设置窗口侧边栏与主内容之间的竖直分割线；同步版本号至 0.19.3（Build 35）及官网发布历史相对时间格式化支持；补充代码中文注释并解决合并冲突与日志错位。
+- 更新系统架构设计文档（`docs/architecture.md`）与威胁模型分析文档（`docs/TypingPetMac-threat-model.md`）至 `0.19.3`（Build 35）基准，完整覆盖自研安全自动更新子系统（ADR-002）、统一动作包模型（ADR-003）、双窗口伴生与非激活焦点安全（ADR-004）及发布管线二进制路径与密钥扫描守卫（`scripts/release.py`）。
 - 在 `AGENTS.md` 中明确每次变更后的强制同步清单：同步更新 `CHANGELOG.md`（`## [Unreleased]`）、核查并同步单元测试（`Tests/TypingPetTests/*`）与独立检查脚本（`scripts/check_*.sh`），以及按需同步全局架构与安全文档。
 
 ### Fixed
 
 - 修复 `scripts/check_todo.sh` 独立编译待办检查工具时缺失 `Sources/TypingPet/PetPreferences.swift` 源文件依赖的问题。
+
+## [0.19.3] - 2026-10-27
+
+### Changed
+
+- 移除设置面板侧边栏与主内容之间的竖直分隔线（使用自定义 `SettingsSplitView` 消除侧边栏边界）。
+
+## [0.19.2] - 2026-10-26
+
+### Changed
+
+- 移除设置侧边栏与内容之间的竖直分隔线并修复分割视图委托一致性。
 
 ## [0.19.1] - 2026-10-26
 
@@ -152,6 +165,14 @@
 - 隐私与健壮性防护：修复 Release 二进制中的本地路径泄漏（`#filePath` 仅在 DEBUG 模式下作为开发回退），消除不安全的强制解包。
 - 架构解耦与重构：集中收敛 UserDefaults 配置键 (`PetPreferences`)，彻底消除 `PetImageLibrary` 与 `KeyReactionStore` 的本地重复键；在 `GlobalKeyMonitor` 销毁与注销时显式失效 MachPort；为按键弹跳动画添加安全越界守卫；将 1397 行的巨石 `main.swift` 拆解为 `PetViews`, `GlobalKeyMonitor`, `PetController`, `AppDelegate` 与 11 行极简启动入口，并新增 ADR-001 决策记录。
 - 现代测试迁移：将单元测试全面迁移至原生 Swift Testing 框架，新增磁盘物理清理、缓存失效生命周期以及首选项存储契约 (`PetPreferencesContractTests`) 测试套件。
+
+## 0.19.3 - 2026-10-27
+
+- Remove the visible vertical divider between the Settings sidebar and main content.
+
+## 0.19.2 - 2026-10-26
+
+- Remove the visible divider line between the Settings sidebar and its content.
 
 ## 0.19.1 - 2026-10-26
 

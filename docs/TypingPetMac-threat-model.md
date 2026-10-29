@@ -1,12 +1,12 @@
 # TypingPetMac — Threat Model
 
-> Repo: `HuihuiDreams/TypingPetMac` (fork of `ynifamily3/TypingPetMac`), branch `main`, baseline v0.19.1 (Build 32).
+> Repo: `HuihuiDreams/TypingPetMac` (fork of `ynifamily3/TypingPetMac`), branch `main`, baseline v0.19.3 (Build 35).
 > Method: repo-grounded AppSec threat model. Every architectural claim is anchored to a repo path/symbol.
 > Context Validation: confirmed with maintainer — ad-hoc/unsigned distribution remains supported alongside notarized builds; update feeds are statically hosted with offline maintainer-held Ed25519 keys; Todo persistence is 100% local POSIX storage.
 
 ## Executive summary
 
-TypingPetMac is a native macOS desktop companion app (`LSUIElement`, `ing.miel.typingpet`) that combines a borderless floating desktop pet with companion utilities (Todo list, Pomodoro timer) and an in-house auto-updater. The application's defining high-value security asset is that it **holds the macOS "Input Monitoring" (`ListenEvent`) TCC privilege and continuously observes global keystroke events** via `CGEventTap` (`GlobalKeyMonitor.swift:30-72`). Between v0.12.2 and v0.19.1, the system underwent three major architectural expansions: an in-house secure auto-update subsystem (ADR-002), a unified Pet Pack expression engine (ADR-003), and a dual-window companion architecture with interactive text input (ADR-004). 
+TypingPetMac is a native macOS desktop companion app (`LSUIElement`, `ing.miel.typingpet`) that combines a borderless floating desktop pet with companion utilities (Todo list, Pomodoro timer) and an in-house auto-updater. The application's defining high-value security asset is that it **holds the macOS "Input Monitoring" (`ListenEvent`) TCC privilege and continuously observes global keystroke events** via `CGEventTap` (`GlobalKeyMonitor.swift:30-72`). Between v0.12.2 and v0.19.3, the system underwent three major architectural expansions: an in-house secure auto-update subsystem (ADR-002), a unified Pet Pack expression engine (ADR-003), and a dual-window companion architecture with interactive text input (ADR-004). 
 
 The primary security risks concentrate in:
 1. **Distribution integrity & Gatekeeper bypass on a high-privilege binary (TM-001, TM-002)**: Ad-hoc/unsigned distribution remains an active delivery method requiring users to execute `xattr -cr` to bypass Gatekeeper. Because the app requests surveillance-grade `ListenEvent` TCC permissions, pre-authorization tampering of distributed zips presents high potential impact.

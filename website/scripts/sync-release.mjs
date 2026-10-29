@@ -15,6 +15,12 @@ const expectedUrl = `https://pet.miel.ing/update/production/TypingPet-${feed.ver
 if (feed.url !== expectedUrl || !/^[a-f0-9]{64}$/.test(feed.sha256)) throw new Error('Unexpected update archive URL or digest');
 const release = await getJson(`https://api.github.com/repos/ynifamily3/TypingPetMac/releases/tags/v${feed.version}`);
 if (release.draft || release.tag_name !== `v${feed.version}`) throw new Error('Matching GitHub release is not public');
+if (!release.published_at || !Number.isFinite(Date.parse(release.published_at))) throw new Error('Missing GitHub publication timestamp');
+const publicReleases = await getJson('https://api.github.com/repos/ynifamily3/TypingPetMac/releases?per_page=100');
+const releaseTimes = Object.fromEntries(publicReleases
+  .filter(item => !item.draft && /^v\d+\.\d+\.\d+$/.test(item.tag_name) && item.published_at && Number.isFinite(Date.parse(item.published_at)))
+  .map(item => [item.tag_name.slice(1), item.published_at]));
+releaseTimes[feed.version] = release.published_at;
 const asset = release.assets.find(a => a.name === `TypingPetMac-v${feed.version}-arm64.zip`);
 const checksum = release.assets.find(a => a.name === `TypingPetMac-v${feed.version}-arm64.zip.sha256`);
 if (!asset || !checksum || asset.size !== feed.size || asset.digest !== `sha256:${feed.sha256}`) throw new Error('GitHub ZIP does not match the update feed');
@@ -46,7 +52,7 @@ for (const note of notes) {
     }
   }
 }
-const output = { version: feed.version, build: feed.build, date: release.published_at.slice(0, 10), prerelease: release.prerelease,
+const output = { version: feed.version, build: feed.build, date: release.published_at.slice(0, 10), publishedAt: release.published_at, releaseTimes, prerelease: release.prerelease,
   size: feed.size, sha256: feed.sha256, url: feed.url, githubUrl: asset.browser_download_url,
   checksumUrl: checksum.browser_download_url, releaseUrl: release.html_url, minimumSystemVersion: feed.minimumSystemVersion, dmg };
 await mkdir(join(root, 'src/generated'), { recursive: true });
