@@ -57,6 +57,10 @@ internal final class PetController: NSObject, NSWindowDelegate {
     private var avoidanceBounds: NSRect?
     private var globalMouseMonitor: Any?
     private var localMouseMonitor: Any?
+    private var cachedRestingOpacity = PetController.savedRestingOpacity
+    private var cachedHoverOpacity = PetController.savedHoverOpacity
+    private var cachedAvoidsPointerWhenLocked = PetController.savedAvoidsPointerWhenLocked
+    private var cachedShakeLevel = PetController.savedShakeLevel
 
     init(
         library: PetImageLibrary,
@@ -170,9 +174,10 @@ internal final class PetController: NSObject, NSWindowDelegate {
     }
 
     var restingOpacity: CGFloat {
-        get { Self.savedRestingOpacity }
+        get { cachedRestingOpacity }
         set {
             let clamped = min(max(newValue, 0), 1)
+            cachedRestingOpacity = clamped
             AppEnvironment.defaults.set(Double(clamped), forKey: AppPreferencesKey.restingOpacity)
             updateMouseMonitoringState()
             updatePetOpacity()
@@ -180,9 +185,10 @@ internal final class PetController: NSObject, NSWindowDelegate {
     }
 
     var hoverOpacity: CGFloat {
-        get { Self.savedHoverOpacity }
+        get { cachedHoverOpacity }
         set {
             let clamped = min(max(newValue, 0), 1)
+            cachedHoverOpacity = clamped
             AppEnvironment.defaults.set(Double(clamped), forKey: AppPreferencesKey.hoverOpacity)
             updateMouseMonitoringState()
             updatePetOpacity()
@@ -190,8 +196,9 @@ internal final class PetController: NSObject, NSWindowDelegate {
     }
 
     var avoidsPointerWhenLocked: Bool {
-        get { Self.savedAvoidsPointerWhenLocked }
+        get { cachedAvoidsPointerWhenLocked }
         set {
+            cachedAvoidsPointerWhenLocked = newValue
             AppEnvironment.defaults.set(newValue, forKey: AppPreferencesKey.avoidsPointerWhenLocked)
             updateMouseMonitoringState()
             if newValue {
@@ -203,17 +210,19 @@ internal final class PetController: NSObject, NSWindowDelegate {
     }
 
     var shakeLevel: Int {
-        get { Self.savedShakeLevel }
+        get { cachedShakeLevel }
         set {
             let clamped = max(AppPreferencesDefault.minShakeLevel, min(newValue, AppPreferencesDefault.maxShakeLevel))
+            cachedShakeLevel = clamped
             AppEnvironment.defaults.set(clamped, forKey: AppPreferencesKey.shakeLevel)
         }
     }
 
     func handleKeystroke(_ stroke: KeyStroke? = nil) {
-        let pack = packStore.activeConfiguration
+        let set = library.activeSet
+        let pack = packStore.rawConfiguration(for: set)
         guard let id = playback.reaction(for: stroke, in: pack),
-              let chosenURL = packStore.imageURL(id: id, in: pack, set: library.activeSet) else { return }
+              let chosenURL = packStore.imageURL(id: id, in: pack, set: set) else { return }
 
         idleWorkItem?.cancel()
         showImage(at: chosenURL)
@@ -286,14 +295,16 @@ internal final class PetController: NSObject, NSWindowDelegate {
     }
 
     private func showIdleImage() {
-        let pack = packStore.activeConfiguration
+        let set = library.activeSet
+        let pack = packStore.rawConfiguration(for: set)
         guard let id = playback.idle(in: pack),
-              let idleURL = packStore.imageURL(id: id, in: pack, set: library.activeSet) else { return }
+              let idleURL = packStore.imageURL(id: id, in: pack, set: set) else { return }
         showImage(at: idleURL)
     }
 
     private func showImage(at url: URL) {
         guard let image = library.image(for: url) else { return }
+        if imageView.image === image, url.pathExtension.caseInsensitiveCompare("gif") != .orderedSame { return }
         imageView.image = nil
         imageView.image = image
     }
@@ -393,8 +404,8 @@ internal final class PetController: NSObject, NSWindowDelegate {
 
     private func updateMouseMonitoringState() {
         let needsMonitoring = panel.isVisible && (
-            abs(Self.savedRestingOpacity - Self.savedHoverOpacity) > 0.001 ||
-            (isPositionLocked && Self.savedAvoidsPointerWhenLocked)
+            abs(cachedRestingOpacity - cachedHoverOpacity) > 0.001 ||
+            (isPositionLocked && cachedAvoidsPointerWhenLocked)
         )
         needsMonitoring ? startMouseHoverMonitoring() : stopMouseHoverMonitoring()
     }
@@ -427,8 +438,8 @@ internal final class PetController: NSObject, NSWindowDelegate {
         guard panel.isVisible, let imageLayer = imageView.layer else { return }
         let targetOpacity = PetOpacityBehavior.opacity(
             isHovering: panel.frame.contains(NSEvent.mouseLocation),
-            restingOpacity: Self.savedRestingOpacity,
-            hoverOpacity: Self.savedHoverOpacity
+            restingOpacity: cachedRestingOpacity,
+            hoverOpacity: cachedHoverOpacity
         )
         guard abs(CGFloat(imageLayer.opacity) - targetOpacity) > 0.001 else { return }
         CATransaction.begin()

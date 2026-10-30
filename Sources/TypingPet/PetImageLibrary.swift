@@ -142,7 +142,10 @@ final class PetImageLibrary {
         set { defaults.set(newValue.uuidString, forKey: Keys.activeSetID) }
     }
 
-    var activeSet: PetImageSet { imageSets.first { $0.id == activeSetID } ?? Self.builtInSet }
+    var activeSet: PetImageSet {
+        let id = activeSetID
+        return id == Self.builtInID ? Self.builtInSet : (customSets.first { $0.id == id } ?? Self.builtInSet)
+    }
     var idleURL: URL? { idleURL(for: activeSet) }
     var reactionURLs: [URL] { reactionURLs(for: activeSet) }
     var usesCustomImages: Bool { activeSetID != Self.builtInID }
@@ -191,7 +194,7 @@ final class PetImageLibrary {
     }
 
     func activateSet(id: UUID) throws {
-        guard imageSets.contains(where: { $0.id == id }) else { throw PetImageLibraryError.imageSetNotFound }
+        guard id == Self.builtInID || customSets.contains(where: { $0.id == id }) else { throw PetImageLibraryError.imageSetNotFound }
         let previousSet = activeSet
         activeSetID = id
         if previousSet.id != id {
@@ -434,7 +437,8 @@ final class PetImageLibrary {
     }
 
     private func repairActiveSelection() {
-        if !imageSets.contains(where: { $0.id == activeSetID }) || (activeSetID != Self.builtInID && !activeSet.idleFileName.isEmpty && idleURL(for: activeSet) == nil) {
+        let id = activeSetID
+        if id != Self.builtInID, !customSets.contains(where: { $0.id == id }) || (!activeSet.idleFileName.isEmpty && idleURL(for: activeSet) == nil) {
             activeSetID = Self.builtInID
         }
     }

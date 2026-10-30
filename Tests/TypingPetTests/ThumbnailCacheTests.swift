@@ -107,4 +107,31 @@ struct ThumbnailCacheTests {
         #expect(cachedImg2 != nil)
         #expect(cachedImg1 !== cachedImg2)
     }
+
+    @Test func packEditorModelSharesLibraryImageCache() throws {
+        let fileManager = FileManager.default
+        let tempRoot = fileManager.temporaryDirectory.appendingPathComponent("TypingPetEditorCacheTest-\(UUID().uuidString)", isDirectory: true)
+        let storedDir = tempRoot.appendingPathComponent("Stored", isDirectory: true)
+        let keysDir = tempRoot.appendingPathComponent("Keys", isDirectory: true)
+        defer { try? fileManager.removeItem(at: tempRoot) }
+
+        let suite = "TypingPetEditorCacheTest.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let library = PetImageLibrary(fileManager: fileManager, defaults: defaults, imagesDirectory: storedDir)
+        let keyStore = KeyReactionStore(fileManager: fileManager, defaults: defaults, directory: keysDir)
+        let store = PetPackStore(library: library, keyStore: keyStore)
+        let editor = PackEditorModel(store: store)
+        let preset = try #require(editor.draft.presets.first)
+        let url = try #require(store.imageURL(for: preset, in: editor.selectedSet))
+
+        let editorImage = try #require(editor.image(for: preset))
+        let libraryImage = try #require(library.image(for: url))
+        #expect(editorImage === libraryImage)
+
+        library.clearCache()
+        let reloadedImage = try #require(editor.image(for: preset))
+        #expect(reloadedImage !== editorImage)
+    }
 }

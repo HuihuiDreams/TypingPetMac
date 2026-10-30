@@ -8,6 +8,11 @@
 
 ### Changed
 
+- 优化全局热路径与常驻后台能耗：
+  - 击键与空闲恢复热路径（`PetController`、`PetPackStore`、`PetImageLibrary`）：`activeSet` 直接按 ID 查找而不对全量图集排序；新增 `rawConfiguration(for:)` 避免每次按键对内置预设名称重复执行多语言本地化拷贝；在 `PetController` 内存中缓存静置/悬停不透明度、指针躲避与抖动等级，消除 60Hz 物理帧、鼠标移动与按键弹跳时的重复 `UserDefaults` 读取；静态图像相同时跳过 `NSImageView` 图层内容重置。
+  - 图像缓存与配置校验统一（`PackEditorModel`、`SettingsWindow`、`PetPackStore`）：移除 `PackEditorModel` 中无上限的独立字典缓存，统一复用 `PetImageLibrary` 的 `NSCache`（上限 64），并在 `PetPackStore.validate(_:in:)` 中通过缓存校验预设图像，避免在键盘编辑器每次点击时重复从磁盘解码全量图像。
+  - 待办气泡与计时器降频节流（`TodoStore`、`TodoBubbleView`、`TodoBubbleWindowController`）：消除 `TodoStore.tick()` 在无运行计时器时的每秒重复 `objectWillChange.send()` 广播（仅在计时器运行或跨自然日时发布）；复用 `TodoTimeText.day` 的 `DateFormatter`；将 `TodoBubbleWindowController` 的 5Hz（0.2s）轮询定时器降为带 `tolerance` 的 1Hz（1.0s）并由鼠标监听直接驱动入口按钮显隐，同时用指针判等与 `className` 替代 `String(describing: type(of:))` 反射。
+  - 设置与权限引导视图精简（`SettingsWindow`、`InputMonitoringGuide`）：移除 9 个无本地化文案叶子视图上的冗余 `@ObservedObject var localization` 订阅；在外观页（`.pet`）停用 2 秒权限轮询，在权限引导 `.preview` 与 `.complete` 阶段停用 0.12 秒系统设置窗口跟随定时器。
 - 同步上游原作者更新（v0.19.2、v0.19.3）：通过重写 `NSSplitView.drawDivider`（`SettingsSplitView`）移除设置窗口侧边栏与主内容之间的竖直分割线；同步版本号至 0.19.3（Build 35）及官网发布历史相对时间格式化支持；补充代码中文注释并解决合并冲突与日志错位。
 - 更新系统架构设计文档（`docs/architecture.md`）与威胁模型分析文档（`docs/TypingPetMac-threat-model.md`）至 `0.19.3`（Build 35）基准，完整覆盖自研安全自动更新子系统（ADR-002）、统一动作包模型（ADR-003）、双窗口伴生与非激活焦点安全（ADR-004）及发布管线二进制路径与密钥扫描守卫（`scripts/release.py`）。
 - 在 `AGENTS.md` 中明确每次变更后的强制同步清单：同步更新 `CHANGELOG.md`（`## [Unreleased]`）、核查并同步单元测试（`Tests/TypingPetTests/*`）与独立检查脚本（`scripts/check_*.sh`），以及按需同步全局架构与安全文档。
