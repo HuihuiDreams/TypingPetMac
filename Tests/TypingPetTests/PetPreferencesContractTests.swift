@@ -86,6 +86,9 @@ struct PetPreferencesContractTests {
             AppPreferencesKey.hoverOpacity,
             AppPreferencesKey.avoidsPointerWhenLocked,
             AppPreferencesKey.shakeLevel,
+            AppPreferencesKey.comboBounceEnabled,
+            AppPreferencesKey.idleBreathingEnabled,
+            AppPreferencesKey.idleSleepMinutes,
             AppPreferencesKey.windowFrame,
             AppPreferencesKey.gallery,
             AppPreferencesKey.activeSetID,
@@ -112,12 +115,17 @@ struct PetPreferencesContractTests {
             AppPreferencesKey.inputMonitoringSetupPending,
         ]
 
-        #expect(allKeys.count == 31)
+        #expect(allKeys.count == 34)
         let uniqueKeys = Set(allKeys)
         #expect(uniqueKeys.count == allKeys.count)
         for key in allKeys {
             #expect(!key.isEmpty)
         }
+
+        // Combo & Idle defaults
+        #expect(AppPreferencesDefault.comboBounceEnabled)
+        #expect(AppPreferencesDefault.idleBreathingEnabled)
+        #expect(AppPreferencesDefault.idleSleepMinutes > 0)
 
         // Scale bounds & default
         #expect(AppPreferencesDefault.minScale < AppPreferencesDefault.petScale)

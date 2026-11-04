@@ -61,6 +61,10 @@ internal final class PetController: NSObject, NSWindowDelegate {
     private var cachedHoverOpacity = PetController.savedHoverOpacity
     private var cachedAvoidsPointerWhenLocked = PetController.savedAvoidsPointerWhenLocked
     private var cachedShakeLevel = PetController.savedShakeLevel
+    private var cachedComboBounceEnabled = PetController.savedComboBounceEnabled
+    private var cachedIdleBreathingEnabled = PetController.savedIdleBreathingEnabled
+    private let comboTracker = PetComboTracker()
+    private let idleStateMachine: PetIdleStateMachine
 
     init(
         library: PetImageLibrary,
@@ -71,6 +75,8 @@ internal final class PetController: NSObject, NSWindowDelegate {
         self.library = library
         self.packStore = packStore
         self.onScaleChanged = onScaleChanged
+        let sleepMinutes = AppEnvironment.defaults.object(forKey: AppPreferencesKey.idleSleepMinutes) as? Int ?? AppPreferencesDefault.idleSleepMinutes
+        idleStateMachine = PetIdleStateMachine(sleepDelay: Double(max(1, sleepMinutes)) * 60.0)
         let initialImage = packStore.idleURL.flatMap { library.image(for: $0) }
         baseSize = Self.normalizedBaseSize(for: initialImage?.size ?? PetConstants.fallbackBaseSize)
         panel = PetPanel(
@@ -122,11 +128,22 @@ internal final class PetController: NSObject, NSWindowDelegate {
             resetPosition()
         }
 
+        comboTracker.onComboReset = { [weak self] in
+            self?.decayComboVisuals()
+        }
+        idleStateMachine.onStateChanged = { [weak self] state in
+            self?.handleIdleStateChanged(state)
+        }
+        idleStateMachine.onWakeUp = { [weak self] in
+            self?.handlePetWakeUp()
+        }
+
         showIdleImage()
         panel.orderFrontRegardless()
         updateMouseMonitoringState()
         updatePetOpacity()
         updatePointerAvoidance()
+        updateBreathingAnimation(resting: true)
     }
 
     deinit {
@@ -219,14 +236,23 @@ internal final class PetController: NSObject, NSWindowDelegate {
     }
 
     func handleKeystroke(_ stroke: KeyStroke? = nil) {
+        let wasSleeping = (idleStateMachine.state == .sleeping)
+        idleStateMachine.receiveInput()
+        let metrics = comboTracker.recordKeystroke(stroke)
+
         let set = library.activeSet
         let pack = packStore.rawConfiguration(for: set)
         guard let id = playback.reaction(for: stroke, in: pack),
-              let chosenURL = packStore.imageURL(id: id, in: pack, set: set) else { return }
+              let chosenURL = packStore.imageURL(id: id, in: pack, set: set) else {
+            if wasSleeping {
+                showIdleImage()
+            }
+            return
+        }
 
         idleWorkItem?.cancel()
         showImage(at: chosenURL)
-        bounce()
+        bounce(metrics: metrics)
 
         let workItem = DispatchWorkItem { [weak self] in
             self?.showIdleImage()
@@ -250,6 +276,9 @@ internal final class PetController: NSObject, NSWindowDelegate {
     func hidePet() {
         stopInertia(savePosition: true)
         stopPointerAvoidance(savePosition: true)
+        comboTracker.resetCombo()
+        idleStateMachine.pause()
+        updateBreathingAnimation(resting: false)
         contentView.hideControls()
         panel.orderOut(nil)
         onPresentationChanged?()
@@ -263,6 +292,8 @@ internal final class PetController: NSObject, NSWindowDelegate {
         updateMouseMonitoringState()
         updatePetOpacity()
         updatePointerAvoidance()
+        idleStateMachine.resume()
+        updateBreathingAnimation(resting: true)
     }
 
     func togglePetVisibility() {
@@ -339,15 +370,51 @@ internal final class PetController: NSObject, NSWindowDelegate {
             y: initialFrame.origin.y + sample.point.y - initialMouse.y
         ))
         appendMoveSample(sample)
+        applyDragStretch(sample: sample)
     }
 
     private func endMove(with sample: PetDragSample) {
         appendMoveSample(sample)
+        clearDragStretch()
         let velocity = PetMotionPhysics.releaseVelocity(samples: moveSamples)
         moveInitialMouseLocation = nil
         moveInitialFrame = nil
         moveSamples.removeAll()
         startInertia(with: velocity)
+    }
+
+    private func applyDragStretch(sample: PetDragSample) {
+        guard let layer = imageView.layer, moveSamples.count >= 2 else { return }
+        let prev = moveSamples[moveSamples.count - 2]
+        let dt = max(sample.timestamp - prev.timestamp, 0.001)
+        let vx = (sample.point.x - prev.point.x) / CGFloat(dt)
+        let vy = (sample.point.y - prev.point.y) / CGFloat(dt)
+        let speed = hypot(vx, vy)
+        guard speed > 80 else { return }
+
+        let stretch = min(speed / 1200.0 * 0.06, 0.06)
+        let (scaleX, scaleY): (CGFloat, CGFloat)
+        if abs(vy) > abs(vx) {
+            scaleX = 1.0 - stretch * 0.5
+            scaleY = 1.0 + stretch
+        } else {
+            scaleX = 1.0 + stretch
+            scaleY = 1.0 - stretch * 0.5
+        }
+
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        layer.transform = CATransform3DMakeScale(scaleX, scaleY, 1.0)
+        CATransaction.commit()
+    }
+
+    private func clearDragStretch() {
+        guard let layer = imageView.layer else { return }
+        CATransaction.begin()
+        CATransaction.setAnimationDuration(0.18)
+        CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(name: .easeOut))
+        layer.transform = CATransform3DIdentity
+        CATransaction.commit()
     }
 
     private func appendMoveSample(_ sample: PetDragSample) {
@@ -388,9 +455,23 @@ internal final class PetController: NSObject, NSWindowDelegate {
         inertiaVelocity = step.velocity
         panel.setFrameOrigin(step.origin)
         updatePetOpacity()
+        if step.hitEdge && hypot(step.velocity.dx, step.velocity.dy) > 60 {
+            playEdgeSquash()
+        }
         if hypot(step.velocity.dx, step.velocity.dy) < PetConstants.inertiaStopSpeed {
             stopInertia(savePosition: true)
         }
+    }
+
+    private func playEdgeSquash() {
+        guard let layer = imageView.layer else { return }
+        guard layer.animation(forKey: "edgeSquash") == nil else { return }
+        let squash = CAKeyframeAnimation(keyPath: "transform.scale")
+        squash.values = [1.0, 0.94, 1.03, 1.0]
+        squash.keyTimes = [0, 0.35, 0.7, 1.0]
+        squash.duration = 0.22
+        squash.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        layer.add(squash, forKey: "edgeSquash")
     }
 
     private func stopInertia(savePosition: Bool) {
@@ -582,18 +663,106 @@ internal final class PetController: NSObject, NSWindowDelegate {
         return clamped
     }
 
-    private func bounce() {
+    private func bounce(metrics: PetComboMetrics? = nil) {
         let level = shakeLevel
         guard PetConstants.bounceAmplitudes.indices.contains(level) else { return }
-        let amplitude = PetConstants.bounceAmplitudes[level]
+        var amplitude = PetConstants.bounceAmplitudes[level]
         guard amplitude > 0 else { return }
         guard let layer = imageView.layer else { return }
+
+        var duration: TimeInterval = 0.16
+        if cachedComboBounceEnabled, let metrics {
+            amplitude *= metrics.amplitudeMultiplier
+            duration = max(0.11, 0.16 / Double(metrics.amplitudeMultiplier))
+
+            if metrics.scaleMultiplier > 1.001 {
+                layer.setValue(metrics.scaleMultiplier, forKeyPath: "transform.scale")
+            }
+        }
+
         let animation = CAKeyframeAnimation(keyPath: "transform.translation.y")
         animation.values = [0, amplitude, 0]
         animation.keyTimes = [0, 0.42, 1]
-        animation.duration = 0.16
+        animation.duration = duration
         animation.timingFunction = CAMediaTimingFunction(name: .easeOut)
         layer.add(animation, forKey: "typingBounce")
+    }
+
+    private func decayComboVisuals() {
+        guard let layer = imageView.layer else { return }
+        let currentScale = (layer.presentation()?.value(forKeyPath: "transform.scale") as? CGFloat) ?? 1.0
+        guard abs(currentScale - 1.0) > 0.001 else { return }
+        let anim = CABasicAnimation(keyPath: "transform.scale")
+        anim.fromValue = currentScale
+        anim.toValue = 1.0
+        anim.duration = 0.20
+        anim.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        layer.setValue(1.0, forKeyPath: "transform.scale")
+        layer.add(anim, forKey: "comboDecay")
+    }
+
+    private func updateBreathingAnimation(resting: Bool) {
+        guard let layer = imageView.layer else { return }
+        guard cachedIdleBreathingEnabled else {
+            layer.removeAnimation(forKey: "idleBreathing")
+            return
+        }
+        if resting && idleStateMachine.state == .resting {
+            guard layer.animation(forKey: "idleBreathing") == nil else { return }
+            let anim = CABasicAnimation(keyPath: "transform.translation.y")
+            anim.fromValue = 0.0
+            anim.toValue = -2.0
+            anim.duration = 2.0
+            anim.autoreverses = true
+            anim.repeatCount = .infinity
+            anim.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            layer.add(anim, forKey: "idleBreathing")
+        } else {
+            layer.removeAnimation(forKey: "idleBreathing")
+        }
+    }
+
+    private func handleIdleStateChanged(_ state: PetIdleState) {
+        switch state {
+        case .active:
+            updateBreathingAnimation(resting: false)
+        case .resting:
+            updateBreathingAnimation(resting: true)
+        case .sleeping:
+            updateBreathingAnimation(resting: false)
+            showSleepingVisuals()
+        }
+    }
+
+    private func handlePetWakeUp() {
+        clearSleepingVisuals()
+        showIdleImage()
+        bounce()
+    }
+
+    private func showSleepingVisuals() {
+        let set = library.activeSet
+        let pack = packStore.rawConfiguration(for: set)
+        if let sleepPreset = pack.presets.first(where: {
+            let lower = $0.name.lowercased() + " " + $0.fileName.lowercased()
+            return lower.contains("sleep") || lower.contains("zzz") || lower.contains("drowsy")
+        }), let url = packStore.imageURL(id: sleepPreset.id, in: pack, set: set) {
+            showImage(at: url)
+        } else {
+            guard let layer = imageView.layer else { return }
+            CATransaction.begin()
+            CATransaction.setAnimationDuration(0.5)
+            layer.opacity = Float(cachedRestingOpacity * 0.72)
+            CATransaction.commit()
+        }
+    }
+
+    private func clearSleepingVisuals() {
+        guard let layer = imageView.layer else { return }
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        layer.opacity = Float(cachedRestingOpacity)
+        CATransaction.commit()
     }
 
     private static func scaledSize(baseSize: NSSize, scale: CGFloat) -> NSSize {
@@ -640,5 +809,13 @@ internal final class PetController: NSObject, NSWindowDelegate {
     private static var savedShakeLevel: Int {
         let stored = AppEnvironment.defaults.object(forKey: AppPreferencesKey.shakeLevel) as? Int
         return max(AppPreferencesDefault.minShakeLevel, min(stored ?? AppPreferencesDefault.shakeLevel, AppPreferencesDefault.maxShakeLevel))
+    }
+
+    private static var savedComboBounceEnabled: Bool {
+        AppEnvironment.defaults.object(forKey: AppPreferencesKey.comboBounceEnabled) as? Bool ?? AppPreferencesDefault.comboBounceEnabled
+    }
+
+    private static var savedIdleBreathingEnabled: Bool {
+        AppEnvironment.defaults.object(forKey: AppPreferencesKey.idleBreathingEnabled) as? Bool ?? AppPreferencesDefault.idleBreathingEnabled
     }
 }

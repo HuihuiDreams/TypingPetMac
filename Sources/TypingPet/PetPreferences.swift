@@ -24,6 +24,15 @@ enum AppPreferencesKey {
     /// Pet keystroke animation shake intensity level (0-3, `Int`).
     static let shakeLevel = "shakeLevel"
 
+    /// Whether keystroke speed dynamically scales bounce amplitude and combo multiplier (`Bool`).
+    static let comboBounceEnabled = "comboBounceEnabled"
+
+    /// Whether pet shows subtle breathing motion while resting (`Bool`).
+    static let idleBreathingEnabled = "idleBreathingEnabled"
+
+    /// Inactive minutes threshold before pet enters sleep state (`Int`).
+    static let idleSleepMinutes = "idleSleepMinutes"
+
     /// NSWindow frame autosave name (`String`).
     static let windowFrame = "TypingPetWindow"
 
@@ -126,6 +135,11 @@ enum AppPreferencesDefault {
     static let shakeLevel: Int = 2
     static let minShakeLevel: Int = 0
     static let maxShakeLevel: Int = 3
+
+    // MARK: - Combo & Idle Defaults
+    static let comboBounceEnabled: Bool = true
+    static let idleBreathingEnabled: Bool = true
+    static let idleSleepMinutes: Int = 5
 
     // MARK: - Timing & Dimensions
     static let idleDelay: TimeInterval = 0.75

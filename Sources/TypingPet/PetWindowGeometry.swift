@@ -99,9 +99,10 @@ struct PetDragSample {
     let timestamp: TimeInterval
 }
 
-struct PetMotionStep {
+struct PetMotionStep: Equatable {
     let origin: CGPoint
     let velocity: CGVector
+    var hitEdge: Bool = false
 }
 
 struct PetMotionPhysics {
@@ -151,22 +152,27 @@ struct PetMotionPhysics {
 
         let maximumX = max(bounds.minX, bounds.maxX - size.width)
         let maximumY = max(bounds.minY, bounds.maxY - size.height)
+        var hitEdge = false
         if nextOrigin.x < bounds.minX {
             nextOrigin.x = bounds.minX
             nextVelocity.dx = abs(nextVelocity.dx) * edgeRestitution
+            hitEdge = true
         } else if nextOrigin.x > maximumX {
             nextOrigin.x = maximumX
             nextVelocity.dx = -abs(nextVelocity.dx) * edgeRestitution
+            hitEdge = true
         }
         if nextOrigin.y < bounds.minY {
             nextOrigin.y = bounds.minY
             nextVelocity.dy = abs(nextVelocity.dy) * edgeRestitution
+            hitEdge = true
         } else if nextOrigin.y > maximumY {
             nextOrigin.y = maximumY
             nextVelocity.dy = -abs(nextVelocity.dy) * edgeRestitution
+            hitEdge = true
         }
 
-        return PetMotionStep(origin: nextOrigin, velocity: nextVelocity)
+        return PetMotionStep(origin: nextOrigin, velocity: nextVelocity, hitEdge: hitEdge)
     }
 }
 

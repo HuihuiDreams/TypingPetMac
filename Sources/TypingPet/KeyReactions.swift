@@ -34,8 +34,44 @@ struct KeyModifiers: OptionSet, Codable, Hashable {
 struct KeyStroke: Codable, Hashable {
     let keyCode: UInt16
     let modifiers: KeyModifiers
+    var isAutorepeat: Bool = false
+
+    init(keyCode: UInt16, modifiers: KeyModifiers, isAutorepeat: Bool = false) {
+        self.keyCode = keyCode
+        self.modifiers = modifiers
+        self.isAutorepeat = isAutorepeat
+    }
 
     var displayName: String { modifiers.displayPrefix + KeyCodeNames.name(for: keyCode) }
+
+    static func == (lhs: KeyStroke, rhs: KeyStroke) -> Bool {
+        lhs.keyCode == rhs.keyCode && lhs.modifiers == rhs.modifiers
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(keyCode)
+        hasher.combine(modifiers)
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case keyCode, modifiers, isAutorepeat
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        keyCode = try container.decode(UInt16.self, forKey: .keyCode)
+        modifiers = try container.decode(KeyModifiers.self, forKey: .modifiers)
+        isAutorepeat = try container.decodeIfPresent(Bool.self, forKey: .isAutorepeat) ?? false
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(keyCode, forKey: .keyCode)
+        try container.encode(modifiers, forKey: .modifiers)
+        if isAutorepeat {
+            try container.encode(isAutorepeat, forKey: .isAutorepeat)
+        }
+    }
 }
 
 struct KeyReactionRule: Codable, Identifiable, Equatable {

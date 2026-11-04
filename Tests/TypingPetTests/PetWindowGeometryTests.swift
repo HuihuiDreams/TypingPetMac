@@ -202,6 +202,7 @@ import Testing
         #expect(abs(freeStep.origin.x - 160) < 0.001)
         #expect(abs(freeStep.origin.y - 130) < 0.001)
         #expect(freeStep.velocity.dx < 600)
+        #expect(!freeStep.hitEdge)
 
         let edgeStep = PetMotionPhysics.advance(
             origin: CGPoint(x: 390, y: 100),
@@ -212,6 +213,7 @@ import Testing
         )
         #expect(abs(edgeStep.origin.x - 400) < 0.001)
         #expect(edgeStep.velocity.dx < 0)
+        #expect(edgeStep.hitEdge)
     }
 
     @Test func horizontalResizeUsesWidthAndPreservesScaleRelationship() {

@@ -4,6 +4,12 @@
 
 ### Added
 
+- 落地游戏级角色打击感与微状态机系统（Phase 1 / P0）：
+  - **打字连击速度追踪与动态弹跳 (`PetComboTracker`)**：按键长按重复（Autorepeat）智能过滤，基于 3.0 秒滑动窗口与击键频率动态提升弹跳振幅（最高 1.4x）与微缩放（最高 1.05x），连击中断后通过 CoreAnimation 平滑弹性衰减回缩至 1.0x 基准尺寸；零常驻轮询定时器，空闲时无多余后台唤醒。
+  - **待机多帧呼吸与发呆瞌睡微状态机 (`PetIdleStateMachine`)**：构建 Active（活跃输入）、Resting（平静待机）、Sleeping（发呆瞌睡）三级微状态机；待机时执行低频（0.5Hz）平滑呼吸微动效；闲置超过阈值（默认 5 分钟）进入打瞌睡状态；解耦并重构 `handleKeystroke` 调用顺序，确保任何全局击键输入（即便未绑定特定动作图片）均可瞬间唤醒宠物。
+  - **拖拽拉伸与撞击挤压物理形变 (Squash & Stretch)**：鼠标提拉拖拽时沿速度方向施加微量形变（Stretch）；惯性滑行撞击屏幕可视边缘（`PetMotionStep.hitEdge`）时触发弹性挤压回弹（Squash），回弹后自动复原图层矩阵。
+  - **集中偏好管理扩充**：在 `AppPreferencesKey` 与 `AppPreferencesDefault` 中收敛 `comboBounceEnabled`、`idleBreathingEnabled`、`idleSleepMinutes`，并在契约测试中全量断言。
+  - **单元测试扩充**：新增 `PetComboTrackerTests` 与 `PetIdleStateMachineTests` 测试套件，覆盖重复键过滤、WPM 国际标准算法、状态跃迁、唤醒时序与边缘碰撞检测。
 - 新增领域模型词汇表（`GLOSSARY.md`）与架构决策记录 `ADR-002`（自研安全自动更新子系统）、`ADR-003`（统一动作包与预设映射模型）、`ADR-004`（双窗口伴生架构与非激活焦点安全不变量）。
 
 ### Changed

@@ -43,7 +43,12 @@ internal final class GlobalKeyMonitor {
                 }
             } else if eventType == .keyDown {
                 let keyCode = UInt16(event.getIntegerValueField(.keyboardEventKeycode))
-                monitor.handler(KeyStroke(keyCode: keyCode, modifiers: KeyModifiers(eventFlags: event.flags)))
+                let isAutorepeat = event.getIntegerValueField(.keyboardEventAutorepeat) != 0
+                monitor.handler(KeyStroke(
+                    keyCode: keyCode,
+                    modifiers: KeyModifiers(eventFlags: event.flags),
+                    isAutorepeat: isAutorepeat
+                ))
             }
 
             return Unmanaged.passUnretained(event)
