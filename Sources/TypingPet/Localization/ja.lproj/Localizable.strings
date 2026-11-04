@@ -389,6 +389,11 @@
 "No supported image files were dropped." = "対応する画像ファイルをドロップしてください。";
 "Image Presets · Select Multiple" = "画像プリセット · 複数選択可";
 "Import Image Pack" = "画像パックを読み込む";
+"Export Pack…" = "アクションパックを書き出す…";
+"Import Pack…" = "アクションパックを読み込む…";
+"Typing Sandbox" = "入力テストサンドボックス";
+"Type here to test animations…" = "ここに入力してアニメーションをプレビュー…";
+"Try typing any keys to preview keystroke reactions and dynamic bounce." = "キーを入力してリアクションとバウンスをプレビューできます。";
 "In Use" = "使用中";
 "Key Mapping" = "キー割り当て";
 "Keyboard Mapping" = "キーボード割り当て";

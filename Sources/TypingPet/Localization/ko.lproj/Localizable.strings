@@ -389,6 +389,11 @@
 "No supported image files were dropped." = "지원하는 이미지 파일을 놓아 주세요.";
 "Image Presets · Select Multiple" = "이미지 프리셋 · 여러 개 선택 가능";
 "Import Image Pack" = "이미지 팩 불러오기";
+"Export Pack…" = "동작 팩 내보내기…";
+"Import Pack…" = "동작 팩 가져오기…";
+"Typing Sandbox" = "타이핑 샌드박스";
+"Type here to test animations…" = "여기에 입력하여 애니메이션을 미리 보세요…";
+"Try typing any keys to preview keystroke reactions and dynamic bounce." = "키를 입력하여 키 반응 동작과 역동적인 바운스를 미리 보세요.";
 "In Use" = "사용 중";
 "Key Mapping" = "키 매핑";
 "Keyboard Mapping" = "키보드 매핑";

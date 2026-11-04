@@ -119,6 +119,13 @@ struct NativeSetWorkspace: View {
     @State private var isGalleryDropTargeted = false
     @State private var hoveredPresetID: String?
     @State private var targetedKeyCodes = Set<UInt16>()
+    @State private var sandboxInput = ""
+    @State private var sandboxImageURL: URL?
+    @State private var sandboxLastKey = ""
+    @State private var sandboxWPM: Int = 0
+    @State private var sandboxCombo: Int = 0
+    @State private var sandboxBounceY: CGFloat = 0
+    @State private var sandboxResetWorkItem: DispatchWorkItem?
     init(editor: PackEditorModel) {
         self.editor = editor
         _popovers = StateObject(wrappedValue: PackPopoverController(editor: editor))
@@ -129,6 +136,7 @@ struct NativeSetWorkspace: View {
                 header
                 gallery
                 mapping
+                sandbox
             }
             .padding(22)
             .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -142,7 +150,11 @@ struct NativeSetWorkspace: View {
         .onChange(of: editor.draft.presets) { presets in
             if case .preset(let id) = popovers.target, !presets.contains(where: { $0.id == id }) { popovers.close() }
         }
-        .onDisappear { popovers.close() }
+        .onDisappear {
+            popovers.close()
+            sandboxResetWorkItem?.cancel()
+            sandboxResetWorkItem = nil
+        }
         .alert(L("Error"), isPresented: Binding(get: { editor.errorMessage != nil }, set: { if !$0 { editor.errorMessage = nil } })) {
             Button(L("OK")) { editor.errorMessage = nil }
         } message: { Text(editor.errorMessage ?? "") }
@@ -160,13 +172,21 @@ struct NativeSetWorkspace: View {
                     .buttonStyle(.bordered)
                     .controlSize(.regular)
                     .disabled(!editor.canEdit)
-                    if !editor.selectedSet.isBuiltIn {
-                        Menu {
+                    Button {
+                        popovers.close()
+                        editor.importPetPack()
+                    } label: { Label(L("Import Pack…"), systemImage: "square.and.arrow.down") }
+                    .buttonStyle(.bordered)
+                    .controlSize(.regular)
+                    Menu {
+                        Button(L("Export Pack…")) { popovers.close(); editor.exportPetPack() }
+                        if !editor.selectedSet.isBuiltIn {
+                            Divider()
                             Button(L("Rename")) { popovers.close(); editor.renamePack(editor.selectedSet) }
                             Button(L("Delete")) { popovers.close(); editor.removePack(editor.selectedSet) }
-                        } label: { Image(systemName: "ellipsis") }
-                        .menuStyle(.borderedButton).controlSize(.regular).fixedSize().accessibilityLabel(L("Set Options"))
-                    }
+                        }
+                    } label: { Image(systemName: "ellipsis") }
+                    .menuStyle(.borderedButton).controlSize(.regular).fixedSize().accessibilityLabel(L("Set Options"))
                 }
                 Text(L("Changes saved automatically."))
                     .font(.caption).foregroundStyle(.secondary)
@@ -479,6 +499,119 @@ struct NativeSetWorkspace: View {
             }
             return true
         }
+    }
+
+    // MARK: - Sandbox
+
+    private var activeIdleURL: URL? {
+        if let first = editor.draft.presets.first {
+            return editor.store.imageURL(id: first.id, in: editor.draft, set: editor.selectedSet)
+        }
+        return nil
+    }
+
+    private var sandbox: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Label(L("Typing Sandbox"), systemImage: "keyboard")
+                    .font(.headline)
+                Spacer()
+                if sandboxCombo > 0 {
+                    Text(L("Combo: %1$@ · WPM: %2$@", sandboxCombo, sandboxWPM))
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(Color.accentColor)
+                }
+            }
+            HStack(spacing: 16) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color(nsColor: .controlBackgroundColor))
+                        .frame(width: 120, height: 100)
+                    if let url = sandboxImageURL ?? activeIdleURL {
+                        AsyncImage(url: url) { phase in
+                            if let image = phase.image {
+                                image.resizable().scaledToFit()
+                            } else {
+                                ProgressView()
+                            }
+                        }
+                        .frame(width: 76, height: 76)
+                        .offset(y: sandboxBounceY)
+                    } else {
+                        Image(systemName: "pawprint.fill")
+                            .font(.system(size: 30))
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.primary.opacity(0.08), lineWidth: 1))
+
+                VStack(alignment: .leading, spacing: 8) {
+                    TextField(L("Type here to test animations…"), text: $sandboxInput)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.body)
+                        .onChange(of: sandboxInput) { newValue in
+                            handleSandboxTyping(newValue)
+                        }
+                    HStack(spacing: 8) {
+                        Text(L("Try typing any keys to preview keystroke reactions and dynamic bounce."))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        if !sandboxLastKey.isEmpty {
+                            Text("[\(sandboxLastKey)]")
+                                .font(.caption.bold())
+                                .foregroundStyle(Color.accentColor)
+                        }
+                    }
+                }
+            }
+            .padding(14)
+            .modifier(SetSurface(radius: 14))
+        }
+    }
+
+    private func handleSandboxTyping(_ input: String) {
+        guard let lastChar = input.last else { return }
+        sandboxLastKey = String(lastChar).uppercased()
+        sandboxCombo += 1
+        sandboxWPM = min(160, sandboxCombo * 12)
+
+        withAnimation(.spring(response: 0.12, dampingFraction: 0.45)) {
+            sandboxBounceY = -10
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+            withAnimation(.easeOut(duration: 0.15)) {
+                sandboxBounceY = 0
+            }
+        }
+
+        let matchedURL: URL? = {
+            for mapping in editor.draft.mappings {
+                if let presetID = mapping.selection.presetIDs.first,
+                   let url = editor.store.imageURL(id: presetID, in: editor.draft, set: editor.selectedSet) {
+                    return url
+                }
+            }
+            if let unassignedID = editor.draft.unassigned.presetIDs.first {
+                return editor.store.imageURL(id: unassignedID, in: editor.draft, set: editor.selectedSet)
+            }
+            return nil
+        }()
+
+        if let matchedURL {
+            sandboxImageURL = matchedURL
+        }
+
+        sandboxResetWorkItem?.cancel()
+        let resetItem = DispatchWorkItem {
+            withAnimation(.easeOut(duration: 0.2)) {
+                sandboxImageURL = nil
+                sandboxCombo = 0
+                sandboxWPM = 0
+                sandboxLastKey = ""
+            }
+        }
+        sandboxResetWorkItem = resetItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.75, execute: resetItem)
     }
 }
 

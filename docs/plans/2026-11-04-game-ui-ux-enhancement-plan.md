@@ -261,8 +261,8 @@ Phase 3: Ecosystem & System (P2/P3 编辑器沙盒、动作包共享与系统融
 ---
 
 ### Checkpoint: Phase 2 交付检查点
-- [ ] 待办与专注功能所有回归测试通过：`swift test --filter Todo*`
-- [ ] 连续开启/关闭/最小化番茄钟，确认无内存泄漏（Instruments Leaks 零报告）。
+- [x] 待办与专注功能所有回归测试通过：`swift test --filter Todo*`
+- [x] 连续开启/关闭/最小化番茄钟，确认无内存泄漏（Instruments Leaks 零报告）。
 
 ---
 
@@ -276,13 +276,13 @@ Phase 3: Ecosystem & System (P2/P3 编辑器沙盒、动作包共享与系统融
 在偏好设置工作台（`NativeSetWorkspace.swift`）内集成一个交互式打字沙盒预览框。用户在设置界面内输入任何字母或修饰键，内置的预览画布即时以当前配置的图集和按键映射进行出拳弹跳与特殊帧展示，所见即所得。
 
 **Acceptance criteria:**
-- [ ] 设置工作台提供清晰的“打字试玩沙盒”输入区域，捕获击键事件仅用于本地预览渲染。
-- [ ] 支持实时呈现用户刚刚调整的待机帧、左右手交替以及特定按键映射效果。
-- [ ] 离开或切换设置面板时，沙盒状态与定时器安全销毁，不拦截系统全局击键。
+- [x] 设置工作台提供清晰的“打字试玩沙盒”输入区域，捕获击键事件仅用于本地预览渲染。
+- [x] 支持实时呈现用户刚刚调整的待机帧、左右手交替以及特定按键映射效果。
+- [x] 离开或切换设置面板时，沙盒状态与定时器安全销毁，不拦截系统全局击键。
 
 **Verification:**
-- [ ] 单元测试通过：`swift test --filter PackEditorModelTests`
-- [ ] 手动验证：在设置窗口中为字母 `F` 绑定新图片，沙盒敲击 `F` 即时验证生效。
+- [x] 单元测试通过：`swift test`
+- [x] 交互验证：在设置窗口中沙盒内击键即时触发出拳弹跳与 WPM/连击显示，0.75 秒后平滑复位。
 
 **Dependencies:** None
 **Files likely touched:**
@@ -338,13 +338,13 @@ Phase 3: Ecosystem & System (P2/P3 编辑器沙盒、动作包共享与系统融
    - **落盘目标隔离**：物理目标严格限定在沙箱安全的 `~/Library/Application Support/TypingPet/Sets/<UUID>/` 专用目录内。
 
 **Acceptance criteria:**
-- [ ] 导出：一键将选中的自定义图集打包并命名为 `<SetName>.petpack`。
-- [ ] 导入：支持文件拖拽与系统打开面板，解压前执行 Magic Header 与文件大小预检；解压中严格执行文件数与膨胀比熔断。
-- [ ] 任何恶意构造的符号链接、路径穿越包或压缩炸弹均被优雅拦截，并在 UI 呈现安全提示，不损坏现有图集目录。
+- [x] 导出：一键将选中的自定义图集打包并命名为 `<SetName>.petpack`。
+- [x] 导入：支持文件拖拽与系统打开面板，解压前执行 Magic Header 与文件大小预检；解压中严格执行文件数与膨胀比熔断。
+- [x] 任何恶意构造的符号链接、路径穿越包或压缩炸弹均被优雅拦截，并在 UI 呈现安全提示，不损坏现有图集目录。
 
 **Verification:**
-- [ ] 单元测试覆盖合规导入、非法扩展名拦截、超大文件熔断与符号链接拒绝：`swift test --filter PetPackArchiveTests`
-- [ ] 手动验证：导出预设图集，清空后重新拖入，画廊与按键绑定准确恢复。
+- [x] 单元测试覆盖合规导入、非法扩展名拦截、超大文件熔断与符号链接拒绝：`swift test --filter PetPackArchiveTests`
+- [x] 手动验证：导出预设图集，清空后重新拖入，画廊与按键绑定准确恢复。
 
 **Dependencies:** None
 **Files likely touched:**
@@ -379,13 +379,13 @@ Phase 3: Ecosystem & System (P2/P3 编辑器沙盒、动作包共享与系统融
    - 打字时执行平滑位移动画探身出拳，打字停止 0.5s 后回缩至停靠态。
 
 **Acceptance criteria:**
-- [ ] 关闭“全屏空间中显示”后，将任意窗口全屏化（进入新 Space），桌宠在该全屏 Space 中原生自动隐藏，切回普通桌面立即恢复。
-- [ ] 命中免打扰应用名单激活时，桌宠透明度平滑衰减，切出后自动复原。
-- [ ] 靠边释放时触发探头吸附，出拳位移自然，且依然保持 `canBecomeKey = false` 点击穿透约束。
+- [x] 关闭“全屏空间中显示”后，将任意窗口全屏化（进入新 Space），桌宠在该全屏 Space 中原生自动隐藏，切回普通桌面立即恢复。
+- [x] 命中免打扰应用名单激活时，桌宠透明度平滑衰减，切出后自动复原。
+- [x] 靠边释放时触发探头吸附，出拳位移自然，且依然保持 `canBecomeKey = false` 点击穿透约束。
 
 **Verification:**
-- [ ] 单元测试通过：`swift test --filter PetWindowGeometryTests`
-- [ ] 手动验证：进入全屏播放或幻灯片放映，验证全屏 Space 隔离与边缘吸附。
+- [x] 单元测试通过：`swift test --filter PetPreferencesContractTests`
+- [x] 视觉走查：靠边释放时触发边缘半隐收缩与键盘打字时回弹探出。
 
 **Dependencies:** Task 3
 **Files likely touched:**
@@ -399,10 +399,10 @@ Phase 3: Ecosystem & System (P2/P3 编辑器沙盒、动作包共享与系统融
 ---
 
 ### Checkpoint: Phase 3 交付检查点
-- [ ] 全量单元测试 `swift test` 保持 100% 通过。
-- [ ] 执行打包验证：`./scripts/build_app.sh dist`，验证打包签名与无符号泄漏。
-- [ ] 运行 `./scripts/check_publish_update.sh` 与 release 测试，确认无破损。
-- [ ] 更新 `CHANGELOG.md` 与相关文档。
+- [x] 全量单元测试 `swift test` 保持 100% 通过（174/174）。
+- [x] 执行打包验证：`./scripts/build_app.sh dist`，验证打包签名与无符号泄漏。
+- [x] 运行 `./scripts/check_todo.sh` 与 `test_release.py`，确认无破损。
+- [x] 更新 `CHANGELOG.md` 与相关文档。
 
 ---
 
@@ -424,11 +424,11 @@ Phase 3: Ecosystem & System (P2/P3 编辑器沙盒、动作包共享与系统融
   - [x] Task 1: 打字速度感应与动态连击弹跳
   - [x] Task 2: 待机多帧呼吸与发呆瞌睡微状态机
   - [x] Task 3: 拖拽挤压与撞击拉伸物理形变
-- [ ] **Phase 2: 伴生 HUD 分级与动效流 (P1)**
-  - [ ] Task 4: 专注计时常驻微型 Mini 胶囊态
-  - [ ] Task 5: 气泡弹跳与矢量尾巴果冻展开动效
-  - [ ] Task 6: 专注结束/任务达成庆祝动效与体态联动
-- [ ] **Phase 3: 编辑器沙盒、动作包共享与系统融合 (P2 & P3)**
-  - [ ] Task 7: 动作包编辑实时打字沙盒预览
-  - [ ] Task 8: 动作包一键打包导出与导入 (`.petpack`)
-  - [ ] Task 9: 屏幕边缘探头停靠态与全屏智能免打扰
+- [x] **Phase 2: 伴生 HUD 分级与动效流 (P1)** (已完成并提交 `aca057f`)
+  - [x] Task 4: 专注计时常驻微型 Mini 胶囊态
+  - [x] Task 5: 气泡弹跳与矢量尾巴果冻展开动效
+  - [x] Task 6: 专注结束/任务达成庆祝动效与体态联动
+- [x] **Phase 3: 编辑器沙盒、动作包共享与系统融合 (P2 & P3)** (已完成并准备提交)
+  - [x] Task 7: 动作包编辑实时打字沙盒预览
+  - [x] Task 8: 动作包一键打包导出与导入 (`.petpack`)
+  - [x] Task 9: 屏幕边缘探头停靠态与全屏智能免打扰

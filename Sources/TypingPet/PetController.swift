@@ -63,6 +63,16 @@ internal final class PetController: NSObject, NSWindowDelegate {
     private var cachedShakeLevel = PetController.savedShakeLevel
     private var cachedComboBounceEnabled = PetController.savedComboBounceEnabled
     private var cachedIdleBreathingEnabled = PetController.savedIdleBreathingEnabled
+    private var cachedEdgePeekingEnabled = false
+    private var isPeekingLeft = false
+    private var isPeekingRight = false
+    private var peekingTucked = false
+    private var dndActive = false
+    private var dndObserverToken: NSObjectProtocol?
+    private static let dndBundleIDs: Set<String> = [
+        "com.apple.iWork.Keynote",
+        "com.apple.QuickTimePlayerX"
+    ]
     private let comboTracker = PetComboTracker()
     private let idleStateMachine: PetIdleStateMachine
 
@@ -119,7 +129,7 @@ internal final class PetController: NSObject, NSWindowDelegate {
         panel.isMovableByWindowBackground = false
         panel.ignoresMouseEvents = Self.savedPositionLocked
         panel.acceptsMouseMovedEvents = true
-        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        panel.collectionBehavior = [.canJoinAllSpaces]
         contentView.controlsEnabled = !Self.savedPositionLocked
 
         let restoredPosition = panel.setFrameUsingName(AppEnvironment.frameAutosaveName)
@@ -138,6 +148,10 @@ internal final class PetController: NSObject, NSWindowDelegate {
             self?.handlePetWakeUp()
         }
 
+        cachedEdgePeekingEnabled = AppEnvironment.defaults.bool(forKey: AppPreferencesKey.edgePeekingEnabled)
+        updateFullScreenAuxiliaryBehavior()
+        setupApplicationDNDObserver()
+
         showIdleImage()
         panel.orderFrontRegardless()
         updateMouseMonitoringState()
@@ -147,6 +161,9 @@ internal final class PetController: NSObject, NSWindowDelegate {
     }
 
     deinit {
+        if let dndObserverToken {
+            NSWorkspace.shared.notificationCenter.removeObserver(dndObserverToken)
+        }
         if let globalMouseMonitor { NSEvent.removeMonitor(globalMouseMonitor) }
         if let localMouseMonitor { NSEvent.removeMonitor(localMouseMonitor) }
         inertiaTimer?.invalidate()
@@ -239,6 +256,9 @@ internal final class PetController: NSObject, NSWindowDelegate {
         let wasSleeping = (idleStateMachine.state == .sleeping)
         idleStateMachine.receiveInput()
         let metrics = comboTracker.recordKeystroke(stroke)
+        if peekingTucked {
+            untuckFromEdge()
+        }
 
         let set = library.activeSet
         let pack = packStore.rawConfiguration(for: set)
@@ -255,7 +275,11 @@ internal final class PetController: NSObject, NSWindowDelegate {
         bounce(metrics: metrics)
 
         let workItem = DispatchWorkItem { [weak self] in
-            self?.showIdleImage()
+            guard let self else { return }
+            self.showIdleImage()
+            if self.isPeekingLeft || self.isPeekingRight {
+                self.tuckToEdge()
+            }
         }
         idleWorkItem = workItem
         DispatchQueue.main.asyncAfter(deadline: .now() + PetConstants.idleDelay, execute: workItem)
@@ -381,6 +405,9 @@ internal final class PetController: NSObject, NSWindowDelegate {
         moveInitialFrame = nil
         moveSamples.removeAll()
         startInertia(with: velocity)
+        if hypot(velocity.dx, velocity.dy) < PetConstants.inertiaStopSpeed {
+            updateEdgePeekingAnchor()
+        }
     }
 
     private func applyDragStretch(sample: PetDragSample) {
@@ -480,7 +507,10 @@ internal final class PetController: NSObject, NSWindowDelegate {
         inertiaVelocity = .zero
         inertiaLastTimestamp = nil
         inertiaBounds = nil
-        if savePosition { panel.saveFrame(usingName: AppEnvironment.frameAutosaveName) }
+        if savePosition {
+            panel.saveFrame(usingName: AppEnvironment.frameAutosaveName)
+            updateEdgePeekingAnchor()
+        }
     }
 
     private func updateMouseMonitoringState() {
@@ -517,16 +547,118 @@ internal final class PetController: NSObject, NSWindowDelegate {
 
     private func updatePetOpacity() {
         guard panel.isVisible, let imageLayer = imageView.layer else { return }
-        let targetOpacity = PetOpacityBehavior.opacity(
-            isHovering: panel.frame.contains(NSEvent.mouseLocation),
-            restingOpacity: cachedRestingOpacity,
-            hoverOpacity: cachedHoverOpacity
-        )
+        let targetOpacity: CGFloat
+        if dndActive {
+            targetOpacity = 0.05
+        } else {
+            targetOpacity = PetOpacityBehavior.opacity(
+                isHovering: panel.frame.contains(NSEvent.mouseLocation),
+                restingOpacity: cachedRestingOpacity,
+                hoverOpacity: cachedHoverOpacity
+            )
+        }
         guard abs(CGFloat(imageLayer.opacity) - targetOpacity) > 0.001 else { return }
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         imageLayer.opacity = Float(targetOpacity)
         CATransaction.commit()
+    }
+
+    // MARK: - Space, DND & Edge Peeking
+
+    func updateFullScreenAuxiliaryBehavior() {
+        let showInFullScreen = AppEnvironment.defaults.bool(forKey: AppPreferencesKey.showInFullScreenSpaces)
+        if showInFullScreen {
+            panel.collectionBehavior.insert(.fullScreenAuxiliary)
+        } else {
+            panel.collectionBehavior.remove(.fullScreenAuxiliary)
+        }
+    }
+
+    private func setupApplicationDNDObserver() {
+        dndObserverToken = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
+                let bundleID = app?.bundleIdentifier ?? ""
+                let shouldDND = Self.dndBundleIDs.contains(bundleID)
+                if self.dndActive != shouldDND {
+                    self.dndActive = shouldDND
+                    self.updatePetOpacity()
+                }
+            }
+        }
+    }
+
+    func setEdgePeekingEnabled(_ enabled: Bool) {
+        cachedEdgePeekingEnabled = enabled
+        AppEnvironment.defaults.set(enabled, forKey: AppPreferencesKey.edgePeekingEnabled)
+        if !enabled && peekingTucked {
+            untuckFromEdge()
+        } else if enabled {
+            updateEdgePeekingAnchor()
+        }
+    }
+
+    private func updateEdgePeekingAnchor() {
+        guard cachedEdgePeekingEnabled, let screen = panel.screen ?? NSScreen.main else {
+            if peekingTucked { untuckFromEdge() }
+            isPeekingLeft = false
+            isPeekingRight = false
+            return
+        }
+        let visible = screen.visibleFrame
+        let threshold: CGFloat = 28
+        if panel.frame.minX <= visible.minX + threshold {
+            isPeekingLeft = true
+            isPeekingRight = false
+            tuckToEdge()
+        } else if panel.frame.maxX >= visible.maxX - threshold {
+            isPeekingLeft = false
+            isPeekingRight = true
+            tuckToEdge()
+        } else {
+            if peekingTucked { untuckFromEdge() }
+            isPeekingLeft = false
+            isPeekingRight = false
+        }
+    }
+
+    private func tuckToEdge() {
+        guard cachedEdgePeekingEnabled, (isPeekingLeft || isPeekingRight), let screen = panel.screen ?? NSScreen.main else { return }
+        peekingTucked = true
+        let visible = screen.visibleFrame
+        let tuckDistance = panel.frame.width * 0.42
+        var targetX = panel.frame.origin.x
+        if isPeekingLeft {
+            targetX = visible.minX - tuckDistance
+        } else if isPeekingRight {
+            targetX = visible.maxX - panel.frame.width + tuckDistance
+        }
+        guard abs(panel.frame.origin.x - targetX) > 1 else { return }
+        var targetFrame = panel.frame
+        targetFrame.origin.x = targetX
+        panel.setFrame(targetFrame, display: true, animate: true)
+    }
+
+    private func untuckFromEdge() {
+        guard peekingTucked, let screen = panel.screen ?? NSScreen.main else { return }
+        peekingTucked = false
+        let visible = screen.visibleFrame
+        var targetX = panel.frame.origin.x
+        if isPeekingLeft {
+            targetX = visible.minX + 4
+        } else if isPeekingRight {
+            targetX = visible.maxX - panel.frame.width - 4
+        }
+        guard abs(panel.frame.origin.x - targetX) > 1 else { return }
+        var targetFrame = panel.frame
+        targetFrame.origin.x = targetX
+        panel.setFrame(targetFrame, display: true, animate: true)
     }
 
     private func updatePointerAvoidance() {

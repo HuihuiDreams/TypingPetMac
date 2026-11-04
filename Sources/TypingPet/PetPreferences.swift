@@ -80,6 +80,13 @@ enum AppPreferencesKey {
     /// System idle minutes threshold before timer pauses (`Int`).
     static let todoIdleMinutes = "todoIdleMinutes"
 
+    // MARK: - Space & DND Integration
+    /// Whether the pet stays visible inside macOS full-screen spaces (`Bool`).
+    static let showInFullScreenSpaces = "showInFullScreenSpaces"
+
+    /// Whether the pet docks and peeks when positioned at screen edges (`Bool`).
+    static let edgePeekingEnabled = "edgePeekingEnabled"
+
     // MARK: - Appearance & Localization
     /// Settings window appearance theme mode (`String`).
     static let settingsAppearanceMode = "SettingsAppearanceMode"
@@ -156,6 +163,10 @@ enum AppPreferencesDefault {
     static let todoListStyle: String = "full"
     static let todoCapsuleMode: Bool = true
     static let todoIdleMinutes: Int = 15
+
+    // MARK: - Space & DND Defaults
+    static let showInFullScreenSpaces: Bool = false
+    static let edgePeekingEnabled: Bool = false
 
     // MARK: - Appearance & Localization Defaults
     static let settingsAppearanceMode: String = "system"

@@ -299,6 +299,51 @@ final class PackEditorModel: ObservableObject {
             onChange(false)
         } catch { errorMessage = error.localizedDescription }
     }
+
+    func exportPetPack() {
+        let panel = NSSavePanel()
+        panel.title = L("Export Pack")
+        panel.nameFieldStringValue = "\(draft.name).petpack"
+        if let type = UTType(filenameExtension: "petpack") {
+            panel.allowedContentTypes = [type]
+        }
+        guard panel.runModal() == .OK, let targetURL = panel.url else { return }
+        do {
+            try PetPackArchive.exportPack(
+                set: selectedSet,
+                config: draft,
+                library: store.library,
+                store: store,
+                destinationURL: targetURL
+            )
+            statusMessage = L("Exported %1$@", targetURL.lastPathComponent)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func importPetPack() {
+        let panel = NSOpenPanel()
+        panel.title = L("Import Pack")
+        if let type = UTType(filenameExtension: "petpack") {
+            panel.allowedContentTypes = [type]
+        }
+        panel.allowsMultipleSelection = false
+        guard panel.runModal() == .OK, let sourceURL = panel.url else { return }
+        do {
+            let imported = try PetPackArchive.importPack(
+                from: sourceURL,
+                library: store.library,
+                store: store
+            )
+            sets = store.library.imageSets
+            selectSet(imported)
+            statusMessage = L("Imported %1$@", imported.name)
+            onChange(false)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
 }
 struct KeyboardLayoutKey: Identifiable {
     var code: UInt16?

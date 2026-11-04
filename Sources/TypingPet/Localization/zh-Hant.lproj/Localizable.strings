@@ -389,6 +389,11 @@
 "No supported image files were dropped." = "請放入支援的圖片檔。";
 "Image Presets · Select Multiple" = "圖片預設 · 可複選";
 "Import Image Pack" = "匯入圖片套件";
+"Export Pack…" = "匯出動作包…";
+"Import Pack…" = "匯入動作包…";
+"Typing Sandbox" = "試玩沙盒";
+"Type here to test animations…" = "在此輸入以預覽動作…";
+"Try typing any keys to preview keystroke reactions and dynamic bounce." = "敲擊鍵盤以預覽即時反應動作與動態彈跳。";
 "In Use" = "使用中";
 "Key Mapping" = "按鍵對應";
 "Keyboard Mapping" = "鍵盤對應";

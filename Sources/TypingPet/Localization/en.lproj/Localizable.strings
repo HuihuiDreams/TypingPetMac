@@ -389,6 +389,11 @@
 "No supported image files were dropped." = "No supported image files were dropped.";
 "Image Presets · Select Multiple" = "Image Presets · Select Multiple";
 "Import Image Pack" = "Import Image Pack";
+"Export Pack…" = "Export Pack…";
+"Import Pack…" = "Import Pack…";
+"Typing Sandbox" = "Typing Sandbox";
+"Type here to test animations…" = "Type here to test animations…";
+"Try typing any keys to preview keystroke reactions and dynamic bounce." = "Try typing any keys to preview keystroke reactions and dynamic bounce.";
 "In Use" = "In Use";
 "Key Mapping" = "Key Mapping";
 "Keyboard Mapping" = "Keyboard Mapping";

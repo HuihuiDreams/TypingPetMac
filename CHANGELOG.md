@@ -15,6 +15,11 @@
   - **弹性展开与矢量尾巴无损折叠流 (Spring Expansion & Vector Tail)**：引入 `Animation.spring(response: 0.35, dampingFraction: 0.72)` 果冻弹性曲线驱动状态切换；`BubbleShape` 遵循 `Animatable` 协议，小尺寸胶囊半径与尾部基底自适应防越界裁剪，消除气泡变形与小尾巴对齐撕裂；自动响应 `accessibilityReduceMotion` 系统无障碍偏好。
   - **倒计时归零与任务完成微庆祝机制 (Celebration Micro-Interactions)**：倒计时结束或完成当日全部待办事项时触发成就正反馈；气泡区域展示轻量级彩带粒子爆发（1.2 秒自动渐隐销毁，0 常驻轮询与内存占用）；伴生宠物同频触发 CoreAnimation 喜悦双跳动效（`PetController.celebrate`）。
   - **契约与功能测试同步**：更新 `PetPreferencesContractTests`（全量键数提升至 35）、`TodoBubbleTests`（覆盖胶囊态尺寸计算、偏好持久化与庆祝标记触发）及 `scripts/check_todo.swift`。
+- 落地编辑器沙盒、动作包共享与系统级融合（Phase 3 / P2 & P3）：
+  - **实时打字沙盒交互演练台 (`NativeSetWorkspace`)**：在设置面板键盘映射编辑器右下侧集成嵌入式交互测试台，用户无需切换到外部文本编辑器即可就地击键试玩，实时观察按键映射图片帧切换、动感弹性振幅与 WPM/Combo 连击数值反馈，0.75 秒空闲后自动平滑复位为静止待机帧。
+  - **安全动作包归档格式与导入导出 (`PetPackArchive`)**：规范并实现单文件 `.petpack` 动作包便携归档标准（基于 Zip 容器与 schemaVersion 1 `pack.json` 清单）。解压前严格执行零第三方依赖的安全预检机制：包括 Magic Header（`PK\x03\x04`）头校验、25MB 归档文件大小上限、200 文件总数上限、50MB 解压总容量、10MB 单文件上限、10:1 压缩比防 Zip 炸弹阈值、路径穿越阻断（`..`、`/`、`\`）、符号链接模式位过滤以及严格文件扩展名白名单（`.json` 与支持的图片扩展名）。在动作包设置界面提供“导出动作包…”与“导入动作包…”原生文件面板集成，导入失败时自动执行物理清理，彻底杜绝孤儿文件。
+  - **macOS 全屏 Space 自动退避与屏幕边缘半隐窥视 (`PetController`)**：利用原生窗口集合行为（根据偏好调整 `.fullScreenAuxiliary`）实现全屏桌面自动退避隐身，返回普通桌面时自动现身，0 轮询 0 权限侵入；监听全屏前台演讲/视频应用（如 Keynote 与 QuickTime Player）自动切换 0.05 超低不透明度勿扰模式；支持开启边缘停靠时，靠近屏幕左右可视边缘（28pt 阈值）自动将 42% 身体收进屏幕边缘外半隐窥视，并在有键盘输入时探出互动。
+  - **契约与功能测试同步**：更新 `PetPreferencesContractTests`（全量键数提升至 37 项），新增 `PetPackArchiveTests` 覆盖动作包往返打包、解包恢复、大小超限、非法文件扩展名与安全防护。
 - 新增领域模型词汇表（`GLOSSARY.md`）与架构决策记录 `ADR-002`（自研安全自动更新子系统）、`ADR-003`（统一动作包与预设映射模型）、`ADR-004`（双窗口伴生架构与非激活焦点安全不变量）。
 
 ### Changed

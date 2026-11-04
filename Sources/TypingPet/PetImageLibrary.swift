@@ -137,6 +137,30 @@ final class PetImageLibrary {
         return set
     }
 
+    func registerImportedSet(
+        name: String,
+        idleFileName: String,
+        reactionFileNames: [String]
+    ) throws -> (set: PetImageSet, destinationDirectory: URL) {
+        let id = UUID()
+        let folderName = id.uuidString
+        let destination = setsDirectory.appendingPathComponent(folderName, isDirectory: true)
+        try fileManager.createDirectory(at: destination, withIntermediateDirectories: true)
+        let requestedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let displayName = requestedName.isEmpty ? L("Imported Pack") : requestedName
+        let set = PetImageSet(
+            id: id,
+            name: displayName,
+            storageFolder: folderName,
+            idleFileName: idleFileName,
+            reactionFileNames: reactionFileNames,
+            isBuiltIn: false
+        )
+        customSets.append(set)
+        persistGallery()
+        return (set, destination)
+    }
+
     var activeSetID: UUID {
         get { UUID(uuidString: defaults.string(forKey: Keys.activeSetID) ?? "") ?? Self.builtInID }
         set { defaults.set(newValue.uuidString, forKey: Keys.activeSetID) }

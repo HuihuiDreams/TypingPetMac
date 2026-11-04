@@ -104,6 +104,8 @@ struct PetPreferencesContractTests {
             AppPreferencesKey.todoListStyle,
             AppPreferencesKey.todoCapsuleMode,
             AppPreferencesKey.todoIdleMinutes,
+            AppPreferencesKey.showInFullScreenSpaces,
+            AppPreferencesKey.edgePeekingEnabled,
             AppPreferencesKey.settingsAppearanceMode,
             AppPreferencesKey.appLanguageMode,
             AppPreferencesKey.automaticUpdateChecks,
@@ -116,12 +118,16 @@ struct PetPreferencesContractTests {
             AppPreferencesKey.inputMonitoringSetupPending,
         ]
 
-        #expect(allKeys.count == 35)
+        #expect(allKeys.count == 37)
         let uniqueKeys = Set(allKeys)
         #expect(uniqueKeys.count == allKeys.count)
         for key in allKeys {
             #expect(!key.isEmpty)
         }
+
+        // Full screen & edge peeking defaults
+        #expect(!AppPreferencesDefault.showInFullScreenSpaces)
+        #expect(!AppPreferencesDefault.edgePeekingEnabled)
 
         // Combo & Idle defaults
         #expect(AppPreferencesDefault.comboBounceEnabled)
