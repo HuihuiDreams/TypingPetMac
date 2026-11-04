@@ -688,6 +688,16 @@ internal final class PetController: NSObject, NSWindowDelegate {
         layer.add(animation, forKey: "typingBounce")
     }
 
+    func celebrate() {
+        guard let layer = imageView.layer else { return }
+        let jump = CAKeyframeAnimation(keyPath: "transform.translation.y")
+        jump.values = [0, 16, 0, 10, 0]
+        jump.keyTimes = [0, 0.25, 0.5, 0.75, 1.0]
+        jump.duration = 0.52
+        jump.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        layer.add(jump, forKey: "celebrationJump")
+    }
+
     private func decayComboVisuals() {
         guard let layer = imageView.layer else { return }
         let currentScale = (layer.presentation()?.value(forKeyPath: "transform.scale") as? CGFloat) ?? 1.0

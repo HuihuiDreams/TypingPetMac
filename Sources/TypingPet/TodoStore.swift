@@ -130,12 +130,15 @@ final class TodoStore: ObservableObject {
     @Published private(set) var bubbleRestingOpacity: Double
     @Published private(set) var bubbleHoverOpacity: Double
     @Published private(set) var listStyle: TodoListStyle
+    @Published private(set) var capsuleMode: Bool
     // Minutes without input before a running timer pauses itself. 0 turns this and the lock pause off.
     @Published private(set) var idleMinutes: Int
     @Published private(set) var absence: TodoAbsence?
     // Bumped when the bubble should bounce for attention like a Dock icon: when a countdown ends,
     // and when the user comes back to an absence notice or an ending they did not see.
     @Published private(set) var attentionRequest = 0
+    // Bumped when a focus countdown ends or all tasks are completed, triggering celebration feedback.
+    @Published private(set) var celebrationToken = 0
     static let idleMinuteChoices = [0, 5, 10, 15, 30, 60]
     let storage: TodoFileStorage
     private var lastCheckpoint: TimeInterval
@@ -151,6 +154,7 @@ final class TodoStore: ObservableObject {
     private static let restingOpacityKey = AppPreferencesKey.todoBubbleRestingOpacity
     private static let hoverOpacityKey = AppPreferencesKey.todoBubbleHoverOpacity
     private static let listStyleKey = AppPreferencesKey.todoListStyle
+    private static let capsuleModeKey = AppPreferencesKey.todoCapsuleMode
     private static let idleMinutesKey = AppPreferencesKey.todoIdleMinutes
 
     init(url: URL = TodoFileStorage.defaultURL, defaults: UserDefaults = AppEnvironment.defaults, monotonicNow: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }, wallNow: @escaping () -> Date = Date.init, idleSeconds: @escaping () -> Double = SystemIdle.seconds) {
@@ -164,6 +168,7 @@ final class TodoStore: ObservableObject {
         bubbleRestingOpacity = (defaults.object(forKey: Self.restingOpacityKey) as? Double).map(Self.clampedOpacity) ?? AppPreferencesDefault.todoBubbleRestingOpacity
         bubbleHoverOpacity = (defaults.object(forKey: Self.hoverOpacityKey) as? Double).map(Self.clampedOpacity) ?? AppPreferencesDefault.todoBubbleHoverOpacity
         listStyle = TodoListStyle(rawValue: defaults.string(forKey: Self.listStyleKey) ?? AppPreferencesDefault.todoListStyle) ?? .full
+        capsuleMode = (defaults.object(forKey: Self.capsuleModeKey) as? Bool) ?? AppPreferencesDefault.todoCapsuleMode
         self.monotonicNow = monotonicNow
         lastCheckpoint = monotonicNow()
         lastObservedDay = Calendar.current.startOfDay(for: wallNow())
@@ -210,6 +215,7 @@ final class TodoStore: ObservableObject {
         // The compact list shows the ending in its own bubble without folding, so an extension returns to the list.
         if listStyle == .full { expanded = false }
         requestAttention()
+        triggerCelebration()
     }
     // Bounce now, and again at the next input when the user seems away and may have missed it.
     private func requestAttention(onlyOnReturn: Bool = false) {
@@ -291,6 +297,14 @@ final class TodoStore: ObservableObject {
         guard value != listStyle else { return }
         listStyle = value
         defaults.set(value.rawValue, forKey: Self.listStyleKey)
+    }
+    func setCapsuleMode(_ value: Bool) {
+        guard value != capsuleMode else { return }
+        capsuleMode = value
+        defaults.set(value, forKey: Self.capsuleModeKey)
+    }
+    func triggerCelebration() {
+        celebrationToken += 1
     }
     func setBubbleRestingOpacity(_ value: Double) {
         let value = Self.clampedOpacity(value)

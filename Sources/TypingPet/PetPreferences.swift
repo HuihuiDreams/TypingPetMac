@@ -74,6 +74,9 @@ enum AppPreferencesKey {
     /// Todo list display style (`String`).
     static let todoListStyle = "todoListStyle"
 
+    /// Whether the focus timer defaults to an ultra-compact capsule mode when collapsed (`Bool`).
+    static let todoCapsuleMode = "todoCapsuleMode"
+
     /// System idle minutes threshold before timer pauses (`Int`).
     static let todoIdleMinutes = "todoIdleMinutes"
 
@@ -151,6 +154,7 @@ enum AppPreferencesDefault {
     static let todoBubbleRestingOpacity: Double = 1.0
     static let todoBubbleHoverOpacity: Double = 1.0
     static let todoListStyle: String = "full"
+    static let todoCapsuleMode: Bool = true
     static let todoIdleMinutes: Int = 15
 
     // MARK: - Appearance & Localization Defaults

@@ -102,6 +102,7 @@ struct PetPreferencesContractTests {
             AppPreferencesKey.todoBubbleRestingOpacity,
             AppPreferencesKey.todoBubbleHoverOpacity,
             AppPreferencesKey.todoListStyle,
+            AppPreferencesKey.todoCapsuleMode,
             AppPreferencesKey.todoIdleMinutes,
             AppPreferencesKey.settingsAppearanceMode,
             AppPreferencesKey.appLanguageMode,
@@ -115,7 +116,7 @@ struct PetPreferencesContractTests {
             AppPreferencesKey.inputMonitoringSetupPending,
         ]
 
-        #expect(allKeys.count == 34)
+        #expect(allKeys.count == 35)
         let uniqueKeys = Set(allKeys)
         #expect(uniqueKeys.count == allKeys.count)
         for key in allKeys {
@@ -142,6 +143,7 @@ struct PetPreferencesContractTests {
 
         // Todo bubble defaults
         #expect(AppPreferencesDefault.todoBubbleZoom > 0)
+        #expect(AppPreferencesDefault.todoCapsuleMode)
         #expect((0.0...1.0).contains(AppPreferencesDefault.todoBubbleRestingOpacity))
         #expect((0.0...1.0).contains(AppPreferencesDefault.todoBubbleHoverOpacity))
         #expect(AppPreferencesDefault.todoIdleMinutes >= 0)

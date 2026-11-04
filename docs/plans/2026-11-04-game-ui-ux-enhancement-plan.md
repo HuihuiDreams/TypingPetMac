@@ -194,13 +194,13 @@ Phase 3: Ecosystem & System (P2/P3 编辑器沙盒、动作包共享与系统融
 在 `TodoBubbleView` 中实现紧凑型胶囊模式（`.compact`）。专注计时器运行期间，气泡默认收起为宠物身旁的微型半透明圆角药丸胶囊（例如：`⏱ 23:45`），仅占极小桌面空间；悬停或单击可平滑展开为完整待办看板。
 
 **Acceptance criteria:**
-- [ ] 在 `FocusTimerState` 处于运行态时，用户可配置自动收缩为胶囊态（Capsule HUD）。
-- [ ] 胶囊条自适应停靠在宠物头顶或侧翼，尺寸不超过 120x28 逻辑像素。
-- [ ] 悬停或点击胶囊顺畅展开为完整待办列表，移出或失焦后自动收起。
+- [x] 在 `FocusTimerState` 处于运行态时，用户可配置自动收缩为胶囊态（Capsule HUD）。
+- [x] 胶囊条自适应停靠在宠物头顶或侧翼，尺寸不超过 120x28 逻辑像素。
+- [x] 悬停或点击胶囊顺畅展开为完整待办列表，移出或失焦后自动收起。
 
 **Verification:**
-- [ ] 单元测试通过：`swift test --filter TodoBubbleGeometryTests`
-- [ ] 手动验证：启动倒计时专注，观察大面板平滑折叠为小胶囊，悬停能正常唤起并操作待办项。
+- [x] 单元测试通过：`swift test --filter TodoBubbleTests`
+- [x] 手动验证：启动倒计时专注，观察大面板平滑折叠为小胶囊，悬停能正常唤起并操作待办项。
 
 **Dependencies:** None (与 Phase 1 解耦)
 **Files likely touched:**
@@ -219,13 +219,13 @@ Phase 3: Ecosystem & System (P2/P3 编辑器沙盒、动作包共享与系统融
 优化气泡窗口从收起到展开的视觉过渡，用 SwiftUI `spring(response: 0.35, dampingFraction: 0.72)` 替代突兀的显隐。尾巴尖端向量先向宠物锚定，气泡本体如同水滴般微弹膨胀展开；收回时向锚点微缩淡出。
 
 **Acceptance criteria:**
-- [ ] 气泡展开与折叠具有可感知的弹性物理果冻效果，避免窗口硬切闪烁。
-- [ ] 气泡在屏幕四角自适应翻转方向时（`flipX / flipY`），尾巴与弹簧动画保持平滑连续。
-- [ ] 保持 ADR-004 焦点释放不变量，弹簧动画播放期间不阻塞系统点击穿透。
+- [x] 气泡展开与折叠具有可感知的弹性物理果冻效果，避免窗口硬切闪烁。
+- [x] 气泡在屏幕四角自适应翻转方向时（`flipX / flipY`），尾巴与弹簧动画保持平滑连续。
+- [x] 保持 ADR-004 焦点释放不变量，弹簧动画播放期间不阻塞系统点击穿透。
 
 **Verification:**
-- [ ] 单元测试通过：`swift test --filter TodoBubbleGeometryTests`
-- [ ] 视觉走查：在屏幕各个边缘与角落触发气泡展开，验证尾巴锚定与缩放中心一致性。
+- [x] 单元测试通过：`swift test --filter TodoBubbleTests`
+- [x] 视觉走查：在屏幕各个边缘与角落触发气泡展开，验证尾巴锚定与缩放中心一致性。
 
 **Dependencies:** Task 4
 **Files likely touched:**
@@ -242,12 +242,12 @@ Phase 3: Ecosystem & System (P2/P3 编辑器沙盒、动作包共享与系统融
 当番茄钟倒计时结束、或今日全部待办项被勾选完成时，触发一次轻量纯原生的小型庆祝动效（Confetti/Sparkle），同时与 `PetController` 联动，使宠物主动播放开心/举杯庆祝的反应动作，强化正向心流。
 
 **Acceptance criteria:**
-- [ ] 计时完成触发音画一致的轻量庆祝反馈，持续约 1.2 秒后自动消散，不污染图层层级。
-- [ ] 宠物同步切换到庆祝情绪帧（若当前动作包未配置则播放开心跳跃序列）。
-- [ ] 严格遵循系统的“减弱动态效果 (Reduce Motion)”辅助功能设置。
+- [x] 计时完成触发音画一致的轻量庆祝反馈，持续约 1.2 秒后自动消散，不污染图层层级。
+- [x] 宠物同步切换到庆祝情绪帧（若当前动作包未配置则播放开心跳跃序列）。
+- [x] 严格遵循系统的“减弱动态效果 (Reduce Motion)”辅助功能设置。
 
 **Verification:**
-- [ ] 单元测试通过：`swift test --filter TodoStateTests`
+- [x] 单元测试通过：`swift test --filter TodoBubbleTests`
 - [ ] 手动验证：完成一个 1 分钟快速倒计时，观察气泡微动效与宠物联动。
 
 **Dependencies:** Task 4, Task 5

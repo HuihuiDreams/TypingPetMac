@@ -75,14 +75,40 @@ import Testing
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("display-\(UUID()).json")
         var store = TodoStore(url: url, defaults: defaults)
         #expect(store.listStyle == .full)
+        #expect(store.capsuleMode == true)
         store.zoomIn(); store.setBubbleVisibility(.hover); store.setBubbleRestingOpacity(0.4); store.setBubbleHoverOpacity(0.7)
         store.setListStyle(.compact)
+        store.setCapsuleMode(false)
         store = TodoStore(url: url, defaults: defaults)
         #expect(store.listStyle == .compact)
+        #expect(store.capsuleMode == false)
         #expect(store.zoom == 1.1)
         #expect(store.bubbleVisibility == .hover)
         #expect(abs(store.bubbleRestingOpacity - 0.4) <= 0.0001)
         #expect(abs(store.bubbleHoverOpacity - 0.7) <= 0.0001)
+    }
+
+    @Test @MainActor func celebrationTokenTriggersAndIncrements() {
+        let suite = "TypingPetTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("celebration-\(UUID()).json")
+        let store = TodoStore(url: url, defaults: defaults)
+        #expect(store.celebrationToken == 0)
+        store.triggerCelebration()
+        #expect(store.celebrationToken == 1)
+        store.triggerCelebration()
+        #expect(store.celebrationToken == 2)
+    }
+
+    @Test func canvasAccommodatesMiniCapsuleContent() {
+        let screen = CGRect(x: 0, y: 24, width: 1440, height: 876)
+        let pet = CGRect(x: 400, y: 400, width: 220, height: 220)
+        let capsuleSize = CGSize(width: 110, height: 28)
+        let canvas = TodoBubbleGeometry.canvas(content: capsuleSize, tail: 10, width: 320, maxHeight: 560, pet: pet, visible: screen)
+        #expect(screen.contains(canvas.frame))
+        #expect(canvas.bubble.width == capsuleSize.width)
+        #expect(canvas.bubble.height == capsuleSize.height + 10)
     }
 
     @Test @MainActor func todoPanelAcceptsFocusAndDoesNotPassClicks() {

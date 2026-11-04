@@ -10,6 +10,11 @@
   - **拖拽拉伸与撞击挤压物理形变 (Squash & Stretch)**：鼠标提拉拖拽时沿速度方向施加微量形变（Stretch）；惯性滑行撞击屏幕可视边缘（`PetMotionStep.hitEdge`）时触发弹性挤压回弹（Squash），回弹后自动复原图层矩阵。
   - **集中偏好管理扩充**：在 `AppPreferencesKey` 与 `AppPreferencesDefault` 中收敛 `comboBounceEnabled`、`idleBreathingEnabled`、`idleSleepMinutes`，并在契约测试中全量断言。
   - **单元测试扩充**：新增 `PetComboTrackerTests` 与 `PetIdleStateMachineTests` 测试套件，覆盖重复键过滤、WPM 国际标准算法、状态跃迁、唤醒时序与边缘碰撞检测。
+- 落地伴生 HUD 分级与动效流系统（Phase 2 / P1）：
+  - **极简胶囊态伴生 HUD (Mini Capsule Mode)**：专注倒计时运行时提供极致紧凑的伴生胶囊态（~100x28pt 药丸胶囊），展示迷你番茄钟与剩余时间数字，悬停提供快速控制操作与上下文菜单，支持平滑展开回完整卡片与待办列表；在 `AppPreferencesKey` 与 `AppPreferencesDefault` 中收敛 `todoCapsuleMode` 并默认开启。
+  - **弹性展开与矢量尾巴无损折叠流 (Spring Expansion & Vector Tail)**：引入 `Animation.spring(response: 0.35, dampingFraction: 0.72)` 果冻弹性曲线驱动状态切换；`BubbleShape` 遵循 `Animatable` 协议，小尺寸胶囊半径与尾部基底自适应防越界裁剪，消除气泡变形与小尾巴对齐撕裂；自动响应 `accessibilityReduceMotion` 系统无障碍偏好。
+  - **倒计时归零与任务完成微庆祝机制 (Celebration Micro-Interactions)**：倒计时结束或完成当日全部待办事项时触发成就正反馈；气泡区域展示轻量级彩带粒子爆发（1.2 秒自动渐隐销毁，0 常驻轮询与内存占用）；伴生宠物同频触发 CoreAnimation 喜悦双跳动效（`PetController.celebrate`）。
+  - **契约与功能测试同步**：更新 `PetPreferencesContractTests`（全量键数提升至 35）、`TodoBubbleTests`（覆盖胶囊态尺寸计算、偏好持久化与庆祝标记触发）及 `scripts/check_todo.swift`。
 - 新增领域模型词汇表（`GLOSSARY.md`）与架构决策记录 `ADR-002`（自研安全自动更新子系统）、`ADR-003`（统一动作包与预设映射模型）、`ADR-004`（双窗口伴生架构与非激活焦点安全不变量）。
 
 ### Changed

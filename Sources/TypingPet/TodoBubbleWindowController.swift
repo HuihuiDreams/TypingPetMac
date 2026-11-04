@@ -82,6 +82,7 @@ final class TodoBubbleWindowController {
     let panel: TodoPanel
     let layout = TodoBubbleLayout()
     let entry: TodoPanel
+    var onCelebration: (() -> Void)?
     private weak var pet: NSWindow?
     private var subscriptions: Set<AnyCancellable> = []
     private var timer: Timer?
@@ -113,6 +114,9 @@ final class TodoBubbleWindowController {
         }.store(in: &subscriptions)
         store.$attentionRequest.dropFirst().sink { [weak self] _ in
             DispatchQueue.main.async { self?.beginBouncing() }
+        }.store(in: &subscriptions)
+        store.$celebrationToken.dropFirst().sink { [weak self] _ in
+            DispatchQueue.main.async { self?.onCelebration?() }
         }.store(in: &subscriptions)
         for name in [NSWindow.didMoveNotification, NSWindow.didResizeNotification, NSWindow.didChangeScreenNotification] {
             notificationTokens.append(NotificationCenter.default.addObserver(forName: name, object: pet, queue: .main) { [weak self] _ in

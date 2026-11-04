@@ -49,6 +49,7 @@ internal final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegat
             onOpenSettings: { [weak self] in self?.showSettings() }
         )
         todoBubble = TodoBubbleWindowController(store: todoStore, pet: petController.todoAnchorWindow)
+        todoBubble?.onCelebration = { [weak self] in self?.petController?.celebrate() }
         petController.shouldHoldPosition = { [weak self] in self?.todoBubble?.isInteracting == true }
         petController.onPresentationChanged = { [weak self] in self?.todoBubble?.synchronize() }
         configureStatusItem()

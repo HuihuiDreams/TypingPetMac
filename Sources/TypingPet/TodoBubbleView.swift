@@ -134,11 +134,13 @@ struct TodoBubbleView: View {
     @State private var zoomBadgeVisible = false
     @State private var zoomBadgeToken = 0
     @State private var hops: CGFloat = 0
+    @State private var celebrationParticlesVisible = false
     @FocusState private var addFocused: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private enum Mode { case list, compactList, focus, away, expired }
-    static let motion = Animation.spring(response: 0.34, dampingFraction: 0.86)
+    static let motion = Animation.spring(response: 0.35, dampingFraction: 0.72)
+    private var activeMotion: Animation { reduceMotion ? .easeInOut(duration: 0.15) : Self.motion }
 
     private var zoom: CGFloat { CGFloat(store.zoom) }
     private var z: Z { Z(zoom: zoom) }
@@ -192,8 +194,17 @@ struct TodoBubbleView: View {
                 guard !reduceMotion else { return }
                 withAnimation(.linear(duration: DockBounce.duration(height: layout.bounceHeight))) { hops += 1 }
             }
-            // The notice appears from a timer tick, outside any animation.
-            .animation(Self.motion, value: store.absence?.sessionID)
+            .onChange(of: store.celebrationToken) { _ in
+                celebrationParticlesVisible = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                    celebrationParticlesVisible = false
+                }
+            }
+            // Animate mode and expansion smoothly with spring physics.
+            .animation(activeMotion, value: store.expanded)
+            .animation(activeMotion, value: store.capsuleMode)
+            .animation(activeMotion, value: mode)
+            .animation(activeMotion, value: store.absence?.sessionID)
     }
 
     // The shape wraps the content, so it animates with it. The panel is a fixed canvas around it.
@@ -215,6 +226,11 @@ struct TodoBubbleView: View {
                                  radius: z(18), halfBase: z(11), inset: 0.5)
                 .stroke(BubbleColor.line, lineWidth: 1))
             .overlay {
+                if celebrationParticlesVisible {
+                    CelebrationEffectView(reduceMotion: reduceMotion)
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
+                }
                 if zoomBadgeVisible {
                     Text("\(store.zoomPercent)%")
                         .font(z.font(13, .bold, .rounded)).monospacedDigit()
@@ -328,7 +344,7 @@ struct TodoBubbleView: View {
                     if count > lastOpenCount, let newest = open.first?.id {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
                             guard listContentHeight > listCap + 1 else { return }
-                            withAnimation(Self.motion) { proxy.scrollTo(newest, anchor: .top) }
+                            withAnimation(activeMotion) { proxy.scrollTo(newest, anchor: .top) }
                         }
                     }
                     lastOpenCount = count
@@ -452,7 +468,7 @@ struct TodoBubbleView: View {
             },
             onRequestDelete: { editingID = nil; pendingDelete = todo.id },
             onConfirmDelete: {
-                withAnimation(Self.motion) { store.change { $0.delete(todo.id) } }
+                withAnimation(activeMotion) { store.change { $0.delete(todo.id) } }
                 pendingDelete = nil
             },
             onCancelDelete: { pendingDelete = nil }
@@ -628,7 +644,7 @@ struct TodoBubbleView: View {
         VStack(alignment: .leading, spacing: z(1)) {
             Rectangle().fill(BubbleColor.line).frame(height: 1).padding(.horizontal, z(8)).padding(.vertical, z(6))
             Button {
-                withAnimation(Self.motion) { completedExpanded.toggle() }
+                withAnimation(activeMotion) { completedExpanded.toggle() }
             } label: {
                 HStack(spacing: z(6)) {
                     Image(systemName: "chevron.right").font(z.font(9, .bold))
@@ -686,7 +702,67 @@ struct TodoBubbleView: View {
 
     // MARK: Focus
 
-    private var focusView: some View {
+    @ViewBuilder private var focusView: some View {
+        if store.capsuleMode {
+            capsuleFocusView
+        } else {
+            cardFocusView
+        }
+    }
+
+    private var capsuleFocusView: some View {
+        Button { setExpanded(true) } label: {
+            HStack(spacing: z(7)) {
+                TomatoRing(fraction: ringFraction, paused: paused, size: 20, showsRing: showsRing)
+                Text(clockText)
+                    .font(z.font(13.5, .semibold, .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(paused ? BubbleColor.muted : BubbleColor.ink)
+                if paused {
+                    Text(L("Paused"))
+                        .font(z.font(10, .semibold))
+                        .foregroundStyle(BubbleColor.muted)
+                }
+            }
+            .padding(.horizontal, z(10))
+            .padding(.vertical, z(5))
+            .frame(height: z(28))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(L("%1$@ · Click to expand the list", activeTitle))
+        .accessibilityLabel(L("%1$@, expand list", activeTitle))
+        .accessibilityValue(clockText)
+        .pointerHover { focusHovering = $0 }
+        .overlay(alignment: .trailing) {
+            if focusHovering {
+                HStack(spacing: z(2)) {
+                    IconButton(symbol: paused ? "play.fill" : "pause.fill", label: paused ? L("Resume") : L("Pause"), tint: BubbleColor.ink, size: 20) { togglePause() }
+                    IconButton(symbol: "stop.fill", label: L("Stop"), tint: BubbleColor.ink, size: 20) { finish() }
+                }
+                .padding(.leading, z(16))
+                .padding(.trailing, z(6))
+                .frame(maxHeight: .infinity)
+                .background(LinearGradient(stops: [
+                    .init(color: BubbleColor.surface.opacity(0), location: 0),
+                    .init(color: BubbleColor.surface, location: 0.35)
+                ], startPoint: .leading, endPoint: .trailing))
+                .transition(.opacity)
+            }
+        }
+        .animation(.easeOut(duration: 0.15), value: focusHovering)
+        .contextMenu {
+            Button(L("Expand List")) { setExpanded(true) }
+            Button(L("Switch to Card View")) { store.setCapsuleMode(false) }
+            Divider()
+            Button(paused ? L("Resume") : L("Pause")) { togglePause() }
+            Button(L("Stop")) { finish() }
+            Divider()
+            Button(L("Hide Todos")) { store.hide() }
+        }
+    }
+
+    private var cardFocusView: some View {
         Button { setExpanded(true) } label: {
             HStack(spacing: z(12)) {
                 TomatoRing(fraction: ringFraction, paused: paused, size: 42, showsRing: showsRing)
@@ -730,6 +806,11 @@ struct TodoBubbleView: View {
         .animation(.easeOut(duration: 0.15), value: focusHovering)
         .contextMenu {
             Button(L("Expand List")) { setExpanded(true) }
+            Button(L("Switch to Capsule View")) { store.setCapsuleMode(true) }
+            Divider()
+            Button(paused ? L("Resume") : L("Pause")) { togglePause() }
+            Button(L("Stop")) { finish() }
+            Divider()
             Button(L("Hide Todos")) { store.hide() }
         }
     }
@@ -794,9 +875,9 @@ struct TodoBubbleView: View {
                 .font(z.font(11.5)).foregroundStyle(BubbleColor.muted).monospacedDigit()
                 .contentTransition(.identity)
             HStack(spacing: z(8)) {
-                PillButton(title: L("Resume Timing"), role: .timer) { withAnimation(Self.motion) { store.change { $0.resume() } } }
+                PillButton(title: L("Resume Timing"), role: .timer) { withAnimation(activeMotion) { store.change { $0.resume() } } }
                     .help(L("Continue without counting time away"))
-                PillButton(title: L("Include Time Away")) { withAnimation(Self.motion) { store.includeAbsence() } }
+                PillButton(title: L("Include Time Away")) { withAnimation(activeMotion) { store.includeAbsence() } }
                     .help(L("Count time away and continue timing"))
                 PillButton(title: L("Finish")) { finish() }
                     .help(L("End this focus session without counting time away"))
@@ -845,7 +926,7 @@ struct TodoBubbleView: View {
         else if session != nil, store.expanded { setExpanded(false) }
     }
     private func setExpanded(_ value: Bool) {
-        withAnimation(Self.motion) { store.expanded = value }
+        withAnimation(activeMotion) { store.expanded = value }
     }
     private func setListStyle(_ style: TodoListStyle) {
         // Save a title being edited before its field goes away.
@@ -853,7 +934,7 @@ struct TodoBubbleView: View {
         addFocused = false
         pendingStart = nil
         pendingDelete = nil
-        withAnimation(Self.motion) { store.setListStyle(style) }
+        withAnimation(activeMotion) { store.setListStyle(style) }
     }
     private func focusInput() {
         layout.window?.makeKey()
@@ -875,20 +956,23 @@ struct TodoBubbleView: View {
         let value = draft
         guard !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         draft = ""
-        withAnimation(Self.motion) { store.change { _ = $0.addTodo(value) } }
+        withAnimation(activeMotion) { store.change { _ = $0.addTodo(value) } }
     }
     // Show the check first, then move the row so the completion is visible.
     private func toggle(_ todo: TodoItem, completed: Bool) {
         if completed {
-            withAnimation(Self.motion) { store.change { $0.setCompleted(todo.id, completed: false) } }
+            withAnimation(activeMotion) { store.change { $0.setCompleted(todo.id, completed: false) } }
             return
         }
         guard !completing.contains(todo.id) else { return }
         completing.insert(todo.id)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
-            withAnimation(Self.motion) {
+            withAnimation(activeMotion) {
                 store.change { $0.setCompleted(todo.id, completed: true) }
                 completing.remove(todo.id)
+            }
+            if store.engine.openTodos.isEmpty && !store.engine.completedToday().isEmpty {
+                store.triggerCelebration()
             }
         }
     }
@@ -915,7 +999,7 @@ struct TodoBubbleView: View {
     // One transaction, so the list turns straight into the focus bubble without showing the active card first.
     private func start(_ id: UUID, confirmed: Bool) {
         addFocused = false
-        withAnimation(Self.motion) {
+        withAnimation(activeMotion) {
             var started = false
             store.change { started = $0.start(id, replaceActive: confirmed) }
             // A compact list keeps showing the Todo with its timer; the full list folds into the focus bubble.
@@ -923,7 +1007,7 @@ struct TodoBubbleView: View {
         }
     }
     private func finish() {
-        withAnimation(Self.motion) {
+        withAnimation(activeMotion) {
             store.change { $0.finish() }
             store.expanded = true
         }
@@ -1580,16 +1664,95 @@ private struct CalyxShape: Shape {
     }
 }
 
+// MARK: - Celebration Animation
+
+private struct ConfettiParticle: Identifiable {
+    let id: Int
+    let color: Color
+    let x: CGFloat
+    let y: CGFloat
+    let rotation: Double
+    let scale: CGFloat
+    let isCircle: Bool
+}
+
+private struct CelebrationEffectView: View {
+    let reduceMotion: Bool
+    @State private var animated = false
+
+    private static let particles: [ConfettiParticle] = [
+        ConfettiParticle(id: 0, color: BubbleColor.tomato, x: -38, y: -38, rotation: 45, scale: 1.0, isCircle: false),
+        ConfettiParticle(id: 1, color: Color.orange, x: 32, y: -42, rotation: -30, scale: 0.9, isCircle: true),
+        ConfettiParticle(id: 2, color: BubbleColor.done, x: -44, y: -16, rotation: 60, scale: 1.1, isCircle: false),
+        ConfettiParticle(id: 3, color: Color.yellow, x: 44, y: -18, rotation: -45, scale: 0.8, isCircle: false),
+        ConfettiParticle(id: 4, color: Color.purple, x: -18, y: -48, rotation: 15, scale: 1.0, isCircle: true),
+        ConfettiParticle(id: 5, color: Color.blue, x: 18, y: -50, rotation: -75, scale: 0.9, isCircle: false),
+        ConfettiParticle(id: 6, color: Color.pink, x: -48, y: -28, rotation: 90, scale: 0.7, isCircle: true),
+        ConfettiParticle(id: 7, color: BubbleColor.tomato, x: 48, y: -32, rotation: 120, scale: 1.1, isCircle: false),
+        ConfettiParticle(id: 8, color: BubbleColor.done, x: -12, y: -52, rotation: -20, scale: 0.85, isCircle: false),
+        ConfettiParticle(id: 9, color: Color.orange, x: 12, y: -54, rotation: 35, scale: 0.95, isCircle: true),
+        ConfettiParticle(id: 10, color: Color.yellow, x: -36, y: -6, rotation: -60, scale: 1.0, isCircle: false),
+        ConfettiParticle(id: 11, color: Color.purple, x: 36, y: -8, rotation: 80, scale: 0.8, isCircle: true),
+        ConfettiParticle(id: 12, color: Color.blue, x: -24, y: -32, rotation: -15, scale: 0.9, isCircle: false),
+        ConfettiParticle(id: 13, color: Color.pink, x: 24, y: -34, rotation: 40, scale: 1.0, isCircle: false),
+        ConfettiParticle(id: 14, color: BubbleColor.done, x: -6, y: -44, rotation: 105, scale: 0.75, isCircle: true),
+        ConfettiParticle(id: 15, color: BubbleColor.tomato, x: 6, y: -46, rotation: -85, scale: 1.05, isCircle: false)
+    ]
+
+    var body: some View {
+        if reduceMotion {
+            Text("🎉")
+                .font(.system(size: 22))
+                .padding(6)
+                .background(Circle().fill(BubbleColor.surface).shadow(radius: 3))
+                .transition(.opacity)
+        } else {
+            ZStack {
+                ForEach(Self.particles) { p in
+                    Group {
+                        if p.isCircle {
+                            Circle()
+                                .fill(p.color)
+                                .frame(width: 6 * p.scale, height: 6 * p.scale)
+                        } else {
+                            RoundedRectangle(cornerRadius: 1)
+                                .fill(p.color)
+                                .frame(width: 8 * p.scale, height: 4 * p.scale)
+                        }
+                    }
+                    .rotationEffect(.degrees(animated ? p.rotation + 180 : 0))
+                    .offset(x: animated ? p.x * 1.5 : 0, y: animated ? p.y * 1.5 : 0)
+                    .scaleEffect(animated ? 0.2 : 1.1)
+                    .opacity(animated ? 0 : 1)
+                }
+            }
+            .onAppear {
+                withAnimation(.easeOut(duration: 1.0)) {
+                    animated = true
+                }
+            }
+        }
+    }
+}
+
 // MARK: - Shape and AppKit bridges
 
 // One outline for the body and tail so the stroke has no seam.
 private struct BubbleShape: Shape {
     let edge: TodoBubbleEdge
-    let offset: CGFloat
+    var offset: CGFloat
     let tail: CGFloat
     var radius: CGFloat = 18
     var halfBase: CGFloat = 11
     var inset: CGFloat = 0
+
+    var animatableData: AnimatablePair<CGFloat, CGFloat> {
+        get { AnimatablePair(offset, radius) }
+        set {
+            offset = newValue.first
+            radius = newValue.second
+        }
+    }
 
     func path(in rect: CGRect) -> Path {
         var body = rect.insetBy(dx: inset, dy: inset)
@@ -1599,26 +1762,30 @@ private struct BubbleShape: Shape {
         case .leading: body.origin.x += tail; body.size.width -= tail
         case .trailing: body.size.width -= tail
         }
-        let r = max(0, min(radius, body.width / 2, body.height / 2))
+        let edgeSpan = (edge == .top || edge == .bottom) ? body.width : body.height
+        let maxRForTail = max(4, (edgeSpan - halfBase * 2) / 2)
+        let r = max(0, min(radius, body.width / 2, body.height / 2, maxRForTail))
+        let maxHalfBase = max(3, (edgeSpan - 2 * r) / 2)
+        let actualHalfBase = min(halfBase, maxHalfBase)
         let center: CGFloat
         switch edge {
         case .top, .bottom:
-            center = min(max(body.midX + offset, body.minX + r + halfBase), body.maxX - r - halfBase)
+            center = min(max(body.midX + offset, body.minX + r + actualHalfBase), body.maxX - r - actualHalfBase)
         case .leading, .trailing:
-            center = min(max(body.midY + offset, body.minY + r + halfBase), body.maxY - r - halfBase)
+            center = min(max(body.midY + offset, body.minY + r + actualHalfBase), body.maxY - r - actualHalfBase)
         }
         var path = Path()
         path.move(to: CGPoint(x: body.minX + r, y: body.minY))
-        if edge == .top { addTail(&path, body: body, center: center) }
+        if edge == .top { addTail(&path, body: body, center: center, halfBase: actualHalfBase) }
         path.addLine(to: CGPoint(x: body.maxX - r, y: body.minY))
         path.addArc(tangent1End: CGPoint(x: body.maxX, y: body.minY), tangent2End: CGPoint(x: body.maxX, y: body.minY + r), radius: r)
-        if edge == .trailing { addTail(&path, body: body, center: center) }
+        if edge == .trailing { addTail(&path, body: body, center: center, halfBase: actualHalfBase) }
         path.addLine(to: CGPoint(x: body.maxX, y: body.maxY - r))
         path.addArc(tangent1End: CGPoint(x: body.maxX, y: body.maxY), tangent2End: CGPoint(x: body.maxX - r, y: body.maxY), radius: r)
-        if edge == .bottom { addTail(&path, body: body, center: center) }
+        if edge == .bottom { addTail(&path, body: body, center: center, halfBase: actualHalfBase) }
         path.addLine(to: CGPoint(x: body.minX + r, y: body.maxY))
         path.addArc(tangent1End: CGPoint(x: body.minX, y: body.maxY), tangent2End: CGPoint(x: body.minX, y: body.maxY - r), radius: r)
-        if edge == .leading { addTail(&path, body: body, center: center) }
+        if edge == .leading { addTail(&path, body: body, center: center, halfBase: actualHalfBase) }
         path.addLine(to: CGPoint(x: body.minX, y: body.minY + r))
         path.addArc(tangent1End: CGPoint(x: body.minX, y: body.minY), tangent2End: CGPoint(x: body.minX + r, y: body.minY), radius: r)
         path.closeSubpath()
@@ -1626,7 +1793,7 @@ private struct BubbleShape: Shape {
     }
 
     // `along` follows the clockwise path direction; `out` points away from the body.
-    private func addTail(_ path: inout Path, body: CGRect, center: CGFloat) {
+    private func addTail(_ path: inout Path, body: CGRect, center: CGFloat, halfBase: CGFloat) {
         let direction: CGFloat = (edge == .top || edge == .trailing) ? 1 : -1
         func point(_ along: CGFloat, _ out: CGFloat) -> CGPoint {
             switch edge {
