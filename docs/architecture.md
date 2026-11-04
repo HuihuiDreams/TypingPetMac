@@ -1,8 +1,8 @@
 # TypingPetMac 架构设计文档
 
-> **最后更新**：2026-10-26
+> **最后更新**：2026-11-04
 >
-> **基准版本**：0.19.3（构建版本 Build 35；以当前仓库代码与配置为准，ADR 保留历史演进背景）
+> **基准版本**：0.20.0（构建版本 Build 36；以当前仓库代码与配置为准，ADR 保留历史演进背景）
 
 ---
 
@@ -50,7 +50,7 @@ TypingPetMac/
 ├── README.txt                  # 简要使用说明与启动提示（随包分发）
 ├── LICENSE                     # MIT 开源许可证
 ├── ASSET_LICENSE.md            # 美术素材版权与致谢声明
-├── version.json                # 集中版本号与构建编号定义 (v0.19.3, build 35)
+├── version.json                # 集中版本号与构建编号定义 (v0.20.0, build 36)
 │
 ├── Sources/
 │   └── TypingPet/
@@ -523,7 +523,7 @@ sequenceDiagram
 
 ## 7. 质量保障体系与测试矩阵
 
-本项目全面采用 Swift 6 原生 **Swift Testing** 框架（`import Testing`），截至 v0.19.3 包含 18 个测试套件、153+ 个自动化测试：
+本项目全面采用 Swift 6 原生 **Swift Testing** 框架（`import Testing`），截至 v0.20.0 包含 21 个测试套件、175+ 个自动化测试：
 
 | 测试套件文件 | 覆盖领域 | 核心校验点 |
 | :--- | :--- | :--- |
