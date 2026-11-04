@@ -411,6 +411,7 @@ internal final class PetController: NSObject, NSWindowDelegate {
 
     private func beginMove(with sample: PetDragSample) {
         stopInertia(savePosition: false)
+        updateBreathingAnimation(resting: false)
         moveInitialMouseLocation = sample.point
         moveInitialFrame = panel.frame
         moveSamples = [sample]
@@ -540,6 +541,7 @@ internal final class PetController: NSObject, NSWindowDelegate {
         if savePosition {
             panel.saveFrame(usingName: AppEnvironment.frameAutosaveName)
             updateEdgePeekingAnchor()
+            updateBreathingAnimation(resting: idleStateMachine.state != .active)
         }
     }
 
@@ -883,12 +885,26 @@ internal final class PetController: NSObject, NSWindowDelegate {
             layer.removeAnimation(forKey: "idleBreathing")
             return
         }
-        if resting && idleStateMachine.state == .resting {
+        if resting && (idleStateMachine.state == .resting || idleStateMachine.state == .sleeping) {
             guard layer.animation(forKey: "idleBreathing") == nil else { return }
-            let anim = CABasicAnimation(keyPath: "transform.translation.y")
-            anim.fromValue = 0.0
-            anim.toValue = -2.0
-            anim.duration = 2.0
+            let isSleeping = (idleStateMachine.state == .sleeping)
+            let width = imageView.bounds.width > 0 ? imageView.bounds.width : panel.frame.width
+            let cx = width / 2.0
+            let cy: CGFloat = 0.0
+
+            let lift: CGFloat = isSleeping ? 3.0 : 5.5
+            let scaleY: CGFloat = isSleeping ? 1.035 : 1.06
+            let scaleX: CGFloat = isSleeping ? 0.985 : 0.975
+            let duration: TimeInterval = isSleeping ? 2.5 : 1.7
+
+            var targetTransform = CATransform3DMakeTranslation(cx, cy + lift, 0)
+            targetTransform = CATransform3DScale(targetTransform, scaleX, scaleY, 1.0)
+            targetTransform = CATransform3DTranslate(targetTransform, -cx, -cy, 0)
+
+            let anim = CABasicAnimation(keyPath: "transform")
+            anim.fromValue = NSValue(caTransform3D: CATransform3DIdentity)
+            anim.toValue = NSValue(caTransform3D: targetTransform)
+            anim.duration = duration
             anim.autoreverses = true
             anim.repeatCount = .infinity
             anim.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
@@ -903,9 +919,11 @@ internal final class PetController: NSObject, NSWindowDelegate {
         case .active:
             updateBreathingAnimation(resting: false)
         case .resting:
+            imageView.layer?.removeAnimation(forKey: "idleBreathing")
             updateBreathingAnimation(resting: true)
         case .sleeping:
-            updateBreathingAnimation(resting: false)
+            imageView.layer?.removeAnimation(forKey: "idleBreathing")
+            updateBreathingAnimation(resting: true)
             showSleepingVisuals()
         }
     }
