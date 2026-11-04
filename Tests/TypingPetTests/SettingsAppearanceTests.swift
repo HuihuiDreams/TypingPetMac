@@ -169,4 +169,60 @@ import Testing
         #expect(bubble.entry.appearance == nil)
         #expect(settings.window?.appearance == nil)
     }
+
+    @Test @MainActor
+    func settingsModelTogglesNewMotionAndSpacePreferences() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("SettingsToggles-\(UUID())")
+        let suite = "TypingPetTogglesTests.\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer {
+            try? FileManager.default.removeItem(at: root)
+            defaults.removePersistentDomain(forName: suite)
+        }
+        var appliedCombo = false
+        var appliedBreathing = false
+        var appliedEdge = false
+        var appliedFullScreen = false
+
+        let model = TypingPetSettingsModel(
+            library: PetImageLibrary(defaults: defaults, imagesDirectory: root.appendingPathComponent("Images")),
+            keyStore: KeyReactionStore(defaults: defaults, directory: root.appendingPathComponent("Keys")),
+            scale: 1, restingOpacity: 1, hoverOpacity: 1, shakeLevel: 0,
+            alwaysOnTop: false, positionLocked: false, avoidsPointerWhenLocked: false,
+            comboBounceEnabled: true,
+            idleBreathingEnabled: true,
+            edgePeekingEnabled: false,
+            showInFullScreenSpaces: false,
+            applyScale: { _ in }, applyRestingOpacity: { _ in }, applyHoverOpacity: { _ in }, applyShake: { _ in },
+            applyAlwaysOnTop: { _ in }, applyPositionLock: { _ in }, applyPointerAvoidance: { _ in },
+            applyAppearance: { _ in },
+            applyComboBounce: { appliedCombo = $0 },
+            applyIdleBreathing: { appliedBreathing = $0 },
+            applyEdgePeeking: { appliedEdge = $0 },
+            applyShowInFullScreenSpaces: { appliedFullScreen = $0 },
+            reloadPet: {}, openInputMonitoringSettings: {},
+            defaults: defaults
+        )
+
+        #expect(model.comboBounceEnabled == true)
+        #expect(model.idleBreathingEnabled == true)
+        #expect(model.edgePeekingEnabled == false)
+        #expect(model.showInFullScreenSpaces == false)
+
+        model.setComboBounceEnabled(false)
+        #expect(model.comboBounceEnabled == false)
+        #expect(appliedCombo == false)
+
+        model.setIdleBreathingEnabled(false)
+        #expect(model.idleBreathingEnabled == false)
+        #expect(appliedBreathing == false)
+
+        model.setEdgePeekingEnabled(true)
+        #expect(model.edgePeekingEnabled == true)
+        #expect(appliedEdge == true)
+
+        model.setShowInFullScreenSpaces(true)
+        #expect(model.showInFullScreenSpaces == true)
+        #expect(appliedFullScreen == true)
+    }
 }

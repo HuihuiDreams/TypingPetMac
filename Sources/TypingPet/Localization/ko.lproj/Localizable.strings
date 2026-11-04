@@ -483,3 +483,9 @@
 "Back" = "뒤로";
 "Forward" = "앞으로";
 "Navigate Settings" = "설정 탐색";
+
+/* System space & motion */
+"Dynamic combo bounce" = "동적 타이핑 콤보 바운스";
+"Idle breathing animation" = "대기 중 호흡 애니메이션";
+"Show in full-screen spaces" = "전체 화면 공간에 표시";
+"Screen edge peeking" = "화면 가장자리 엿보기 대기";

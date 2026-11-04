@@ -571,7 +571,8 @@ struct NativeSetWorkspace: View {
 
     private func handleSandboxTyping(_ input: String) {
         guard let lastChar = input.last else { return }
-        sandboxLastKey = String(lastChar).uppercased()
+        let keyName = (lastChar == " ") ? "Space" : (lastChar == "\n" ? "Return" : String(lastChar).uppercased())
+        sandboxLastKey = keyName
         sandboxCombo += 1
         sandboxWPM = min(160, sandboxCombo * 12)
 
@@ -585,16 +586,17 @@ struct NativeSetWorkspace: View {
         }
 
         let matchedURL: URL? = {
-            for mapping in editor.draft.mappings {
-                if let presetID = mapping.selection.presetIDs.first,
-                   let url = editor.store.imageURL(id: presetID, in: editor.draft, set: editor.selectedSet) {
-                    return url
-                }
+            if let matchedMapping = editor.draft.mappings.first(where: { mapping in
+                let codeName = KeyCodeNames.name(for: mapping.stroke.keyCode).uppercased()
+                let displayName = mapping.stroke.displayName.uppercased()
+                return codeName == keyName || displayName == keyName
+            }), let presetID = matchedMapping.selection.presetIDs.first {
+                return editor.store.imageURL(id: presetID, in: editor.draft, set: editor.selectedSet)
             }
             if let unassignedID = editor.draft.unassigned.presetIDs.first {
                 return editor.store.imageURL(id: unassignedID, in: editor.draft, set: editor.selectedSet)
             }
-            return nil
+            return activeIdleURL
         }()
 
         if let matchedURL {

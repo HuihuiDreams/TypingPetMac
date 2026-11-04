@@ -35,6 +35,9 @@
 
 ### Fixed
 
+- 修复动作包编辑试玩沙盒（`NativeSetWorkspace`）在击键时未能根据实际输入的字符匹配对应按键映射动作帧的问题，基于 `KeyCodeNames` 与 `KeyStroke` 精确匹配动作帧并在未命中时回退至未分配动作或待机帧。
+- 修复应用程序冷启动时若前台已处于 Keynote 或 QuickTime Player 等免打扰应用中未能立即应用 0.05 超低不透明度的问题。
+- 补齐设置面板（`SettingsWindow`）对动态打字连击弹跳、待机平缓呼吸动效、全屏空间显示与屏幕边缘停靠探头的原生 Toggle 控制项及 5 语种国际化支持。
 - 修复 `scripts/check_todo.sh` 独立编译待办检查工具时缺失 `Sources/TypingPet/PetPreferences.swift` 源文件依赖的问题。
 
 ## [0.19.3] - 2026-10-27

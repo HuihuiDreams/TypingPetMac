@@ -252,6 +252,36 @@ internal final class PetController: NSObject, NSWindowDelegate {
         }
     }
 
+    var comboBounceEnabled: Bool {
+        get { cachedComboBounceEnabled }
+        set {
+            cachedComboBounceEnabled = newValue
+            AppEnvironment.defaults.set(newValue, forKey: AppPreferencesKey.comboBounceEnabled)
+        }
+    }
+
+    var idleBreathingEnabled: Bool {
+        get { cachedIdleBreathingEnabled }
+        set {
+            cachedIdleBreathingEnabled = newValue
+            AppEnvironment.defaults.set(newValue, forKey: AppPreferencesKey.idleBreathingEnabled)
+            updateBreathingAnimation(resting: idleStateMachine.state == .resting)
+        }
+    }
+
+    var showInFullScreenSpaces: Bool {
+        get { AppEnvironment.defaults.bool(forKey: AppPreferencesKey.showInFullScreenSpaces) }
+        set {
+            AppEnvironment.defaults.set(newValue, forKey: AppPreferencesKey.showInFullScreenSpaces)
+            updateFullScreenAuxiliaryBehavior()
+        }
+    }
+
+    var edgePeekingEnabled: Bool {
+        get { cachedEdgePeekingEnabled }
+        set { setEdgePeekingEnabled(newValue) }
+    }
+
     func handleKeystroke(_ stroke: KeyStroke? = nil) {
         let wasSleeping = (idleStateMachine.state == .sleeping)
         idleStateMachine.receiveInput()
@@ -576,6 +606,10 @@ internal final class PetController: NSObject, NSWindowDelegate {
     }
 
     private func setupApplicationDNDObserver() {
+        if let currentApp = NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
+           Self.dndBundleIDs.contains(currentApp) {
+            dndActive = true
+        }
         dndObserverToken = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didActivateApplicationNotification,
             object: nil,

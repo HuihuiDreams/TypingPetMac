@@ -483,3 +483,9 @@
 "Back" = "戻る";
 "Forward" = "進む";
 "Navigate Settings" = "設定の移動";
+
+/* System space & motion */
+"Dynamic combo bounce" = "打鍵コンボバウンス";
+"Idle breathing animation" = "待機時の呼吸アニメーション";
+"Show in full-screen spaces" = "フルスクリーン空間でも表示";
+"Screen edge peeking" = "画面端のひょっこり待機";

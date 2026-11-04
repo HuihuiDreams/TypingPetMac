@@ -35,6 +35,10 @@ final class TypingPetSettingsModel: ObservableObject {
     @Published private(set) var alwaysOnTop: Bool
     @Published private(set) var positionLocked: Bool
     @Published private(set) var avoidsPointerWhenLocked: Bool
+    @Published private(set) var comboBounceEnabled: Bool
+    @Published private(set) var idleBreathingEnabled: Bool
+    @Published private(set) var edgePeekingEnabled: Bool
+    @Published private(set) var showInFullScreenSpaces: Bool
     @Published private(set) var launchAtLogin: Bool
     @Published private(set) var appearanceMode: SettingsAppearanceMode
     @Published private(set) var inputMonitoringGranted = false
@@ -55,6 +59,10 @@ final class TypingPetSettingsModel: ObservableObject {
     private let currentPositionLock: (() -> Bool)?
     private let applyPointerAvoidance: (Bool) -> Void
     private let applyAppearance: (SettingsAppearanceMode) -> Void
+    private let applyComboBounce: (Bool) -> Void
+    private let applyIdleBreathing: (Bool) -> Void
+    private let applyEdgePeeking: (Bool) -> Void
+    private let applyShowInFullScreenSpaces: (Bool) -> Void
     private let reloadPet: () -> Void
     private let openInputMonitoringSettingsAction: () -> Void
     private let monitoringIsRunning: () -> Bool
@@ -72,6 +80,10 @@ final class TypingPetSettingsModel: ObservableObject {
         alwaysOnTop: Bool,
         positionLocked: Bool,
         avoidsPointerWhenLocked: Bool,
+        comboBounceEnabled: Bool = AppEnvironment.defaults.object(forKey: AppPreferencesKey.comboBounceEnabled) as? Bool ?? AppPreferencesDefault.comboBounceEnabled,
+        idleBreathingEnabled: Bool = AppEnvironment.defaults.object(forKey: AppPreferencesKey.idleBreathingEnabled) as? Bool ?? AppPreferencesDefault.idleBreathingEnabled,
+        edgePeekingEnabled: Bool = AppEnvironment.defaults.bool(forKey: AppPreferencesKey.edgePeekingEnabled),
+        showInFullScreenSpaces: Bool = AppEnvironment.defaults.bool(forKey: AppPreferencesKey.showInFullScreenSpaces),
         applyScale: @escaping (CGFloat) -> Void,
         applyRestingOpacity: @escaping (CGFloat) -> Void,
         applyHoverOpacity: @escaping (CGFloat) -> Void,
@@ -81,6 +93,10 @@ final class TypingPetSettingsModel: ObservableObject {
         currentPositionLock: (() -> Bool)? = nil,
         applyPointerAvoidance: @escaping (Bool) -> Void,
         applyAppearance: @escaping (SettingsAppearanceMode) -> Void = { _ in },
+        applyComboBounce: @escaping (Bool) -> Void = { _ in },
+        applyIdleBreathing: @escaping (Bool) -> Void = { _ in },
+        applyEdgePeeking: @escaping (Bool) -> Void = { _ in },
+        applyShowInFullScreenSpaces: @escaping (Bool) -> Void = { _ in },
         reloadPet: @escaping () -> Void,
         openInputMonitoringSettings: @escaping () -> Void,
         monitoringIsRunning: @escaping () -> Bool = { false },
@@ -99,6 +115,10 @@ final class TypingPetSettingsModel: ObservableObject {
         self.alwaysOnTop = alwaysOnTop
         self.positionLocked = positionLocked
         self.avoidsPointerWhenLocked = avoidsPointerWhenLocked
+        self.comboBounceEnabled = comboBounceEnabled
+        self.idleBreathingEnabled = idleBreathingEnabled
+        self.edgePeekingEnabled = edgePeekingEnabled
+        self.showInFullScreenSpaces = showInFullScreenSpaces
         self.applyScale = applyScale
         self.applyRestingOpacity = applyRestingOpacity
         self.applyHoverOpacity = applyHoverOpacity
@@ -108,6 +128,10 @@ final class TypingPetSettingsModel: ObservableObject {
         self.currentPositionLock = currentPositionLock
         self.applyPointerAvoidance = applyPointerAvoidance
         self.applyAppearance = applyAppearance
+        self.applyComboBounce = applyComboBounce
+        self.applyIdleBreathing = applyIdleBreathing
+        self.applyEdgePeeking = applyEdgePeeking
+        self.applyShowInFullScreenSpaces = applyShowInFullScreenSpaces
         self.reloadPet = reloadPet
         openInputMonitoringSettingsAction = openInputMonitoringSettings
         self.monitoringIsRunning = monitoringIsRunning
@@ -192,6 +216,26 @@ final class TypingPetSettingsModel: ObservableObject {
     func setPointerAvoidance(_ value: Bool) {
         avoidsPointerWhenLocked = value
         applyPointerAvoidance(value)
+    }
+
+    func setComboBounceEnabled(_ value: Bool) {
+        comboBounceEnabled = value
+        applyComboBounce(value)
+    }
+
+    func setIdleBreathingEnabled(_ value: Bool) {
+        idleBreathingEnabled = value
+        applyIdleBreathing(value)
+    }
+
+    func setEdgePeekingEnabled(_ value: Bool) {
+        edgePeekingEnabled = value
+        applyEdgePeeking(value)
+    }
+
+    func setShowInFullScreenSpaces(_ value: Bool) {
+        showInFullScreenSpaces = value
+        applyShowInFullScreenSpaces(value)
     }
 
     func setAppearanceMode(_ value: SettingsAppearanceMode) {
@@ -517,6 +561,26 @@ struct GeneralSettingsView: View {
                             Divider()
                             SettingsNote(text: L("Your pet smoothly moves aside when the pointer gets close, staying on screen."))
                                 .frame(maxWidth: .infinity, alignment: .leading)
+                            Divider()
+                            SettingsToggleRow(
+                                title: L("Dynamic combo bounce"),
+                                isOn: Binding(get: { model.comboBounceEnabled }, set: model.setComboBounceEnabled)
+                            )
+                            Divider()
+                            SettingsToggleRow(
+                                title: L("Idle breathing animation"),
+                                isOn: Binding(get: { model.idleBreathingEnabled }, set: model.setIdleBreathingEnabled)
+                            )
+                            Divider()
+                            SettingsToggleRow(
+                                title: L("Show in full-screen spaces"),
+                                isOn: Binding(get: { model.showInFullScreenSpaces }, set: model.setShowInFullScreenSpaces)
+                            )
+                            Divider()
+                            SettingsToggleRow(
+                                title: L("Screen edge peeking"),
+                                isOn: Binding(get: { model.edgePeekingEnabled }, set: model.setEdgePeekingEnabled)
+                            )
                         }
                     }
 

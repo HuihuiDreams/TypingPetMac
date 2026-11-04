@@ -483,3 +483,9 @@
 "Back" = "后退";
 "Forward" = "前进";
 "Navigate Settings" = "设置导航";
+
+/* System space & motion */
+"Dynamic combo bounce" = "动态打字连击弹跳";
+"Idle breathing animation" = "待机平缓呼吸动效";
+"Show in full-screen spaces" = "在全屏空间中显示";
+"Screen edge peeking" = "屏幕边缘半隐窥视";

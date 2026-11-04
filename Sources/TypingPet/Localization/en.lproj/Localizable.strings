@@ -483,3 +483,9 @@
 "Back" = "Back";
 "Forward" = "Forward";
 "Navigate Settings" = "Navigate Settings";
+
+/* System space & motion */
+"Dynamic combo bounce" = "Dynamic combo bounce";
+"Idle breathing animation" = "Idle breathing animation";
+"Show in full-screen spaces" = "Show in full-screen spaces";
+"Screen edge peeking" = "Screen edge peeking";
