@@ -15,10 +15,11 @@ AGENT = 'TypingPet-Website-Verifier/1.0 (+https://github.com/ynifamily3/TypingPe
 def urlopen(request, timeout=30):
     if isinstance(request, urllib.request.Request):
         url, method, headers = request.full_url, request.get_method(), dict(request.header_items())
-        if request.data is not None:
-            raise ValueError('This verifier transport does not send request bodies')
+        data = request.data
+        if data is not None and not isinstance(data, bytes):
+            raise ValueError('Verification request bodies must be bytes')
     else:
-        url, method, headers = request, 'GET', {}
+        url, method, headers, data = request, 'GET', {}, None
     if urlsplit(url).scheme != 'https' or method not in {'GET', 'HEAD', 'POST', 'PUT', 'DELETE'}:
         raise ValueError('Unexpected verification request')
     print(f'Verifying {method} {urlsplit(url).netloc}{urlsplit(url).path}', flush=True)
@@ -35,7 +36,12 @@ def urlopen(request, timeout=30):
             args.extend(['--request', method])
         for key, value in headers.items():
             args.extend(['--header', key + ': ' + value])
-        output = subprocess.check_output([*args, url], text=True)
+        if data is None:
+            output = subprocess.check_output([*args, url], text=True)
+        else:
+            # Keep payload bytes out of command arguments and preserve the original request method.
+            args.extend(['--data-binary', '@-'])
+            output = subprocess.check_output([*args, url], input=data).decode('utf-8')
         code, final = output.split('\n', 1)
         code = int(code)
         blocks = [block for block in (root / 'headers').read_bytes().replace(b'\r\n', b'\n').split(b'\n\n')
@@ -46,7 +52,7 @@ def urlopen(request, timeout=30):
         payload = root / 'body'
         if not payload.exists() and method != 'HEAD' and code not in {204, 304}:
             raise RuntimeError('Missing verification response body')
-        body = io.BytesIO(payload.read_bytes() if payload.exists() else b'')
+        body = io.BytesIO(payload.read_bytes() if method != 'HEAD' and payload.exists() else b'')
         if code >= 400 or code == 304:
             raise urllib.error.HTTPError(final, code, 'HTTP response', response_headers, body)
         return urllib.response.addinfourl(body, response_headers, final, code)

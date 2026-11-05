@@ -42,10 +42,24 @@ class HTTPTransportTests(unittest.TestCase):
                 urlopen(urllib.request.Request('https://example.com/file', method='POST'))
             self.assertEqual(error.exception.code, 405)
             error.exception.close()
-        with self.response(200, omit=True):
+        with self.response(200, body=b"ignored HEAD header output"):
             with urlopen(urllib.request.Request('https://example.com/file', method='HEAD')) as result:
                 self.assertEqual(result.status, 200)
         self.assertIn('--head', self.command)
+
+    def test_json_body_is_sent_on_stdin_with_the_requested_method(self):
+        def execute(args, **kwargs):
+            self.assertEqual(kwargs["input"], b"{}")
+            self.assertIn("--data-binary", args)
+            self.assertEqual(args[args.index("--request") + 1], "POST")
+            Path(args[args.index("--dump-header") + 1]).write_bytes(b"HTTP/2 405\r\nContent-Length: 0\r\n\r\n")
+            Path(args[args.index("--output") + 1]).write_bytes(b"")
+            return b"405\nhttps://example.com/"
+        with patch("http_transport.subprocess.check_output", side_effect=execute):
+            with self.assertRaises(urllib.error.HTTPError) as error:
+                urlopen(urllib.request.Request("https://example.com/", data=b"{}", method="POST"))
+            self.assertEqual(error.exception.code, 405)
+            error.exception.close()
 
     def test_http_and_bodyless_success_without_a_body_file_are_rejected(self):
         with self.assertRaises(ValueError):
