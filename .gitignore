@@ -24,3 +24,6 @@ __pycache__/
 
 # Share service virtual environment.
 scripts/share-service/.venv/
+
+# Cloudflare local account discovery cache.
+.cloudflare/

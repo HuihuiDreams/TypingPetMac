@@ -590,3 +590,19 @@
 
 /* Template sidebar and management. */
 "Share code character %1$@" = "Share code character %1$@";
+
+/* Community and version previews. */
+"Community public pack" = "Community public pack";
+"Community public packs" = "Community public packs";
+"Explore packs shared publicly by the community. Preview any version before importing." = "Explore packs shared publicly by the community. Preview any version before importing.";
+"Images: %1$@" = "Images: %1$@";
+"Import version %1$@" = "Import version %1$@";
+"Keyboard mappings are included with this pack." = "Keyboard mappings are included with this pack.";
+"Load more" = "Load more";
+"No community packs yet." = "No community packs yet.";
+"No individual key assignments. Uses the normal typing selection." = "No individual key assignments. Uses the normal typing selection.";
+"Public packs can be found and imported by anyone in the community gallery." = "Public packs can be found and imported by anyone in the community gallery.";
+"Refresh" = "Refresh";
+"Saved version: v%1$@" = "Saved version: v%1$@";
+"Template details" = "Template details";
+"Version" = "Version";

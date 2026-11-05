@@ -3,6 +3,8 @@
 import concurrent.futures
 import base64
 import hashlib
+import hmac
+import sqlite3
 import io
 import json
 import os
@@ -192,6 +194,79 @@ class ShareServiceTests(unittest.TestCase):
             path = "/v1/shares/" + created["code"]
             self.assertEqual(self.request(path + "/authorize", "POST", headers=auth)[0], 200)
             self.assertEqual(self.request(path, "DELETE", headers=auth)[0], 200)
+
+    def test_community_visibility_requires_password_and_unpublishing_hides_cover(self):
+        created, _ = self.create()
+        code = created["code"]; path = "/v1/shares/" + code
+        self.assertFalse(self.request(path)[1]["isPublic"])
+        self.assertNotIn(code, [p["code"] for p in self.request("/v1/community")[1]["packs"]])
+        payload = json.dumps({"isPublic": True}).encode()
+        self.assertEqual(self.request(path + "/visibility", "POST", payload)[0], 403)
+        auth = {"X-Share-Password": created["managementPassword"]}
+        self.assertEqual(self.request(path + "/visibility", "POST", payload, auth)[0], 200)
+        self.assertTrue(self.request(path)[1]["isPublic"])
+        listed = next(p for p in self.request("/v1/community")[1]["packs"] if p["code"] == code)
+        self.assertEqual(listed["version"], 1)
+        status, cover = self.request("/v1/community/" + code + "/cover")
+        self.assertEqual(status, 200); self.assertTrue(cover.startswith(b"\x89PNG"))
+        self.assertEqual(self.request(path + "/visibility", "POST", b'{"isPublic":"true"}', auth)[0], 400)
+        self.assertEqual(self.request(path + "/versions", "POST", package("public v2"), {**auth,"X-Base-Version":"1"})[0], 201)
+        listed = next(p for p in self.request("/v1/community")[1]["packs"] if p["code"] == code)
+        self.assertEqual((listed["version"], listed["creatorMessage"]), (2, "public v2"))
+        self.assertEqual(self.request(path + "/visibility", "POST", b'{"isPublic":false}', auth)[0], 200)
+        self.assertNotIn(code, [p["code"] for p in self.request("/v1/community")[1]["packs"]])
+        self.assertEqual(self.request("/v1/community/" + code + "/cover")[0], 404)
+        self.assertEqual(self.request(path)[0], 200, "Unpublishing keeps code-based access")
+        self.assertEqual(self.request("/v1/community?page=0")[0], 400)
+        self.request(path, "DELETE", headers=auth)
+
+    def test_admin_gateway_identity_csrf_review_and_deletion(self):
+        created, _ = self.create(package("moderation fixture"))
+        key = (Path(self.temp.name) / "lookup.key").read_bytes()
+        gateway = hmac.new(key, b"typing-pet-admin-gateway-v1", hashlib.sha256).hexdigest()
+        headers = {"Host":"typing-pet-admin.miel.ing","X-Authentik-Username":"akadmin","X-Admin-Gateway":gateway}
+        self.assertEqual(self.request("/admin/")[0], 403)
+        self.assertEqual(self.request("/admin/", headers={**headers,"X-Admin-Gateway":"forged"})[0], 403)
+        self.assertEqual(self.request("/admin/", headers={**headers,"X-Authentik-Username":"ordinary-user"})[0], 403)
+        self.assertEqual(self.request("/admin/", headers={**headers,"Host":"pet.miel.ing"})[0], 403)
+        self.assertEqual(self.request("/admin/", headers=headers)[0], 200)
+        token = self.request("/admin/api/session", headers=headers)[1]["csrfToken"]
+        packs = self.request("/admin/api/packs", headers=headers)[1]["packs"]
+        own = next(p for p in packs if p["code"] == created["code"])
+        path = "/admin/api/packs/" + own["id"]
+        self.assertEqual(self.request(path + "/versions", headers=headers)[1]["versions"][0]["version"], 1)
+        detail = self.request(path + "/versions/1", headers=headers)[1]
+        self.assertEqual(detail["manifest"]["creatorMessage"], "moderation fixture")
+        self.assertTrue(self.request(path + "/versions/1/images/one", headers=headers)[1].startswith(b"\x89PNG"))
+        self.assertEqual(self.request(path, "DELETE", headers=headers)[0], 403)
+        self.assertEqual(self.request(path,"DELETE",headers={**headers,"X-Admin-CSRF":token,"Origin":"https://evil.example"})[0],403)
+        self.assertEqual(self.request(path,"DELETE",headers={**headers,"X-Admin-CSRF":token,"Origin":"https://typing-pet-admin.miel.ing"})[0],200)
+        self.assertEqual(self.request("/v1/shares/" + created["code"])[0],410)
+        with sqlite3.connect(Path(self.temp.name) / "shares.sqlite3") as db:
+            self.assertEqual(db.execute("SELECT actor,action FROM moderation_actions WHERE share_id=?", (own["id"],)).fetchone(),("akadmin","delete"))
+
+    def test_legacy_community_migration_runs_once_and_preserves_later_unpublishing(self):
+        created, _ = self.create()
+        auth = {"X-Share-Password": created["managementPassword"]}
+        path = "/v1/shares/" + created["code"]
+        with sqlite3.connect(Path(self.temp.name) / "shares.sqlite3") as db:
+            db.execute("DELETE FROM service_metadata WHERE key='legacy-community-public-v1'")
+        def restart():
+            type(self).process.terminate(); type(self).process.wait(timeout=5)
+            port = self.base.rsplit(":",1)[1]
+            type(self).process = subprocess.Popen([sys.executable,str(ROOT / "share_dev_server.py")],
+                env={**os.environ,"TYPINGPET_SHARE_STATE_DIR":self.temp.name,"TYPINGPET_SHARE_PORT":port},stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+            for _ in range(100):
+                try: urllib.request.urlopen(self.base+"/health",timeout=1).close();return
+                except OSError:time.sleep(.05)
+            raise RuntimeError("Migration service did not restart")
+        restart()
+        self.assertTrue(self.request(path)[1]["isPublic"])
+        self.assertIn(created["code"],[p["code"] for p in self.request("/v1/community")[1]["packs"]])
+        self.request(path+"/visibility","POST",b'{"isPublic":false}',auth)
+        restart()
+        self.assertFalse(self.request(path)[1]["isPublic"])
+        self.request(path,"DELETE",headers=auth)
 
     def test_rejects_invalid_packages_and_long_message(self):
         headers = {"X-Request-ID": str(uuid.uuid4()), "X-Request-Secret": uuid.uuid4().hex}

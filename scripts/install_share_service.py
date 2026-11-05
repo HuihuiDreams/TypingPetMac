@@ -22,6 +22,7 @@ release = root / 'releases' / stamp
 release.mkdir()
 for name in ['share_dev_server.py', 'backup_share_service.py']:
     shutil.copy2(project / 'scripts' / name, release / name)
+shutil.copytree(project / 'scripts/share-admin', release / 'share-admin')
 for name in ['pyproject.toml', 'uv.lock']:
     shutil.copy2(project / 'scripts/share-service' / name, release / name)
 subprocess.run(['/opt/homebrew/bin/uv', 'sync', '--project', str(release), '--frozen'], check=True)
@@ -59,6 +60,9 @@ if 'location ^~ /share-api/' not in updated:
 
     location = /latest {''', 1)
     if updated == original or 'POST|DELETE' not in updated: raise SystemExit('Unexpected nginx configuration; no changes applied')
+if 'proxy_set_header X-Admin-Gateway "";' not in updated:
+    updated = updated.replace('        proxy_set_header X-Real-IP $remote_addr;',
+        '        proxy_set_header X-Admin-Gateway "";\n        proxy_set_header X-Authentik-Username "";\n        proxy_set_header X-Real-IP $remote_addr;', 1)
 shutil.copy2(nginx, root / 'backups' / ('nginx-' + stamp + '.conf'))
 nginx.write_text(updated)
 try:
@@ -94,7 +98,7 @@ subprocess.run([nginx_bin, '-s', 'reload', '-c', config], check=True)
 doc = {'id': 'typing-pet-share', 'root': str(root), 'descriptor': str(root / 'service.json'), 'version': 1,
        'paths': {'source': [str(current)], 'deploy': [str(root / 'deploy')], 'data': [str(root / 'data')],
                  'logs': [str(root / 'logs')], 'backups': [str(root / 'backups')], 'config': [], 'state': [], 'output': []},
-       'launchd': labels, 'compose': None, 'nginx_configs': [str(nginx)], 'nginx_mirrors': [],
+       'launchd': labels, 'compose': None, 'nginx_configs': [str(path) for path in [nginx, nginx.with_name('typing-pet-admin.conf')] if path.exists()], 'nginx_mirrors': [],
        'legacy_compose': [], 'monitoring_checks': [], 'secret_profiles': [], 'exceptions': []}
 (root / 'service.json').write_text(json.dumps(doc, indent=2) + '\n')
 registry = Path('/Users/miel/server/infra/services/registry.json')

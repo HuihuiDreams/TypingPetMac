@@ -48,7 +48,7 @@ final class ShareTemplateStore: ObservableObject {
         try install(data, preview: preview)
     }
 
-    func install(_ data: Data, preview: LocalSharePreview) throws {
+    func install(_ data: Data, preview: LocalSharePreview, latestKnownVersion: Int? = nil) throws {
         let (root, manifest) = try LocalShareAPI.extract(data)
         defer { try? FileManager.default.removeItem(at: root) }
         guard manifest.name == preview.manifest.name,
@@ -63,7 +63,7 @@ final class ShareTemplateStore: ObservableObject {
         let old = templates.first { $0.id == preview.id }
         var next = templates.filter { $0.id != preview.id }
         next.append(ShareTemplate(preview: preview, folder: folder, lastCheckedAt: Date(),
-                                  latestVersion: preview.latestVersion, checkStatus: nil))
+                                  latestVersion: max(preview.latestVersion, latestKnownVersion ?? preview.latestVersion), checkStatus: nil))
         do { try save(next) }
         catch { try? FileManager.default.removeItem(at: destination); throw error }
         if let old { try? FileManager.default.removeItem(at: directory.appendingPathComponent(old.folder)) }

@@ -507,7 +507,7 @@
 "Imported “%1$@” as an independent copy." = "Imported “%1$@” as an independent copy.";
 "Issue share code" = "Issue share code";
 "Keep the password separately. Anyone with it can edit or delete this share. Lost passwords cannot be recovered." = "Keep the password separately. Anyone with it can edit or delete this share. Lost passwords cannot be recovered.";
-"Latest version" = "Latest version";
+"Latest version" = "最新バージョン";
 "Local development server · no data leaves this Mac" = "Local development server · no data leaves this Mac";
 "Local share server is unavailable. Start the development server first." = "Local share server is unavailable. Start the development server first.";
 "Make local copy" = "Make local copy";
@@ -589,3 +589,19 @@
 
 /* Template sidebar and management. */
 "Share code character %1$@" = "共有コードの%1$@文字目";
+
+/* Community and version previews. */
+"Community public pack" = "コミュニティに公開";
+"Community public packs" = "コミュニティ公開パック";
+"Explore packs shared publicly by the community. Preview any version before importing." = "公開パックを探して、好きなバージョンを確認してから読み込めます。";
+"Images: %1$@" = "画像 %1$@枚";
+"Import version %1$@" = "v%1$@ を読み込む";
+"Keyboard mappings are included with this pack." = "画像と一緒にキーボード割り当ても含まれています。";
+"Load more" = "もっと見る";
+"No community packs yet." = "公開パックはまだありません。";
+"No individual key assignments. Uses the normal typing selection." = "個別キーの割り当てはありません。通常の入力設定を使用します。";
+"Public packs can be found and imported by anyone in the community gallery." = "公開したパックは誰でもコミュニティから読み込めます。";
+"Refresh" = "更新";
+"Saved version: v%1$@" = "保存済み: v%1$@";
+"Template details" = "Template details";
+"Version" = "バージョン";

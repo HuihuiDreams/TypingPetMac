@@ -4,11 +4,12 @@ import Darwin
 import SwiftUI
 
 private enum WorkspacePage: String, CaseIterable {
-    case sets, templates, appearance, todos, general
+    case sets, templates, community, appearance, todos, general
     var title: String {
         switch self {
         case .sets: L("Set Management")
         case .templates: L("Templates")
+        case .community: L("Community public packs")
         case .appearance: L("Appearance and Behavior")
         case .todos: L("Todos and Focus")
         case .general: L("General")
@@ -18,6 +19,7 @@ private enum WorkspacePage: String, CaseIterable {
         switch self {
         case .sets: "shippingbox"
         case .templates: "square.stack"
+        case .community: "globe"
         case .appearance: "slider.horizontal.3"
         case .todos: "checklist"
         case .general: "gearshape"
@@ -27,6 +29,7 @@ private enum WorkspacePage: String, CaseIterable {
         switch self {
         case .sets: .systemTeal
         case .templates: .systemOrange
+        case .community: .systemGreen
         case .appearance: .systemBlue
         case .todos: .systemPurple
         case .general: .secondaryLabelColor
@@ -53,6 +56,7 @@ private final class WorkspaceNavigation: ObservableObject {
         switch history.current {
         case .imageSet: .sets
         case .templates, .template: .templates
+        case .community, .communityPack: .community
         case .appearance: .appearance
         case .todos: .todos
         case .general: .general
@@ -66,6 +70,7 @@ private final class WorkspaceNavigation: ObservableObject {
         switch page {
         case .sets: break
         case .templates: visit(SettingsDestination.templates)
+        case .community: visit(SettingsDestination.community)
         case .appearance: visit(SettingsDestination.appearance)
         case .todos: visit(SettingsDestination.todos)
         case .general: visit(SettingsDestination.general)
@@ -216,6 +221,7 @@ final class SettingsWorkspaceController: NSSplitViewController, NSToolbarDelegat
         switch history.current {
         case .imageSet: page = .sets
         case .templates, .template: page = .templates
+        case .community, .communityPack: page = .community
         case .appearance: page = .appearance
         case .todos: page = .todos
         case .general: page = .general
@@ -371,13 +377,14 @@ private final class WorkspaceSidebarController: NSViewController, NSTableViewDat
         addButton.setAccessibilityLabel(L("New Set"))
         addButton.toolTip = L("New Set")
         addButton.isEnabled = editor.canEdit
-        rows = editor.sets.map { .set($0.id) } + [.templates] + templates.templates.map { .template($0.id) } + [.settings] + [WorkspacePage.appearance, .todos, .general].map(Row.page)
+        rows = editor.sets.map { .set($0.id) } + [.templates] + templates.templates.map { .template($0.id) } + [.page(.community), .settings] + [WorkspacePage.appearance, .todos, .general].map(Row.page)
         table.reloadData()
         let desired: Row
         switch navigation.history.current {
         case .imageSet(let id): desired = .set(id)
         case .template(let code): desired = .template(code)
         case .templates: desired = .templates
+        case .community, .communityPack: desired = .page(.community)
         default: desired = .page(navigation.page)
         }
         if let row = rows.firstIndex(of: desired) { table.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false) }
@@ -395,7 +402,7 @@ private final class WorkspaceSidebarController: NSViewController, NSTableViewDat
             button.bezelStyle = .inline; button.font = .systemFont(ofSize: 11)
             let group = NSStackView(views: [title, NSView(), button])
             group.alignment = .centerY
-            group.edgeInsets = NSEdgeInsets(top: 0, left: 10, bottom: 0, right: 4)
+            group.edgeInsets = NSEdgeInsets(top: 0, left: 10, bottom: 0, right: 16)
             return group
         }
         if case .template(let code) = rows[row], let template = templates.templates.first(where: { $0.id == code }) {
@@ -413,7 +420,7 @@ private final class WorkspaceSidebarController: NSViewController, NSTableViewDat
                 icon.widthAnchor.constraint(equalToConstant: 20), icon.heightAnchor.constraint(equalToConstant: 20),
                 label.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 8), label.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
                 label.trailingAnchor.constraint(lessThanOrEqualTo: manage.leadingAnchor, constant: -4),
-                manage.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -2), manage.centerYAnchor.constraint(equalTo: cell.centerYAnchor)
+                manage.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -14), manage.centerYAnchor.constraint(equalTo: cell.centerYAnchor)
             ])
             cell.textField = label; cell.imageView = icon; cell.toolTip = template.preview.manifest.name + " · " + code
             return cell
@@ -650,6 +657,10 @@ private struct WorkspaceContentView: View {
             if navigation.page == .sets { NativeSetWorkspace(editor: editor, templates: templates) }
             else if case .template(let code) = navigation.history.current {
                 TemplateDetailView(code: code, editor: editor, templates: templates).id(code)
+            } else if case .communityPack(let code) = navigation.history.current {
+                TemplateDetailView(code: code, editor: editor, templates: templates, onReceived: { navigation.visit(.template($0)) }).id("community-" + code)
+            } else if navigation.page == .community {
+                CommunityGalleryView { navigation.visit(.communityPack($0)) }
             } else if navigation.page == .templates {
                 TemplateLibraryView(templates: templates) { navigation.visit(.template($0)) }
             } else { NativeSettingsPages(model: model, todoStore: todoStore, updater: updater, navigation: navigation) }
@@ -809,7 +820,7 @@ private struct NativeSettingsPages: View {
     var body: some View {
         Group {
                 switch navigation.page {
-                case .sets, .templates: EmptyView()
+                case .sets, .templates, .community: EmptyView()
                 case .appearance: GeneralSettingsView(model: model, updater: updater, scope: .pet)
                 case .todos: TodoSettingsView(store: todoStore)
                 case .general: GeneralSettingsView(model: model, updater: updater, scope: .system)

@@ -1,5 +1,54 @@
 [
   {
+    "version": "0.21.0",
+    "date": "2026-11-05",
+    "ko": {
+      "title": "커뮤니티 공개 팩과 버전 선택",
+      "items": [
+        "커뮤니티 공개 팩에서 이미지와 키보드 배치를 미리 보고 원하는 버전을 가져올 수 있습니다.",
+        "템플릿의 버전 선택 메뉴에서 최신 버전부터 과거 버전까지 확인하고 선택한 버전을 복제할 수 있습니다.",
+        "관리 비밀번호를 확인한 뒤 커뮤니티 공개 여부를 바꿀 수 있습니다. 기존 테스트 팩은 공개 목록으로 이관했습니다.",
+        "6자리 코드 입력란의 커서 위치, 이미지 카드 높이와 사이드바 버튼 여백을 다듬었습니다."
+      ]
+    },
+    "en": {
+      "title": "Community packs and version selection",
+      "items": [
+        "Browse public community packs and preview their images and keyboard assignments before importing any version.",
+        "Use the version menu to view releases from newest to oldest and copy the selected version into a local pack.",
+        "Verify the management password to change community visibility. Existing test packs have moved into the public gallery.",
+        "Improve the six-character input caret, image card alignment, and sidebar button spacing."
+      ]
+    },
+    "ja": {
+      "title": "公開パックとバージョン選択",
+      "items": [
+        "コミュニティの公開パックで画像とキー割り当てを確認し、好きなバージョンを読み込めます。",
+        "バージョンメニューを新しい順に表示し、選択したバージョンをローカルパックにコピーできます。",
+        "管理パスワードの確認後、コミュニティへの公開を切り替えられます。既存のテストパックは公開一覧へ移行しました。",
+        "6文字コードのカーソル位置、画像カードの高さ、サイドバーボタンの余白を調整しました。"
+      ]
+    },
+    "zh-Hans": {
+      "title": "社区公开素材包与版本选择",
+      "items": [
+        "浏览社区公开素材包，预览图片及键盘映射后导入所需版本。",
+        "在版本菜单中按从新到旧的顺序查看，并将所选版本复制为本地素材包。",
+        "验证管理密码后可切换社区公开状态。已有测试素材包已迁移至公开列表。",
+        "优化六位代码输入光标、图片卡片高度和侧边栏按钮间距。"
+      ]
+    },
+    "zh-Hant": {
+      "title": "社群公開素材包與版本選擇",
+      "items": [
+        "瀏覽社群公開素材包，預覽圖片及鍵盤對應後匯入所需版本。",
+        "在版本選單中依新到舊的順序查看，並將所選版本複製為本機素材包。",
+        "驗證管理密碼後可切換社群公開狀態。既有測試素材包已移至公開清單。",
+        "調整六位代碼輸入游標、圖片卡片高度及側邊欄按鈕間距。"
+      ]
+    }
+  },
+  {
     "version": "0.20.1",
     "date": "2026-11-05",
     "ko": {

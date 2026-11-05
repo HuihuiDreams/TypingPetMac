@@ -1,0 +1,4 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Typing Pet · 팩 관리</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script></head><body>
+<header><div><span class="brand">TYPING PET</span><h1>팩 관리</h1><p>공유된 팩의 이미지, 키 배치, 버전 이력을 확인하고 부적절한 팩을 삭제합니다.</p></div><div class="actions"><span id="user"></span><button id="refresh">새로고침</button></div></header>
+<main><p id="status" role="status"></p><div id="packs" class="packs"></div><button id="more" hidden>더 보기</button></main>
+<dialog id="detail"><div class="dialog-head"><h2 id="title"></h2><button id="close" aria-label="닫기">닫기</button></div><div class="version-line"><label>버전 <select id="versions"></select></label><button id="delete" class="danger">팩 삭제</button></div><p id="description"></p><div id="images" class="images"></div><h3>키보드 배치</h3><p id="defaults"></p><div id="mappings"></div></dialog></body></html>

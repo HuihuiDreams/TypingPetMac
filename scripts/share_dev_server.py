@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import unquote, urlsplit
+from urllib.parse import unquote, urlsplit, parse_qs
 import hashlib
+import io
 import base64
 import hmac
 import json
@@ -36,6 +37,30 @@ CODE_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 MAX_PACKAGE = 50 * 1024 * 1024
 MAX_FILES = 200
 MAX_EXPANDED = 200 * 1024 * 1024
+ADMIN_HOST = os.environ.get("TYPINGPET_ADMIN_HOST", "typing-pet-admin.miel.ing")
+ADMIN_USER = os.environ.get("TYPINGPET_ADMIN_USER", "akadmin")
+
+
+def generated_share_code(seed, attempt):
+    digest = hmac.new(seed, str(attempt).encode(), hashlib.sha256).digest()
+    number = int.from_bytes(digest, "big") % (36 ** 6)
+    result = ""
+    for _ in range(6):
+        number, index = divmod(number, 36)
+        result += CODE_ALPHABET[index]
+    return result
+
+
+def recovered_share_code(key, digest, identity):
+    if not identity:
+        return None
+    seed = hmac.new(key, ("code:" + identity).encode(), hashlib.sha256).digest()
+    for attempt in range(20):
+        code = generated_share_code(seed, attempt)
+        candidate = hmac.new(key, code.encode(), hashlib.sha256).hexdigest()
+        if hmac.compare_digest(candidate, digest):
+            return code
+    return None
 
 
 def initialize() -> bytes:
@@ -80,13 +105,35 @@ def initialize() -> bytes:
                 share_id TEXT NOT NULL REFERENCES shares(id),
                 package_hash TEXT NOT NULL
             );
-            PRAGMA user_version=2;
+            CREATE TABLE IF NOT EXISTS community_shares (
+                share_id TEXT PRIMARY KEY REFERENCES shares(id),
+                code TEXT NOT NULL UNIQUE,
+                listed_at INTEGER NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS service_metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS moderation_actions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, share_id TEXT NOT NULL,
+                actor TEXT NOT NULL, action TEXT NOT NULL, created_at INTEGER NOT NULL
+            );
+            PRAGMA user_version=3;
         """)
+        migration = "legacy-community-public-v1"
+        if db.execute("SELECT 1 FROM service_metadata WHERE key=?", (migration,)).fetchone() is None:
+            rows = db.execute("SELECT s.id,s.code_digest,r.request_digest FROM shares s LEFT JOIN share_requests r ON r.share_id=s.id WHERE s.status='active'").fetchall()
+            for share_id, digest, identity in rows:
+                code = recovered_share_code(key, digest, identity)
+                if code is None:
+                    raise RuntimeError("Cannot recover a legacy share code; migration stopped without publishing changes")
+                db.execute("INSERT INTO community_shares VALUES (?, ?, ?) ON CONFLICT(share_id) DO NOTHING",
+                           (share_id, code, int(time.time())))
+            db.execute("INSERT INTO service_metadata VALUES (?, ?)", (migration, str(len(rows))))
     os.chmod(DB_PATH, 0o600)
     return key
 
 
 KEY = initialize()
+ADMIN_GATEWAY = hmac.new(KEY, b"typing-pet-admin-gateway-v1", hashlib.sha256).hexdigest()
+ADMIN_CSRF = hmac.new(KEY, ("typing-pet-admin-csrf:" + ADMIN_USER).encode(), hashlib.sha256).hexdigest()
 
 
 def db_connect() -> sqlite3.Connection:
@@ -264,11 +311,19 @@ class API(BaseHTTPRequestHandler):
                     del self.rate_windows[old]
             count = self.rate_windows.get(key, 0) + 1
             self.rate_windows[key] = count
-        if count > 120:
+        if count > 120 and not self.admin_authorized():
             return self.send_json(429, {"error": "rate_limited"})
         path = unquote(urlsplit(self.path).path)
+        if path == "/admin" or path.startswith("/admin/"):
+            return self.admin_route(path)
         if path == "/health" and self.command == "GET":
-            return self.send_json(200, {"ok": True, "mode": os.environ.get("TYPINGPET_SHARE_MODE", "local-development"), "version": "0.20.0"})
+            return self.send_json(200, {"ok": True, "mode": os.environ.get("TYPINGPET_SHARE_MODE", "local-development"), "version": "0.21.0"})
+        if path == "/v1/community" and self.command == "GET":
+            return self.community_list()
+        if path.startswith("/v1/community/") and self.command == "GET":
+            parts = path.strip("/").split("/")
+            if len(parts) == 4 and parts[3] == "cover":
+                return self.community_cover(parts[2])
         if path == "/v1/shares" and self.command == "POST":
             return self.create_share()
         parts = path.strip("/").split("/")
@@ -278,6 +333,8 @@ class API(BaseHTTPRequestHandler):
                 return self.stop_share(code)
             if len(parts) == 3 and self.command == "GET":
                 return self.describe(code)
+            if len(parts) == 4 and parts[3] == "visibility" and self.command == "POST":
+                return self.set_visibility(code)
             if len(parts) == 4 and parts[3] == "authorize" and self.command == "POST":
                 return self.verify_management(code)
             if len(parts) == 4 and parts[3] == "versions" and self.command == "GET":
@@ -376,13 +433,7 @@ class API(BaseHTTPRequestHandler):
 
     @staticmethod
     def generated_code(seed, attempt):
-        digest = hmac.new(seed, str(attempt).encode(), hashlib.sha256).digest()
-        number = int.from_bytes(digest, "big") % (36 ** 6)
-        result = ""
-        for _ in range(6):
-            number, index = divmod(number, 36)
-            result += CODE_ALPHABET[index]
-        return result
+        return generated_share_code(seed, attempt)
 
     def create_share_retry(self, identity, package_hash, code_seed, password):
         with db_connect() as db:
@@ -411,6 +462,171 @@ class API(BaseHTTPRequestHandler):
                    (share_id, version, str(final), digest, len(package),
                     json.dumps(manifest, ensure_ascii=False), int(time.time())))
         return {"packageSize": len(package), "sha256": digest, "manifest": manifest}
+
+    def admin_authorized(self):
+        return (self.headers.get("X-Authentik-Username") == ADMIN_USER
+                and self.headers.get("Host", "").split(":")[0] == ADMIN_HOST
+                and hmac.compare_digest(self.headers.get("X-Admin-Gateway", ""), ADMIN_GATEWAY))
+
+    def send_asset(self, payload, mime, private=False):
+        self.send_response(200)
+        self.send_header("Content-Type", mime)
+        self.send_header("Content-Length", str(len(payload)))
+        self.send_header("Cache-Control", "private, no-store" if private else "no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("X-Frame-Options", "DENY")
+        self.send_header("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'")
+        self.end_headers(); self.wfile.write(payload)
+
+    def admin_route(self, path):
+        if not self.admin_authorized():
+            return self.send_json(403, {"error": "admin_required"})
+        static = {"/admin/": ("index.html", "text/html; charset=utf-8"),
+                  "/admin/app.js": ("app.js", "application/javascript; charset=utf-8"),
+                  "/admin/style.css": ("style.css", "text/css; charset=utf-8")}
+        if path == "/admin": path = "/admin/"
+        if path in static and self.command == "GET":
+            name, mime = static[path]
+            return self.send_asset((Path(__file__).resolve().parent / "share-admin" / name).read_bytes(), mime, True)
+        if path == "/admin/api/session" and self.command == "GET":
+            return self.send_json(200, {"username": ADMIN_USER, "csrfToken": ADMIN_CSRF})
+        if path == "/admin/api/packs" and self.command == "GET":
+            page = int(parse_qs(urlsplit(self.path).query).get("page", ["1"])[0])
+            if not 1 <= page <= 10000: return self.send_json(400, {"error": "invalid_page"})
+            with db_connect() as db:
+                rows = db.execute("""SELECT s.*,r.request_digest,v.manifest_json,v.package_size,
+                    EXISTS(SELECT 1 FROM community_shares c WHERE c.share_id=s.id) AS is_public
+                    FROM shares s LEFT JOIN share_requests r ON r.share_id=s.id
+                    JOIN share_versions v ON v.share_id=s.id AND v.version=s.latest_version
+                    WHERE s.status='active' ORDER BY s.created_at DESC,s.id DESC LIMIT 25 OFFSET ?""", ((page - 1) * 24,)).fetchall()
+            packs = []
+            for row in rows[:24]:
+                manifest = json.loads(row["manifest_json"])
+                packs.append({"id": row["id"], "code": recovered_share_code(KEY, row["code_digest"], row["request_digest"]),
+                              "name": manifest["name"][:200], "creatorMessage": manifest.get("creatorMessage", ""),
+                              "version": row["latest_version"], "isPublic": bool(row["is_public"]),
+                              "presetCount": len(manifest["configuration"]["presets"]), "createdAt": row["created_at"]})
+            return self.send_json(200, {"packs": packs, "nextPage": page + 1 if len(rows) > 24 else None})
+        parts = path.strip("/").split("/")
+        if len(parts) >= 4 and parts[:3] == ["admin", "api", "packs"]:
+            share_id = parts[3]
+            with db_connect() as db:
+                share = db.execute("SELECT * FROM shares WHERE id=?", (share_id,)).fetchone()
+            if share is None or share["status"] != "active":
+                return self.send_json(404, {"error": "share_unavailable"})
+            if len(parts) == 4 and self.command == "DELETE":
+                if (self.headers.get("Origin") != "https://" + ADMIN_HOST
+                        or not hmac.compare_digest(self.headers.get("X-Admin-CSRF", ""), ADMIN_CSRF)):
+                    return self.send_json(403, {"error": "csrf_required"})
+                return self.admin_delete(share_id)
+            if len(parts) >= 5 and parts[4] == "versions" and self.command == "GET":
+                with db_connect() as db:
+                    rows = db.execute("SELECT * FROM share_versions WHERE share_id=? ORDER BY version DESC", (share_id,)).fetchall()
+                if len(parts) == 5:
+                    return self.send_json(200, {"versions": [{"version": row["version"], "publishedAt": row["created_at"]} for row in rows]})
+                if len(parts) >= 6 and parts[5].isascii() and parts[5].isdigit():
+                    row = next((item for item in rows if item["version"] == int(parts[5])), None)
+                    if row is None: return self.send_json(404, {"error": "version_unavailable"})
+                    manifest = json.loads(row["manifest_json"])
+                    if len(parts) == 6:
+                        return self.send_json(200, {"version": row["version"], "publishedAt": row["created_at"], "manifest": manifest})
+                    if len(parts) == 8 and parts[6] == "images" and parts[7] in manifest["images"]:
+                        with zipfile.ZipFile(STATE / "packages" / share_id / f"v{row['version']}.zip") as archive:
+                            payload = archive.read(manifest["images"][parts[7]])
+                        with Image.open(io.BytesIO(payload)) as image:
+                            mime = Image.MIME.get(image.format, "application/octet-stream")
+                        return self.send_asset(payload, mime, True)
+        return self.send_json(404, {"error": "not_found"})
+
+    @serialized_mutation
+    def admin_delete(self, share_id):
+        with db_connect() as db:
+            result = db.execute("UPDATE shares SET status='stopped',stopped_at=? WHERE id=? AND status='active'", (int(time.time()), share_id))
+            if result.rowcount:
+                db.execute("DELETE FROM community_shares WHERE share_id=?", (share_id,))
+                db.execute("INSERT INTO moderation_actions(share_id,actor,action,created_at) VALUES (?,?,?,?)",
+                           (share_id, ADMIN_USER, "delete", int(time.time())))
+        shutil.rmtree(STATE / "packages" / share_id, ignore_errors=True)
+        shutil.rmtree(STATE / "thumbnails" / share_id, ignore_errors=True)
+        return self.send_json(200, {"deleted": True})
+
+    def is_public(self, share_id):
+        with db_connect() as db:
+            return db.execute("SELECT 1 FROM community_shares WHERE share_id=?", (share_id,)).fetchone() is not None
+
+    @serialized_mutation
+    def set_visibility(self, code):
+        share = self.lookup(code)
+        if share is None or share["status"] != "active":
+            return self.send_json(404, {"error": "share_unavailable"})
+        if not self.authorize(share):
+            return self.send_json(403, {"error": "invalid_password"})
+        if int(self.headers.get("Content-Length", "0")) > 1024:
+            return self.send_json(400, {"error": "invalid_visibility"})
+        try:
+            body = json.loads(self.read_body())
+        except (ValueError, UnicodeDecodeError):
+            return self.send_json(400, {"error": "invalid_visibility"})
+        if not isinstance(body, dict) or type(body.get("isPublic")) is not bool:
+            return self.send_json(400, {"error": "invalid_visibility"})
+        with db_connect() as db:
+            if body["isPublic"]:
+                db.execute("INSERT INTO community_shares VALUES (?, ?, ?) ON CONFLICT(share_id) DO NOTHING",
+                           (share["id"], code, int(time.time())))
+            else:
+                db.execute("DELETE FROM community_shares WHERE share_id=?", (share["id"],))
+        return self.send_json(200, {"code": code, "isPublic": body["isPublic"]})
+
+    def community_list(self):
+        try:
+            page = int(parse_qs(urlsplit(self.path).query).get("page", ["1"])[0])
+            if not 1 <= page <= 10000:
+                raise ValueError()
+        except ValueError:
+            return self.send_json(400, {"error": "invalid_page"})
+        size = 24
+        with db_connect() as db:
+            rows = db.execute("""SELECT c.code,c.listed_at,s.latest_version,v.manifest_json,v.package_size,v.created_at
+                FROM community_shares c JOIN shares s ON s.id=c.share_id
+                JOIN share_versions v ON v.share_id=s.id AND v.version=s.latest_version
+                WHERE s.status='active' ORDER BY c.listed_at DESC,c.share_id DESC LIMIT ? OFFSET ?""",
+                (size + 1, (page - 1) * size)).fetchall()
+        packs = []
+        for row in rows[:size]:
+            manifest = json.loads(row["manifest_json"])
+            packs.append({"code": row["code"], "version": row["latest_version"], "name": manifest["name"][:200],
+                          "creatorMessage": manifest.get("creatorMessage", "")[:500],
+                          "presetCount": len(manifest["configuration"]["presets"]),
+                          "mappingCount": len(manifest["configuration"].get("mappings", [])),
+                          "packageSize": row["package_size"], "publishedAt": row["created_at"]})
+        return self.send_json(200, {"packs": packs, "nextPage": page + 1 if len(rows) > size else None})
+
+    def community_cover(self, code):
+        share = self.lookup(code)
+        if share is None or share["status"] != "active" or not self.is_public(share["id"]):
+            return self.send_json(404, {"error": "share_unavailable"})
+        version = share["latest_version"]
+        folder = STATE / "thumbnails" / share["id"]
+        target = folder / f"v{version}.png"
+        if not target.exists():
+            with db_connect() as db:
+                row = db.execute("SELECT manifest_json FROM share_versions WHERE share_id=? AND version=?", (share["id"], version)).fetchone()
+            manifest = json.loads(row["manifest_json"])
+            preset = manifest["configuration"]["idle"]["presetIDs"][0]
+            with zipfile.ZipFile(STATE / "packages" / share["id"] / f"v{version}.zip") as archive:
+                with Image.open(io.BytesIO(archive.read(manifest["images"][preset]))) as source:
+                    image = source.convert("RGBA")
+                    image.thumbnail((256, 256))
+                    output = io.BytesIO(); image.save(output, format="PNG")
+            folder.mkdir(parents=True, exist_ok=True)
+            pending = folder / (secrets.token_hex(8) + ".tmp")
+            pending.write_bytes(output.getvalue()); os.replace(pending, target)
+        payload = target.read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", "image/png")
+        self.send_header("Content-Length", str(len(payload)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers(); self.wfile.write(payload)
 
     def management_password(self):
         encoded = self.headers.get("X-Share-Password-Base64")
@@ -466,7 +682,7 @@ class API(BaseHTTPRequestHandler):
                                     "latestVersion": row["version"],
                                     "manifest": json.loads(row["manifest_json"]),
                                     "packageSize": row["package_size"], "sha256": row["sha256"],
-                                    "publishedAt": row["created_at"]})
+                                    "publishedAt": row["created_at"], "isPublic": self.is_public(share["id"])})
 
     @serialized_mutation
     def add_version(self, code: str):
@@ -505,7 +721,10 @@ class API(BaseHTTPRequestHandler):
         with db_connect() as db:
             result = db.execute("UPDATE shares SET status='stopped', stopped_at=? WHERE id=? AND status='active'",
                                 (int(time.time()), share["id"]))
+        with db_connect() as db:
+            db.execute("DELETE FROM community_shares WHERE share_id=?", (share["id"],))
         shutil.rmtree(STATE / "packages" / share["id"], ignore_errors=True)
+        shutil.rmtree(STATE / "thumbnails" / share["id"], ignore_errors=True)
         self.send_json(200, {"code": code, "status": "stopped", "latestVersion": share["latest_version"]})
 
     def download_latest(self, code: str, revision="latest"):

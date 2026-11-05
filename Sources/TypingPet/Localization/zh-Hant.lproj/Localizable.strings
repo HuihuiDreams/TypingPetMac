@@ -507,7 +507,7 @@
 "Imported “%1$@” as an independent copy." = "Imported “%1$@” as an independent copy.";
 "Issue share code" = "Issue share code";
 "Keep the password separately. Anyone with it can edit or delete this share. Lost passwords cannot be recovered." = "Keep the password separately. Anyone with it can edit or delete this share. Lost passwords cannot be recovered.";
-"Latest version" = "Latest version";
+"Latest version" = "最新版本";
 "Local development server · no data leaves this Mac" = "Local development server · no data leaves this Mac";
 "Local share server is unavailable. Start the development server first." = "Local share server is unavailable. Start the development server first.";
 "Make local copy" = "Make local copy";
@@ -589,3 +589,19 @@
 
 /* Template sidebar and management. */
 "Share code character %1$@" = "分享代碼第%1$@個字元";
+
+/* Community and version previews. */
+"Community public pack" = "在社群公開";
+"Community public packs" = "社群公開素材包";
+"Explore packs shared publicly by the community. Preview any version before importing." = "瀏覽社群公開素材包，預覽所需版本後匯入。";
+"Images: %1$@" = "圖片 %1$@ 張";
+"Import version %1$@" = "匯入 v%1$@";
+"Keyboard mappings are included with this pack." = "此素材包包含圖片和鍵盤對應。";
+"Load more" = "載入更多";
+"No community packs yet." = "尚無社群公開素材包。";
+"No individual key assignments. Uses the normal typing selection." = "沒有個別按鍵對應，使用一般打字設定。";
+"Public packs can be found and imported by anyone in the community gallery." = "任何人都可以在社群中尋找並匯入公開素材包。";
+"Refresh" = "重新整理";
+"Saved version: v%1$@" = "已儲存版本：v%1$@";
+"Template details" = "Template details";
+"Version" = "版本";

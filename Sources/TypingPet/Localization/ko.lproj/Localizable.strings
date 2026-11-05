@@ -590,3 +590,19 @@
 
 /* Template sidebar and management. */
 "Share code character %1$@" = "공유 코드 %1$@번째 글자";
+
+/* Community and version previews. */
+"Community public pack" = "커뮤니티 공개 팩";
+"Community public packs" = "커뮤니티 공개 팩";
+"Explore packs shared publicly by the community. Preview any version before importing." = "커뮤니티에 공개된 팩을 둘러보고 원하는 버전을 확인한 후 가져오세요.";
+"Images: %1$@" = "이미지 %1$@개";
+"Import version %1$@" = "v%1$@ 가져오기";
+"Keyboard mappings are included with this pack." = "이미지와 함께 키보드 배치도 포함되어 있습니다.";
+"Load more" = "더 보기";
+"No community packs yet." = "아직 공개된 커뮤니티 팩이 없습니다.";
+"No individual key assignments. Uses the normal typing selection." = "개별 키 배치가 없습니다. 일반 타이핑 구성을 사용합니다.";
+"Public packs can be found and imported by anyone in the community gallery." = "공개한 팩은 누구나 커뮤니티에서 찾아 가져올 수 있습니다.";
+"Refresh" = "새로고침";
+"Saved version: v%1$@" = "보관 중인 버전: v%1$@";
+"Template details" = "Template details";
+"Version" = "버전";

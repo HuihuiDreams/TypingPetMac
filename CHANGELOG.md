@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.21.0 - 2026-11-05
+
+- Add a community gallery for public packs, with password-protected publication controls. Migrate existing test shares into the public gallery once.
+- Preview and import any published version using a newest-first version selector, including images, idle/typing playback, and keyboard assignments.
+- Center the six-character input editor and caret, align preview card heights, and add space around the sidebar import button.
+- Add an administrator-only web page to review pack versions, images, and keyboard assignments and remove inappropriate shares, with an audit record.
+
 ## 0.20.1 - 2026-11-05
 
 - Move Share to the right of the pack header and organize receiving and management in a Templates sidebar group.

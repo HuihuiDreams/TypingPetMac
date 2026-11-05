@@ -20,7 +20,25 @@ struct LocalSharePreview: Codable, Identifiable {
     let packageSize: Int
     let sha256: String
     let publishedAt: Int
+    var isPublic: Bool? = nil
 }
+
+struct CommunityPackSummary: Decodable, Identifiable {
+    var id: String { code }
+    let code: String
+    let version: Int
+    let name: String
+    let creatorMessage: String
+    let presetCount: Int
+    let mappingCount: Int
+    let packageSize: Int
+    let publishedAt: Int
+}
+struct CommunityPackPage: Decodable {
+    let packs: [CommunityPackSummary]
+    let nextPage: Int?
+}
+private struct CommunityVisibility: Decodable { let isPublic: Bool }
 
 struct ShareVersionSummary: Codable, Identifiable {
     var id: Int { version }
@@ -149,6 +167,21 @@ enum LocalShareAPI {
         return try await request("/v1/shares/\(code)/versions/\(revision)/metadata")
     }
 
+    static func community(page: Int = 1) async throws -> CommunityPackPage {
+        try await request("/v1/community", query: [URLQueryItem(name: "page", value: String(page))])
+    }
+    static func communityCover(code: String, revision: Int) -> URL {
+        var parts = URLComponents(url: baseURL.appendingPathComponent("v1/community/\(code)/cover"), resolvingAgainstBaseURL: false)!
+        parts.queryItems = [URLQueryItem(name: "version", value: String(revision))]
+        return parts.url!
+    }
+    static func setPublic(code: String, password: String, enabled: Bool) async throws -> Bool {
+        let data = try JSONEncoder().encode(["isPublic": enabled])
+        let result: CommunityVisibility = try await request("/v1/shares/\(code)/visibility", method: "POST", body: data,
+            password: password, contentType: "application/json")
+        return result.isPublic
+    }
+
     static func download(_ preview: LocalSharePreview) async throws -> Data {
         let request = URLRequest(url: try endpoint("v1/shares/\(preview.code)/versions/\(preview.latestVersion)"))
         // Download to disk so an oversized response never accumulates in memory.
@@ -167,12 +200,15 @@ enum LocalShareAPI {
     }
 
     private static func request<T: Decodable>(_ path: String, method: String = "GET", body: Data? = nil,
-            password: String? = nil, headers: [String: String] = [:]) async throws -> T {
-        var request = URLRequest(url: try endpoint(path))
+            password: String? = nil, headers: [String: String] = [:], contentType: String = "application/zip",
+            query: [URLQueryItem] = []) async throws -> T {
+        var parts = URLComponents(url: try endpoint(path), resolvingAgainstBaseURL: false)!
+        if !query.isEmpty { parts.queryItems = query }
+        var request = URLRequest(url: parts.url!)
         request.timeoutInterval = 30
         request.httpMethod = method
         request.httpBody = body
-        if body != nil { request.setValue("application/zip", forHTTPHeaderField: "Content-Type") }
+        if body != nil { request.setValue(contentType, forHTTPHeaderField: "Content-Type") }
         if let password { request.setValue(Data(password.utf8).base64EncodedString(), forHTTPHeaderField: "X-Share-Password-Base64") }
         for (key, value) in headers { request.setValue(value, forHTTPHeaderField: key) }
         let data: Data

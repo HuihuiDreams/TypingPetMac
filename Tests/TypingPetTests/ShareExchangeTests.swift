@@ -106,6 +106,37 @@ final class ShareExchangeTests: XCTestCase {
         XCTAssertThrowsError(try LocalShareAPI.unpack(symlink, into: fixture.store))
     }
 
+    @MainActor func testKeyboardMappingsAndPlaybackSurviveSharingAndSelectedVersionImport() throws {
+        let fixture = try Fixture(); defer { fixture.clean() }
+        let source = fixture.store.library.activeSet
+        var config = fixture.store.configuration(for: source)
+        let ids = config.presets.map(\.id)
+        XCTAssertGreaterThan(ids.count, 1)
+        config.idle = PresetSelection(presetIDs: [ids[0]], mode: .cycle)
+        config.unassigned = PresetSelection(presetIDs: Array(ids.reversed()), mode: .cycle)
+        config.mappings = [PresetKeyMapping(stroke: KeyStroke(keyCode: 0, modifiers: [.control, .shift]),
+            selection: PresetSelection(presetIDs: Array(ids.prefix(2)), mode: .cycle))]
+        let bytes = try LocalShareAPI.package(configuration: config, set: source, store: fixture.store, message: "v1 layout")
+        let preview = try fixture.preview(bytes, version: 1)
+        XCTAssertEqual(preview.manifest.configuration, config)
+        try fixture.templates.install(bytes, preview: preview, latestKnownVersion: 3)
+        let template = try XCTUnwrap(fixture.templates.templates.first)
+        XCTAssertEqual(template.preview.latestVersion, 1)
+        XCTAssertEqual(template.latestVersion, 3)
+        let copy = try fixture.templates.copy(template, into: fixture.store)
+        let copied = fixture.store.configuration(for: copy)
+        XCTAssertEqual(copied.idle, config.idle)
+        XCTAssertEqual(copied.unassigned, config.unassigned)
+        XCTAssertEqual(copied.mappings, config.mappings)
+        for preset in config.presets {
+            let original = try XCTUnwrap(fixture.store.imageURL(for: preset, in: source))
+            let target = try XCTUnwrap(copied.presets.first { $0.id == preset.id })
+            let copiedURL = try XCTUnwrap(fixture.store.imageURL(for: target, in: copy))
+            XCTAssertNotEqual(original, copiedURL)
+            XCTAssertEqual(try Data(contentsOf: original), try Data(contentsOf: copiedURL))
+        }
+    }
+
     @MainActor func testRealHTTPExchangeLifecycle() async throws {
         guard ProcessInfo.processInfo.environment["TYPINGPET_TEST_SHARE_HTTP"] == "1" else {
             throw XCTSkip("Set TYPINGPET_TEST_SHARE_HTTP=1 with an isolated share API")
@@ -131,6 +162,24 @@ final class ShareExchangeTests: XCTestCase {
         XCTAssertEqual(history.map(\.version), [2, 1])
         let historical = try await LocalShareAPI.version(code: created.code, revision: 1)
         XCTAssertEqual(historical.manifest.creatorMessage, "hello from creator")
+        let browser = TemplateVersionPreview()
+        browser.open(code: created.code)
+        for _ in 0..<200 { if !browser.busy { break }; try await Task.sleep(nanoseconds: 10_000_000) }
+        XCTAssertFalse(browser.busy)
+        XCTAssertEqual(browser.versions.map(\.version), [2, 1])
+        XCTAssertEqual(browser.preview?.manifest.creatorMessage, "v2")
+        browser.select(1)
+        for _ in 0..<200 { if !browser.busy { break }; try await Task.sleep(nanoseconds: 10_000_000) }
+        XCTAssertEqual(browser.preview?.manifest.creatorMessage, "hello from creator")
+        let preparedRoot = try XCTUnwrap(browser.root)
+        try fixture.templates.install(try XCTUnwrap(browser.data), preview: try XCTUnwrap(browser.preview), latestKnownVersion: browser.latestVersion)
+        XCTAssertEqual(fixture.templates.templates.first?.latestVersion, 2)
+        browser.close()
+        XCTAssertFalse(FileManager.default.fileExists(atPath: preparedRoot.path))
+        try await LocalShareAPI.setPublic(code: created.code, password: password, enabled: true)
+        let community = try await LocalShareAPI.community(page: 1)
+        XCTAssertTrue(community.packs.contains { $0.code == created.code })
+        try await LocalShareAPI.setPublic(code: created.code, password: password, enabled: false)
         let oldCopy = try await fixture.templates.copyVersion(code: created.code, revision: 1, into: fixture.store)
         XCTAssertTrue(fixture.store.configuration(for: oldCopy).name.contains("v1"))
         XCTAssertEqual(fixture.templates.templates.first?.preview.latestVersion, 1)

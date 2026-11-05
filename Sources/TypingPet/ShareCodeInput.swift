@@ -10,19 +10,17 @@ struct ShareCodeInput: NSViewRepresentable {
         let stack = CodeStack()
         for index in 0..<6 {
             let field = NSTextField(string: "")
-            field.cell = CodeCell(textCell: "")
             field.tag = index; field.delegate = context.coordinator
             field.isEditable = true; field.isSelectable = true
             field.font = .monospacedSystemFont(ofSize: 30, weight: .medium)
-            field.alignment = .center; field.isBordered = false; field.drawsBackground = true
+            field.alignment = .center; field.isBordered = false; field.drawsBackground = false
             field.backgroundColor = .controlBackgroundColor; field.focusRingType = .none
             field.maximumNumberOfLines = 1; field.cell?.usesSingleLineMode = true
-            field.wantsLayer = true; field.layer?.cornerRadius = 13
-            field.layer?.borderWidth = 1.5; field.layer?.borderColor = NSColor.gray.withAlphaComponent(0.35).cgColor
             field.setAccessibilityLabel(L("Share code character %1$@", String(index + 1)))
             field.setAccessibilityIdentifier("share-code-\(index + 1)")
-            field.frame = NSRect(x: index * 66, y: 0, width: 58, height: 70)
-            stack.addSubview(field); context.coordinator.fields.append(field)
+            let box = CodeBox(field: field)
+            box.frame = NSRect(x: index * 66, y: 0, width: 58, height: 70)
+            stack.addSubview(box); context.coordinator.fields.append(field)
         }
         stack.onAttach = { [weak coordinator = context.coordinator] in coordinator?.focus(0) }
         context.coordinator.render()
@@ -34,12 +32,25 @@ struct ShareCodeInput: NSViewRepresentable {
         context.coordinator.render()
     }
 
-    final class CodeCell: NSTextFieldCell {
-        override func drawingRect(forBounds rect: NSRect) -> NSRect {
-            var result = super.drawingRect(forBounds: rect)
-            let inset = max(0, (result.height - cellSize.height) / 2)
-            result.origin.y += inset; result.size.height -= inset * 2
-            return result
+    /// The editor and the resting text use the same native-height field inside the tall box.
+    final class CodeBox: NSView {
+        let field: NSTextField
+        init(field: NSTextField) {
+            self.field = field
+            super.init(frame: NSRect(x: 0, y: 0, width: 58, height: 70))
+            wantsLayer = true; layer?.cornerRadius = 13
+            layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
+            layer?.borderWidth = 1.5; layer?.borderColor = NSColor.gray.withAlphaComponent(0.35).cgColor
+            addSubview(field)
+        }
+        required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+        override func layout() {
+            super.layout()
+            let height = min(bounds.height, ceil(field.cell?.cellSize.height ?? 38))
+            field.frame = NSRect(x: 0, y: (bounds.height - height) / 2, width: bounds.width, height: height)
+        }
+        override func mouseDown(with event: NSEvent) {
+            window?.makeFirstResponder(field); field.selectText(nil)
         }
     }
 
@@ -47,7 +58,10 @@ struct ShareCodeInput: NSViewRepresentable {
         override var intrinsicContentSize: NSSize { NSSize(width: 388, height: 70) }
         override func layout() {
             super.layout()
-            for (index, view) in subviews.enumerated() { view.frame = NSRect(x: index * 66, y: 0, width: 58, height: 70) }
+            for (index, view) in subviews.enumerated() {
+                view.frame = NSRect(x: index * 66, y: 0, width: 58, height: 70)
+                view.needsLayout = true
+            }
         }
         var onAttach: (() -> Void)?
         override func viewDidMoveToWindow() {
@@ -76,8 +90,8 @@ struct ShareCodeInput: NSViewRepresentable {
         }
         private func highlight(_ index: Int?) {
             for (position, field) in fields.enumerated() {
-                field.layer?.borderColor = (position == index ? NSColor.controlAccentColor : NSColor.gray.withAlphaComponent(0.35)).cgColor
-                field.layer?.borderWidth = position == index ? 2 : 1.5
+                field.superview?.layer?.borderColor = (position == index ? NSColor.controlAccentColor : NSColor.gray.withAlphaComponent(0.35)).cgColor
+                field.superview?.layer?.borderWidth = position == index ? 2 : 1.5
             }
         }
         func controlTextDidBeginEditing(_ notification: Notification) {

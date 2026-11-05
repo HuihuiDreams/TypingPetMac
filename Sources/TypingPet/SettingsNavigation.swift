@@ -1,7 +1,7 @@
 import Foundation
 
 enum SettingsDestination: Equatable {
-    case imageSet(UUID), templates, template(String), appearance, todos, general
+    case imageSet(UUID), templates, template(String), community, communityPack(String), appearance, todos, general
 }
 
 struct SettingsNavigationHistory {
