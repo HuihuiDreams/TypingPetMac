@@ -85,6 +85,7 @@ class NginxDownloads(unittest.TestCase):
         template = template.replace('listen 172.30.1.1:8444 ssl;', f'listen 127.0.0.1:{cls.port};')
         template = template.replace('listen 127.0.0.1:8444 ssl;', '')
         template = re.sub(r'^\s*ssl_.*$', '', template, flags=re.MULTILINE)
+        template = re.sub(r'^\s*include /Users/miel/\.config/nginx/snippets/common-tls-1\.conf;$', '', template, flags=re.MULTILINE)
         template = re.sub(r'^\s*access_log .*$', '    access_log off;', template, flags=re.MULTILINE)
         template = re.sub(r'^\s*error_log .*$', f'    error_log {cls.root}/error.log warn;', template, flags=re.MULTILINE)
         template = template.replace('/Users/miel/.config/nginx/snippets/typing-pet-download-targets.conf', str(cls.root / 'targets.conf'))

@@ -21,3 +21,6 @@ __pycache__/
 
 # Local planning and working drafts. Curated public writing lives in developer-notes/.
 /docs/
+
+# Share service virtual environment.
+scripts/share-service/.venv/

@@ -1,26 +1,80 @@
 [
   {
+    "version": "0.20.0",
+    "date": "2026-11-05",
+    "ko": {
+      "title": "코드로 팩 교환",
+      "items": [
+        "6자리 코드로 팩 사본과 제작자의 한마디를 공유하고, 자동 발급된 관리 비밀번호로 수정·삭제할 수 있습니다.",
+        "받은 팩은 템플릿으로 보관하고 내 로컬 팩으로 복사해 사용합니다. 업데이트 확인으로 템플릿을 갱신해도 기존 로컬 사본은 유지됩니다.",
+        "서버 주소를 입력할 필요 없이 공유 서비스에 자동으로 연결합니다."
+      ]
+    },
+    "en": {
+      "title": "Exchange packs by code",
+      "items": [
+        "Share a pack snapshot and creator message using a six-character code. A generated management password lets you publish revisions or delete the share.",
+        "Receive packs as templates and make local copies to use them. Check for template updates while preserving your edited local copies.",
+        "Connect to the share service automatically, with no server address to enter."
+      ]
+    },
+    "ja": {
+      "title": "コードでパックを交換",
+      "items": [
+        "6文字のコードでパックのコピーと作者のメッセージを共有できます。自動発行の管理パスワードで更新や削除ができます。",
+        "受け取ったパックはテンプレートとして保存し、ローカルにコピーして使用します。テンプレートを更新しても既存のコピーは保持されます。",
+        "サーバーアドレスの入力は不要です。共有サービスに自動で接続します。"
+      ]
+    },
+    "zh-Hans": {
+      "title": "通过代码交换素材包",
+      "items": [
+        "使用六位代码分享素材包副本和作者留言。自动生成的管理密码可用于发布新版本或删除分享。",
+        "收到的素材包作为模板保存，复制到本地后使用。更新模板时会保留已编辑的本地副本。",
+        "自动连接分享服务，无需输入服务器地址。"
+      ]
+    },
+    "zh-Hant": {
+      "title": "透過代碼交換素材包",
+      "items": [
+        "使用六位代碼分享素材包副本及作者留言。自動產生的管理密碼可用於發佈新版本或刪除分享。",
+        "收到的素材包會儲存為範本，複製到本機後使用。更新範本時會保留已編輯的本機副本。",
+        "自動連接分享服務，無需輸入伺服器位址。"
+      ]
+    }
+  },
+  {
     "version": "0.19.3",
     "date": "2026-10-27",
     "ko": {
       "title": "사이드바 경계선 제거",
-      "items": ["설정 사이드바와 메인 화면 사이의 세로 경계선을 제거했습니다."]
+      "items": [
+        "설정 사이드바와 메인 화면 사이의 세로 경계선을 제거했습니다."
+      ]
     },
     "en": {
       "title": "Remove the Settings sidebar boundary",
-      "items": ["Removed the vertical divider between the Settings sidebar and main content."]
+      "items": [
+        "Removed the vertical divider between the Settings sidebar and main content."
+      ]
     },
     "ja": {
       "title": "設定サイドバーの境界線を削除",
-      "items": ["設定サイドバーとメイン画面の間にある縦の境界線を削除しました。"]
+      "items": [
+        "設定サイドバーとメイン画面の間にある縦の境界線を削除しました。"
+      ]
     },
     "zh-Hans": {
       "title": "移除设置侧边栏边界线",
-      "items": ["移除了设置侧边栏与主内容之间的竖直分隔线。"]
+      "items": [
+        "移除了设置侧边栏与主内容之间的竖直分隔线。"
+      ]
     },
     "zh-Hant": {
       "title": "移除設定側邊欄界線",
-      "items": ["移除了設定側邊欄與主內容之間的垂直分隔線。"]
+      "items": [
+        "移除了設定側邊欄與主內容之間的垂直分隔線。"
+      ]
     }
   },
   {
@@ -28,23 +82,33 @@
     "date": "2026-10-26",
     "ko": {
       "title": "설정 사이드바 구분선 제거",
-      "items": ["설정 사이드바와 본문 사이의 세로 구분선을 제거했습니다."]
+      "items": [
+        "설정 사이드바와 본문 사이의 세로 구분선을 제거했습니다."
+      ]
     },
     "en": {
       "title": "Remove the Settings sidebar divider",
-      "items": ["Removed the vertical divider between the Settings sidebar and content."]
+      "items": [
+        "Removed the vertical divider between the Settings sidebar and content."
+      ]
     },
     "ja": {
       "title": "設定サイドバーの境界線を削除",
-      "items": ["設定サイドバーとコンテンツの間にある縦の境界線を削除しました。"]
+      "items": [
+        "設定サイドバーとコンテンツの間にある縦の境界線を削除しました。"
+      ]
     },
     "zh-Hans": {
       "title": "移除设置侧边栏分隔线",
-      "items": ["移除了设置侧边栏与内容之间的竖直分隔线。"]
+      "items": [
+        "移除了设置侧边栏与内容之间的竖直分隔线。"
+      ]
     },
     "zh-Hant": {
       "title": "移除設定側邊欄分隔線",
-      "items": ["移除了設定側邊欄與內容之間的垂直分隔線。"]
+      "items": [
+        "移除了設定側邊欄與內容之間的垂直分隔線。"
+      ]
     }
   },
   {

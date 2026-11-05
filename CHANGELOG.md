@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.20.0 - 2026-11-05
+
+- Exchange pack snapshots using random six-character codes and automatically generated management passwords, with an optional creator message.
+- Receive read-only templates, check for updates, and explicitly copy templates into independent local packs. Template updates and share deletion preserve existing local copies.
+- Manage shares by code and password, publish immutable revisions with conflict checks, and delete shares to stop new downloads.
+- Connect automatically to the dedicated Mac mini share service over HTTPS. Validate archive paths, image files, sizes, and download hashes before installation.
+
 ## 0.19.3 - 2026-10-27
 
 - Remove the visible vertical divider between the Settings sidebar and main content.

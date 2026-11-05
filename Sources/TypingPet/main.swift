@@ -1118,7 +1118,8 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate
         #endif
 
         #if DEBUG
-        if ProcessInfo.processInfo.arguments.contains("--show-settings") {
+        if ProcessInfo.processInfo.arguments.contains("--show-settings")
+            || (AppEnvironment.isDevelopment && Bundle.main.object(forInfoDictionaryKey: "TypingPetPreviewSettings") as? Bool == true) {
             DispatchQueue.main.async { [weak self] in self?.showSettings() }
         }
         #endif

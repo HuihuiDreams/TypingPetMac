@@ -119,6 +119,7 @@ struct NativeSetWorkspace: View {
     @State private var isGalleryDropTargeted = false
     @State private var hoveredPresetID: String?
     @State private var targetedKeyCodes = Set<UInt16>()
+    @State private var showingSharePanel = false
     init(editor: PackEditorModel) {
         self.editor = editor
         _popovers = StateObject(wrappedValue: PackPopoverController(editor: editor))
@@ -143,6 +144,7 @@ struct NativeSetWorkspace: View {
             if case .preset(let id) = popovers.target, !presets.contains(where: { $0.id == id }) { popovers.close() }
         }
         .onDisappear { popovers.close() }
+        .sheet(isPresented: $showingSharePanel) { LocalSharePanel(editor: editor) }
         .alert(L("Error"), isPresented: Binding(get: { editor.errorMessage != nil }, set: { if !$0 { editor.errorMessage = nil } })) {
             Button(L("OK")) { editor.errorMessage = nil }
         } message: { Text(editor.errorMessage ?? "") }
@@ -160,6 +162,11 @@ struct NativeSetWorkspace: View {
                     .buttonStyle(.bordered)
                     .controlSize(.regular)
                     .disabled(!editor.canEdit)
+                    Button { popovers.close(); showingSharePanel = true } label: {
+                        Label(L("Share & Import"), systemImage: "square.and.arrow.up")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
                     if !editor.selectedSet.isBuiltIn {
                         Menu {
                             Button(L("Rename")) { popovers.close(); editor.renamePack(editor.selectedSet) }

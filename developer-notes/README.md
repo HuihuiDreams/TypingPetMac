@@ -11,6 +11,7 @@ Implementation guides and design reviews for Typing Pet. Design reviews describe
 | 노트 | 내용 |
 | --- | --- |
 | [프리셋 팩과 키보드 매핑](preset-editor.md) | 프리셋 갤러리, 키별 아코디언, 미리보기, 저장과 기존 설정 보존 |
+| [팩 교환 API](share-api-local.md) | 6자리 코드, 관리 비밀번호, 템플릿 받기·업데이트·로컬 복사 |
 | [로컬 개발](development.md) | 개발용 앱 실행, 배포용 앱과의 데이터 분리, 입력 모니터링 확인 |
 | [할 일과 집중 타이머](todos.md) | 사용법, 시간 측정, 로컬 저장과 복구 |
 | [자동 업데이트](updates.md) | feed, 서명 검증, 설치 흐름과 개발용 점검 |
@@ -24,7 +25,7 @@ Implementation guides and design reviews for Typing Pet. Design reviews describe
 | 노트 | 상태 | 검토하는 문제 |
 | --- | --- | --- |
 | [할 일 동기화](todo-sync.md) | 검토 중 · 미구현 | 여러 Mac의 로컬 우선 저장, 충돌과 계정 전환 |
-| [펫 세트 서비스](pet-set-service.md) | 검토 중 · 미구현 | 서버 세트 배포, 코드 등록, 이용권과 기존 사용자 전환 |
+| [펫 세트 서비스](pet-set-service.md) | 서비스 설계 검토 중 · 운영 서비스 미구현 | 계정·유료 세트·공식 배포와 기존 사용자 전환 |
 
 ## 발행 기준
 
