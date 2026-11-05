@@ -562,3 +562,30 @@
 
 /* Pack exchange 0.20.0. Untranslated entries use English. */
 "Could not connect to the share service. Check your network and try again." = "Could not connect to the share service. Check your network and try again.";
+
+/* Template sidebar and management. */
+"Choose a local pack" = "ローカルパックを選択";
+"Copy version %1$@" = "v%1$@ をコピー";
+"Enter the management password to manage and publish this template." = "管理パスワードを入力すると、このテンプレートの管理や新しいバージョンの公開ができます。";
+"Image set preview" = "画像セットのプレビュー";
+"Import template" = "テンプレートを読み込む";
+"Local pack to publish" = "公開するローカルパック";
+"Manage" = "管理";
+"Manage template" = "テンプレートを管理";
+"Management password (at least 4 characters)" = "管理パスワード（4文字以上）";
+"Publishing creates a new version. Local copies are preserved." = "公開すると新しいバージョンが作成されます。既存のローカルコピーは保持されます。";
+"Saved template" = "保存済みバージョン";
+"Share" = "共有";
+"Sharing succeeded. Import this code in Templates to add it to your library." = "共有を作成しました。テンプレートでこのコードを読み込むと一覧に追加できます。";
+"Templates" = "テンプレート";
+"The passwords do not match." = "パスワードが一致しません。";
+"Unlock management" = "パスワードを確認";
+"Use at least four characters for the management password." = "管理パスワードは4文字以上にしてください。";
+"Version history" = "バージョン履歴";
+"Your shared pack is available in Templates." = "共有したパックはテンプレートから管理できます。";
+
+/* Template sidebar and management. */
+"Enter a management password." = "管理パスワードを入力してください。";
+
+/* Template sidebar and management. */
+"Share code character %1$@" = "共有コードの%1$@文字目";

@@ -49,4 +49,21 @@ final class SettingsNavigationTests: XCTestCase {
         XCTAssertEqual(empty.current, .imageSet(kept))
         XCTAssertFalse(empty.canGoBack)
     }
+    func testTemplateHistoryKeepsLocalSetsAndPrunesDeletedTemplates() {
+        let local = UUID()
+        var history = SettingsNavigationHistory(initial: .imageSet(local))
+        history.visit(.templates)
+        history.visit(.template("AB12CD"))
+        history.visit(.general)
+        history.goBack()
+        XCTAssertEqual(history.current, .template("AB12CD"))
+        history.removeDeletedSets(validIDs: [local], fallbackID: local)
+        XCTAssertEqual(history.current, .template("AB12CD"))
+        history.removeDeletedTemplates(validCodes: [])
+        XCTAssertEqual(history.current, .templates)
+        XCTAssertFalse(history.entries.contains(.template("AB12CD")))
+        history.goBack()
+        XCTAssertEqual(history.current, .imageSet(local))
+    }
+
 }

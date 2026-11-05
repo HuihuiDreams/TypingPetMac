@@ -562,3 +562,30 @@
 
 /* Pack exchange 0.20.0. Untranslated entries use English. */
 "Could not connect to the share service. Check your network and try again." = "Could not connect to the share service. Check your network and try again.";
+
+/* Template sidebar and management. */
+"Choose a local pack" = "選擇本機素材包";
+"Copy version %1$@" = "複製 v%1$@";
+"Enter the management password to manage and publish this template." = "輸入管理密碼後，即可管理此範本並發佈新版本。";
+"Image set preview" = "圖片集預覽";
+"Import template" = "匯入範本";
+"Local pack to publish" = "要發佈的本機素材包";
+"Manage" = "管理";
+"Manage template" = "管理範本";
+"Management password (at least 4 characters)" = "管理密碼（至少4個字元）";
+"Publishing creates a new version. Local copies are preserved." = "發佈後將建立新版本，並保留現有本機副本。";
+"Saved template" = "已儲存版本";
+"Share" = "分享";
+"Sharing succeeded. Import this code in Templates to add it to your library." = "分享已建立。在範本中匯入此代碼即可加入清單。";
+"Templates" = "範本";
+"The passwords do not match." = "兩次輸入的密碼不一致。";
+"Unlock management" = "驗證密碼";
+"Use at least four characters for the management password." = "管理密碼至少需要4個字元。";
+"Version history" = "版本歷程";
+"Your shared pack is available in Templates." = "可在左側範本清單中管理已分享的素材包。";
+
+/* Template sidebar and management. */
+"Enter a management password." = "請輸入管理密碼。";
+
+/* Template sidebar and management. */
+"Share code character %1$@" = "分享代碼第%1$@個字元";

@@ -563,3 +563,30 @@
 
 /* Pack exchange 0.20.0. Untranslated entries use English. */
 "Could not connect to the share service. Check your network and try again." = "공유 서버에 연결할 수 없습니다. 네트워크를 확인한 뒤 다시 시도하세요.";
+
+/* Template sidebar and management. */
+"Choose a local pack" = "로컬 팩을 선택하세요";
+"Copy version %1$@" = "v%1$@ 복제";
+"Enter the management password to manage and publish this template." = "관리 비밀번호를 입력하면 이 템플릿을 관리하고 새 버전을 배포할 수 있습니다.";
+"Image set preview" = "이미지 세트 미리보기";
+"Import template" = "템플릿 가져오기";
+"Local pack to publish" = "배포할 로컬 팩";
+"Manage" = "관리";
+"Manage template" = "템플릿 관리";
+"Management password (at least 4 characters)" = "관리 비밀번호 (4글자 이상)";
+"Publishing creates a new version. Local copies are preserved." = "배포하면 새 버전이 생성됩니다. 기존 로컬 사본은 유지됩니다.";
+"Saved template" = "보관 중인 버전";
+"Share" = "공유";
+"Sharing succeeded. Import this code in Templates to add it to your library." = "공유를 생성했습니다. 왼쪽 템플릿에서 이 코드를 가져오면 목록에 추가할 수 있습니다.";
+"Templates" = "템플릿";
+"The passwords do not match." = "비밀번호가 일치하지 않습니다.";
+"Unlock management" = "비밀번호 확인";
+"Use at least four characters for the management password." = "관리 비밀번호는 4글자 이상이어야 합니다.";
+"Version history" = "버전 이력";
+"Your shared pack is available in Templates." = "공유한 팩은 왼쪽 템플릿에서 관리할 수 있습니다.";
+
+/* Template sidebar and management. */
+"Enter a management password." = "관리 비밀번호를 입력하세요.";
+
+/* Template sidebar and management. */
+"Share code character %1$@" = "공유 코드 %1$@번째 글자";

@@ -13,6 +13,8 @@ struct ShareTemplate: Codable, Identifiable {
 /// A template never enters PetImageLibrary until the user explicitly makes a copy.
 @MainActor
 final class ShareTemplateStore: ObservableObject {
+    @Published var showsImport = false
+    @Published var managementCode: String?
     @Published private(set) var templates: [ShareTemplate] = []
     @Published private(set) var loadError: String?
     let directory: URL
@@ -96,6 +98,17 @@ final class ShareTemplateStore: ObservableObject {
         let root = directory.appendingPathComponent(template.folder)
         let manifest = try JSONDecoder().decode(LocalShareManifest.self, from: Data(contentsOf: root.appendingPathComponent("manifest.json")))
         return try LocalShareAPI.copy(manifest, root: root, into: store)
+    }
+
+    func copyVersion(code: String, revision: Int, into store: PetPackStore) async throws -> PetImageSet {
+        if let template = templates.first(where: { $0.id == code && $0.preview.latestVersion == revision }) {
+            let root = directory.appendingPathComponent(template.folder)
+            let manifest = try JSONDecoder().decode(LocalShareManifest.self, from: Data(contentsOf: root.appendingPathComponent("manifest.json")))
+            return try LocalShareAPI.copy(manifest, root: root, into: store, revision: revision)
+        }
+        let preview = try await LocalShareAPI.version(code: code, revision: revision)
+        let data = try await LocalShareAPI.download(preview)
+        return try LocalShareAPI.unpack(data, into: store, revision: revision)
     }
 
     func remove(_ template: ShareTemplate) throws {

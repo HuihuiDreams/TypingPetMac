@@ -113,8 +113,13 @@ final class ShareExchangeTests: XCTestCase {
         let fixture = try Fixture(); defer { fixture.clean() }
         let source = fixture.store.library.activeSet
         let created = try await LocalShareAPI.create(archive: fixture.snapshot(message: "hello from creator"), set: source,
-            requestID: UUID().uuidString, secret: UUID().uuidString + UUID().uuidString)
+            requestID: UUID().uuidString, secret: UUID().uuidString + UUID().uuidString, password: "한글네자")
         let password = try XCTUnwrap(created.managementPassword)
+        try await LocalShareAPI.authorize(code: created.code, password: password)
+        do {
+            try await LocalShareAPI.authorize(code: created.code, password: "incorrect")
+            XCTFail("Wrong passwords must not unlock management")
+        } catch LocalShareError.server("invalid_password") {}
         let preview1 = try await LocalShareAPI.preview(code: created.code)
         try await fixture.templates.receive(preview1)
         let local = try fixture.templates.copy(try XCTUnwrap(fixture.templates.templates.first), into: fixture.store)
@@ -122,6 +127,13 @@ final class ShareExchangeTests: XCTestCase {
         let version = try await LocalShareAPI.update(code: created.code, configuration: fixture.store.configuration(for: source),
             set: source, store: fixture.store, password: password, message: "v2", baseVersion: 1)
         XCTAssertEqual(version, 2)
+        let history = try await LocalShareAPI.versions(code: created.code)
+        XCTAssertEqual(history.map(\.version), [2, 1])
+        let historical = try await LocalShareAPI.version(code: created.code, revision: 1)
+        XCTAssertEqual(historical.manifest.creatorMessage, "hello from creator")
+        let oldCopy = try await fixture.templates.copyVersion(code: created.code, revision: 1, into: fixture.store)
+        XCTAssertTrue(fixture.store.configuration(for: oldCopy).name.contains("v1"))
+        XCTAssertEqual(fixture.templates.templates.first?.preview.latestVersion, 1)
         try await fixture.templates.check(try XCTUnwrap(fixture.templates.templates.first))
         XCTAssertEqual(fixture.templates.templates.first?.latestVersion, 2)
         try await fixture.templates.update(try XCTUnwrap(fixture.templates.templates.first))

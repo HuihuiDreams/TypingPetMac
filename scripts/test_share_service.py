@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Exercise actual HTTP against an isolated share service; never print credentials."""
 import concurrent.futures
+import base64
 import hashlib
 import io
 import json
@@ -149,6 +150,48 @@ class ShareServiceTests(unittest.TestCase):
                 self.base = original_base
                 restored.terminate(); restored.wait(timeout=5)
         self.request("/v1/shares/" + created["code"], "DELETE", headers={"X-Share-Password": created["managementPassword"]})
+
+    def test_custom_password_authorization_and_version_history(self):
+        identity = {"X-Request-ID": str(uuid.uuid4()), "X-Request-Secret": uuid.uuid4().hex}
+        for password in [""]:
+            headers = {**identity, "X-Share-Password-Base64": base64.b64encode(password.encode()).decode()}
+            status, result = self.request("/v1/shares", "POST", package(), headers)
+            self.assertEqual(status, 400)
+            self.assertEqual(result["error"], "password_length")
+        password = "한글네자"
+        auth = {"X-Share-Password-Base64": base64.b64encode(password.encode()).decode()}
+        v1 = package("original")
+        created, _ = self.create(v1, {**identity, **auth})
+        self.assertEqual(created["managementPassword"], password)
+        path = "/v1/shares/" + created["code"]
+        self.assertEqual(self.request(path + "/authorize", "POST")[0], 403)
+        self.assertEqual(self.request(path + "/authorize", "POST", headers={"X-Share-Password": "wrong"})[0], 403)
+        self.assertEqual(self.request(path + "/authorize", "POST", headers=auth)[0], 200)
+        self.assertEqual(self.request(path + "/versions", "POST", package("changed"), {**auth, "X-Base-Version": "1"})[0], 201)
+        status, history = self.request(path + "/versions")
+        self.assertEqual(status, 200)
+        self.assertEqual([item["version"] for item in history["versions"]], [2, 1])
+        self.assertEqual(history["versions"][1]["creatorMessage"], "original")
+        self.assertNotIn("manifest", history["versions"][0])
+        status, old = self.request(path + "/versions/1/metadata")
+        self.assertEqual(status, 200)
+        self.assertEqual(old["latestVersion"], 1)
+        self.assertEqual(old["sha256"], hashlib.sha256(v1).hexdigest())
+        self.assertEqual(self.request(path)[1]["latestVersion"], 2)
+        self.assertEqual(self.request(path + "/versions/99/metadata")[0], 404)
+        self.assertEqual(self.request(path + "/versions/not-a-number/metadata")[0], 404)
+        self.assertEqual(self.request(path, "DELETE", headers=auth)[0], 200)
+        self.assertEqual(self.request(path + "/authorize", "POST", headers=auth)[0], 404)
+        self.assertEqual(self.request(path + "/versions")[0], 404)
+
+    def test_custom_password_has_no_character_count_restriction(self):
+        for password in ["a", "가나다", "한" * 600]:
+            auth = {"X-Share-Password-Base64": base64.b64encode(password.encode()).decode()}
+            identity = {"X-Request-ID": str(uuid.uuid4()), "X-Request-Secret": uuid.uuid4().hex}
+            created, _ = self.create(package(), {**identity, **auth})
+            path = "/v1/shares/" + created["code"]
+            self.assertEqual(self.request(path + "/authorize", "POST", headers=auth)[0], 200)
+            self.assertEqual(self.request(path, "DELETE", headers=auth)[0], 200)
 
     def test_rejects_invalid_packages_and_long_message(self):
         headers = {"X-Request-ID": str(uuid.uuid4()), "X-Request-Secret": uuid.uuid4().hex}

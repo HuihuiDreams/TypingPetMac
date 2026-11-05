@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.20.1 - 2026-11-05
+
+- Move Share to the right of the pack header and organize receiving and management in a Templates sidebar group.
+- Add six large code-entry cells with paste and backspace support, plus image-set previews before receiving a template.
+- Let creators choose a visible-text management password, accepting any nonempty value including Korean text.
+- Require server password verification before opening template management. Show version history and copy any published version into an independent local pack.
+- Make website verification use curl for reliable response-body reads while retaining the existing publication checks.
+
 ## 0.20.0 - 2026-11-05
 
 - Exchange pack snapshots using random six-character codes and automatically generated management passwords, with an optional creator message.

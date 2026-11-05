@@ -563,3 +563,30 @@
 
 /* Pack exchange 0.20.0. Untranslated entries use English. */
 "Could not connect to the share service. Check your network and try again." = "Could not connect to the share service. Check your network and try again.";
+
+/* Template sidebar and management. */
+"Choose a local pack" = "Choose a local pack";
+"Copy version %1$@" = "Copy version %1$@";
+"Enter the management password to manage and publish this template." = "Enter the management password to manage and publish this template.";
+"Image set preview" = "Image set preview";
+"Import template" = "Import template";
+"Local pack to publish" = "Local pack to publish";
+"Manage" = "Manage";
+"Manage template" = "Manage template";
+"Management password (at least 4 characters)" = "Management password (at least 4 characters)";
+"Publishing creates a new version. Local copies are preserved." = "Publishing creates a new version. Local copies are preserved.";
+"Saved template" = "Saved template";
+"Share" = "Share";
+"Sharing succeeded. Import this code in Templates to add it to your library." = "Sharing succeeded. Import this code in Templates to add it to your library.";
+"Templates" = "Templates";
+"The passwords do not match." = "The passwords do not match.";
+"Unlock management" = "Unlock management";
+"Use at least four characters for the management password." = "Use at least four characters for the management password.";
+"Version history" = "Version history";
+"Your shared pack is available in Templates." = "Your shared pack is available in Templates.";
+
+/* Template sidebar and management. */
+"Enter a management password." = "Enter a management password.";
+
+/* Template sidebar and management. */
+"Share code character %1$@" = "Share code character %1$@";

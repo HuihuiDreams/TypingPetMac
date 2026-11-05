@@ -22,6 +22,25 @@ struct LocalSharePreview: Codable, Identifiable {
     let publishedAt: Int
 }
 
+struct ShareVersionSummary: Codable, Identifiable {
+    var id: Int { version }
+    let version: Int
+    let name: String
+    let creatorMessage: String
+    let packageSize: Int
+    let publishedAt: Int
+
+    init(preview: LocalSharePreview) {
+        version = preview.latestVersion; name = preview.manifest.name
+        creatorMessage = preview.manifest.creatorMessage ?? ""
+        packageSize = preview.packageSize; publishedAt = preview.publishedAt
+    }
+}
+
+private struct ShareVersionHistory: Decodable {
+    let versions: [ShareVersionSummary]
+}
+
 struct LocalShareCreated: Decodable {
     let managementPassword: String?
     let code: String
@@ -45,6 +64,7 @@ enum LocalShareError: LocalizedError {
         case .server(let code):
             switch code {
             case "share_unavailable": L("This share code is unavailable or has been stopped.")
+            case "password_length": L("Enter a management password.")
             case "invalid_password": L("The management password is incorrect.")
             case "version_conflict": L("This share changed. Check the latest version before publishing again.")
             case "rate_limited": L("Too many requests. Try again in a minute.")
@@ -92,8 +112,8 @@ enum LocalShareAPI {
         AppEnvironment.defaults.set(codes, forKey: codesKey)
     }
 
-    static func create(archive: Data, set: PetImageSet, requestID: String, secret: String) async throws -> LocalShareCreated {
-        let result: LocalShareCreated = try await request("/v1/shares", method: "POST", body: archive,
+    static func create(archive: Data, set: PetImageSet, requestID: String, secret: String, password: String? = nil) async throws -> LocalShareCreated {
+        let result: LocalShareCreated = try await request("/v1/shares", method: "POST", body: archive, password: password,
             headers: ["X-Request-ID": requestID, "X-Request-Secret": secret])
         return result
     }
@@ -113,6 +133,20 @@ enum LocalShareAPI {
     static func preview(code: String) async throws -> LocalSharePreview {
         guard normalizedCode(code) == code, code.count == 6 else { throw LocalShareError.invalidResponse }
         return try await request("/v1/shares/\(code)")
+    }
+
+    static func authorize(code: String, password: String) async throws {
+        let _: LocalShareCreated = try await request("/v1/shares/\(code)/authorize", method: "POST", password: password)
+    }
+
+    static func versions(code: String) async throws -> [ShareVersionSummary] {
+        let history: ShareVersionHistory = try await request("/v1/shares/\(code)/versions")
+        return history.versions
+    }
+
+    static func version(code: String, revision: Int) async throws -> LocalSharePreview {
+        guard revision > 0 else { throw LocalShareError.invalidResponse }
+        return try await request("/v1/shares/\(code)/versions/\(revision)/metadata")
     }
 
     static func download(_ preview: LocalSharePreview) async throws -> Data {
@@ -139,7 +173,7 @@ enum LocalShareAPI {
         request.httpMethod = method
         request.httpBody = body
         if body != nil { request.setValue("application/zip", forHTTPHeaderField: "Content-Type") }
-        if let password { request.setValue(password, forHTTPHeaderField: "X-Share-Password") }
+        if let password { request.setValue(Data(password.utf8).base64EncodedString(), forHTTPHeaderField: "X-Share-Password-Base64") }
         for (key, value) in headers { request.setValue(value, forHTTPHeaderField: key) }
         let data: Data
         let response: URLResponse
@@ -183,10 +217,10 @@ enum LocalShareAPI {
         return data
     }
 
-    static func unpack(_ data: Data, into store: PetPackStore) throws -> PetImageSet {
+    static func unpack(_ data: Data, into store: PetPackStore, revision: Int? = nil) throws -> PetImageSet {
         let (root, manifest) = try extract(data)
         defer { try? FileManager.default.removeItem(at: root) }
-        return try copy(manifest, root: root, into: store)
+        return try copy(manifest, root: root, into: store, revision: revision)
     }
 
     static func extract(_ data: Data) throws -> (URL, LocalShareManifest) {
@@ -238,10 +272,10 @@ enum LocalShareAPI {
         }
     }
 
-    static func copy(_ manifest: LocalShareManifest, root: URL, into store: PetPackStore) throws -> PetImageSet {
+    static func copy(_ manifest: LocalShareManifest, root: URL, into store: PetPackStore, revision: Int? = nil) throws -> PetImageSet {
         try validateManifest(manifest, root: root)
         guard manifest.images.count == manifest.configuration.presets.count else { throw LocalShareError.invalidPackage }
-        let originalName = manifest.configuration.name
+        let originalName = manifest.configuration.name + (revision.map { " v\($0)" } ?? "")
         var name = "\(originalName) (\(L("Copy")))"
         var suffix = 2
         while store.library.imageSets.contains(where: { $0.name.localizedCaseInsensitiveCompare(name) == .orderedSame }) {

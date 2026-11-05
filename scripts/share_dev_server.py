@@ -6,6 +6,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
 import hashlib
+import base64
 import hmac
 import json
 import os
@@ -277,6 +278,14 @@ class API(BaseHTTPRequestHandler):
                 return self.stop_share(code)
             if len(parts) == 3 and self.command == "GET":
                 return self.describe(code)
+            if len(parts) == 4 and parts[3] == "authorize" and self.command == "POST":
+                return self.verify_management(code)
+            if len(parts) == 4 and parts[3] == "versions" and self.command == "GET":
+                return self.list_versions(code)
+            if len(parts) == 6 and parts[3] == "versions" and parts[5] == "metadata" and self.command == "GET":
+                if not parts[4].isascii() or not parts[4].isdigit() or len(parts[4]) > 9:
+                    return self.send_json(404, {"error": "version_unavailable"})
+                return self.describe(code, int(parts[4]))
             if len(parts) == 4 and parts[3] == "versions" and self.command == "POST":
                 return self.add_version(code)
             if len(parts) == 4 and parts[3] == "stop" and self.command == "POST":
@@ -311,7 +320,12 @@ class API(BaseHTTPRequestHandler):
             return self.send_json(400, {"error": "request_identity_required"})
         identity = hmac.new(KEY, (request_id + ":" + recovery).encode(), hashlib.sha256).hexdigest()
         # Recoverable on an authenticated retry, never persisted in plaintext.
-        password = hmac.new(KEY, ("password:" + identity).encode(), hashlib.sha256).hexdigest()[:32]
+        password = self.management_password()
+        if password is not None and not password:
+            return self.send_json(400, {"error": "password_length"})
+        if password is None:
+            # Compatibility with 0.20.0 clients, which still expect a generated password.
+            password = hmac.new(KEY, ("password:" + identity).encode(), hashlib.sha256).hexdigest()[:32]
         code_seed = hmac.new(KEY, ("code:" + identity).encode(), hashlib.sha256).digest()
         try:
             package = self.read_body()
@@ -325,6 +339,8 @@ class API(BaseHTTPRequestHandler):
                 if prior["package_hash"] != package_hash:
                     return self.send_json(409, {"error": "request_conflict"})
                 row = db.execute("SELECT * FROM shares WHERE id=?", (prior["share_id"],)).fetchone()
+                if not hmac.compare_digest(password_record(password, bytes(row["password_salt"]))[1], bytes(row["password_hash"])):
+                    return self.send_json(409, {"error": "request_conflict"})
                 code = self.generated_code(code_seed, 0)
                 # Recover the collision attempt without persisting the plaintext code.
                 for attempt in range(20):
@@ -396,14 +412,46 @@ class API(BaseHTTPRequestHandler):
                     json.dumps(manifest, ensure_ascii=False), int(time.time())))
         return {"packageSize": len(package), "sha256": digest, "manifest": manifest}
 
+    def management_password(self):
+        encoded = self.headers.get("X-Share-Password-Base64")
+        if encoded is not None:
+            try:
+                return base64.b64decode(encoded, validate=True).decode("utf-8")
+            except (ValueError, UnicodeDecodeError):
+                raise ValueError("invalid_password") from None
+        return self.headers.get("X-Share-Password")
+
     def authorize(self, share) -> bool:
-        password = self.headers.get("X-Share-Password", "")
-        if not password or len(password) > 256:
+        password = self.management_password() or ""
+        if not password:
             return False
         candidate = password_record(password, bytes(share["password_salt"]))[1]
         return hmac.compare_digest(candidate, bytes(share["password_hash"]))
 
-    def describe(self, code: str):
+    def verify_management(self, code: str):
+        share = self.lookup(code)
+        if share is None or share["status"] != "active":
+            return self.send_json(404, {"error": "share_unavailable"})
+        if not self.authorize(share):
+            return self.send_json(403, {"error": "invalid_password"})
+        return self.send_json(200, {"code": code, "status": "active", "latestVersion": share["latest_version"]})
+
+    def list_versions(self, code: str):
+        share = self.lookup(code)
+        if share is None or share["status"] != "active":
+            return self.send_json(404, {"error": "share_unavailable"})
+        with db_connect() as db:
+            rows = db.execute("SELECT version, manifest_json, package_size, created_at FROM share_versions WHERE share_id=? ORDER BY version DESC",
+                              (share["id"],)).fetchall()
+        versions = []
+        for row in rows:
+            manifest = json.loads(row["manifest_json"])
+            versions.append({"version": row["version"], "name": manifest["name"],
+                             "creatorMessage": manifest.get("creatorMessage", ""),
+                             "packageSize": row["package_size"], "publishedAt": row["created_at"]})
+        return self.send_json(200, {"versions": versions})
+
+    def describe(self, code: str, revision=None):
         share = self.lookup(code)
         if share is None:
             return self.send_json(404, {"error": "share_unavailable"})
@@ -411,7 +459,9 @@ class API(BaseHTTPRequestHandler):
             return self.send_json(410, {"error": "share_unavailable"})
         with db_connect() as db:
             row = db.execute("SELECT version, manifest_json, package_size, sha256, created_at FROM share_versions WHERE share_id=? AND version=?",
-                             (share["id"], share["latest_version"])).fetchone()
+                             (share["id"], share["latest_version"] if revision is None else revision)).fetchone()
+        if row is None:
+            return self.send_json(404, {"error": "version_unavailable"})
         return self.send_json(200, {"code": code, "status": share["status"],
                                     "latestVersion": row["version"],
                                     "manifest": json.loads(row["manifest_json"]),

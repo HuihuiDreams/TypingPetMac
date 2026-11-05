@@ -115,12 +115,14 @@ private final class CursorRegionView: NSView {
 struct NativeSetWorkspace: View {
     @ObservedObject private var localization = AppLocalization.shared
     @ObservedObject var editor: PackEditorModel
+    @ObservedObject var templates: ShareTemplateStore
     @StateObject private var popovers: PackPopoverController
     @State private var isGalleryDropTargeted = false
     @State private var hoveredPresetID: String?
     @State private var targetedKeyCodes = Set<UInt16>()
     @State private var showingSharePanel = false
-    init(editor: PackEditorModel) {
+    init(editor: PackEditorModel, templates: ShareTemplateStore) {
+        self.templates = templates
         self.editor = editor
         _popovers = StateObject(wrappedValue: PackPopoverController(editor: editor))
     }
@@ -144,7 +146,7 @@ struct NativeSetWorkspace: View {
             if case .preset(let id) = popovers.target, !presets.contains(where: { $0.id == id }) { popovers.close() }
         }
         .onDisappear { popovers.close() }
-        .sheet(isPresented: $showingSharePanel) { LocalSharePanel(editor: editor) }
+        .sheet(isPresented: $showingSharePanel) { LocalSharePanel(editor: editor, templates: templates) }
         .alert(L("Error"), isPresented: Binding(get: { editor.errorMessage != nil }, set: { if !$0 { editor.errorMessage = nil } })) {
             Button(L("OK")) { editor.errorMessage = nil }
         } message: { Text(editor.errorMessage ?? "") }
@@ -162,11 +164,6 @@ struct NativeSetWorkspace: View {
                     .buttonStyle(.bordered)
                     .controlSize(.regular)
                     .disabled(!editor.canEdit)
-                    Button { popovers.close(); showingSharePanel = true } label: {
-                        Label(L("Share & Import"), systemImage: "square.and.arrow.up")
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
                     if !editor.selectedSet.isBuiltIn {
                         Menu {
                             Button(L("Rename")) { popovers.close(); editor.renamePack(editor.selectedSet) }
@@ -179,6 +176,9 @@ struct NativeSetWorkspace: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
             Spacer(minLength: 8)
+            Button { popovers.close(); showingSharePanel = true } label: {
+                Label(L("Share"), systemImage: "square.and.arrow.up")
+            }.buttonStyle(.bordered).controlSize(.regular).disabled(!editor.draft.isUsable)
             if !editor.isActive {
                 Button(L("Use This Set")) { editor.activate(editor.selectedSet) }
                     .buttonStyle(.borderedProminent)
