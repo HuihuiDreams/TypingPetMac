@@ -115,6 +115,7 @@ private final class CursorRegionView: NSView {
 struct NativeSetWorkspace: View {
     @ObservedObject private var localization = AppLocalization.shared
     @ObservedObject var editor: PackEditorModel
+    @ObservedObject var templates: ShareTemplateStore
     @StateObject private var popovers: PackPopoverController
     @State private var isGalleryDropTargeted = false
     @State private var hoveredPresetID: String?
@@ -126,8 +127,11 @@ struct NativeSetWorkspace: View {
     @State private var sandboxCombo: Int = 0
     @State private var sandboxBounceY: CGFloat = 0
     @State private var sandboxResetWorkItem: DispatchWorkItem?
-    init(editor: PackEditorModel) {
+    @State private var showingSharePanel = false
+
+    init(editor: PackEditorModel, templates: ShareTemplateStore) {
         self.editor = editor
+        self.templates = templates
         _popovers = StateObject(wrappedValue: PackPopoverController(editor: editor))
     }
     var body: some View {
@@ -155,6 +159,7 @@ struct NativeSetWorkspace: View {
             sandboxResetWorkItem?.cancel()
             sandboxResetWorkItem = nil
         }
+        .sheet(isPresented: $showingSharePanel) { LocalSharePanel(editor: editor, templates: templates) }
         .alert(L("Error"), isPresented: Binding(get: { editor.errorMessage != nil }, set: { if !$0 { editor.errorMessage = nil } })) {
             Button(L("OK")) { editor.errorMessage = nil }
         } message: { Text(editor.errorMessage ?? "") }
@@ -192,6 +197,9 @@ struct NativeSetWorkspace: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
             Spacer(minLength: 8)
+            Button { popovers.close(); showingSharePanel = true } label: {
+                Label(L("Share"), systemImage: "square.and.arrow.up")
+            }.buttonStyle(.bordered).controlSize(.regular).disabled(!editor.draft.isUsable)
             if !editor.isActive {
                 Button(L("Use This Set")) { editor.activate(editor.selectedSet) }
                     .buttonStyle(.borderedProminent)

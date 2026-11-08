@@ -489,3 +489,132 @@
 "Idle breathing animation" = "待機平緩呼吸動效";
 "Show in full-screen spaces" = "在全螢幕空間中顯示";
 "Screen edge peeking" = "螢幕邊緣半隱窺視";
+
+/* Pack exchange 0.20.0. Untranslated entries use English. */
+"A share service address is required for online exchange." = "A share service address is required for online exchange.";
+"A word from the creator (optional)" = "A word from the creator (optional)";
+"Anyone with the code can import it. The password lets you publish updates and stop this distribution." = "Anyone with the code can import it. The password lets you publish updates and stop this distribution.";
+"Anyone with the code can receive this pack. The management password is separate." = "Anyone with the code can receive this pack. The management password is separate.";
+"Check all updates" = "Check all updates";
+"Check current version" = "Check current version";
+"Check updates" = "Check updates";
+"Code copied." = "Code copied.";
+"Confirm password" = "Confirm password";
+"Copy code" = "Copy code";
+"Copy management password" = "Copy management password";
+"Could not prepare the set package." = "Could not prepare the set package.";
+"Could not reach the local share server." = "Could not reach the local share server.";
+"Create a distribution for “%1$@”" = "Create a distribution for “%1$@”";
+"Create share copy" = "Create share copy";
+"Current share code" = "Current share code";
+"Delete share" = "Delete share";
+"Delete shared pack?" = "Delete shared pack?";
+"Distribution stopped. Existing copies are unchanged." = "Distribution stopped. Existing copies are unchanged.";
+"Enter a six-character code to receive a read-only template." = "Enter a six-character code to receive a read-only template.";
+"Enter a six-character share code. Importing always creates an independent copy." = "Enter a six-character share code. Importing always creates an independent copy.";
+"Export set file…" = "Export set file…";
+"Exported set file." = "Exported set file.";
+"Import as a new copy" = "Import as a new copy";
+"Import by code" = "Import by code";
+"Import set file…" = "Import set file…";
+"Imported “%1$@” as an independent copy." = "Imported “%1$@” as an independent copy.";
+"Issue share code" = "Issue share code";
+"Keep the password separately. Anyone with it can edit or delete this share. Lost passwords cannot be recovered." = "Keep the password separately. Anyone with it can edit or delete this share. Lost passwords cannot be recovered.";
+"Latest version" = "最新版本";
+"Local development server · no data leaves this Mac" = "Local development server · no data leaves this Mac";
+"Local share server is unavailable. Start the development server first." = "Local share server is unavailable. Start the development server first.";
+"Make local copy" = "Make local copy";
+"Manage share" = "Manage share";
+"Manage this set" = "Manage this set";
+"Management password" = "Management password";
+"New downloads and updates will stop. Existing local copies will remain available." = "New downloads and updates will stop. Existing local copies will remain available.";
+"No received templates yet." = "No received templates yet.";
+"Pack exchange" = "Pack exchange";
+"Preview share" = "Preview share";
+"Publish from “%1$@”" = "Publish from “%1$@”";
+"Publish new version" = "Publish new version";
+"Publish the selected local pack to an existing share." = "Publish the selected local pack to an existing share.";
+"Published version %1$@" = "Published version %1$@";
+"Re-importing this code creates a separate copy of the latest version." = "Re-importing this code creates a separate copy of the latest version.";
+"Receive template" = "Receive template";
+"Received templates" = "Received templates";
+"Remove received template" = "Remove received template";
+"Retry share creation" = "Retry share creation";
+"Save your management password" = "Save your management password";
+"Set a management password (8 or more characters)" = "Set a management password (8 or more characters)";
+"Share & Import" = "Share & Import";
+"Share actions" = "Share actions";
+"Share code issued: %1$@" = "Share code issued: %1$@";
+"Share deleted" = "Share deleted";
+"Share deleted. Received templates and local copies are preserved." = "Share deleted. Received templates and local copies are preserved.";
+"Share pack" = "Share pack";
+"Share request failed: %1$@" = "Share request failed: %1$@";
+"Share sets" = "Share sets";
+"Shared snapshot published as version 1." = "Shared snapshot published as version 1.";
+"Sharing publishes a snapshot. Later local edits are published only when you choose to update." = "Sharing publishes a snapshot. Later local edits are published only when you choose to update.";
+"Some update checks failed. See each template for details." = "Some update checks failed. See each template for details.";
+"Stop distribution" = "Stop distribution";
+"Template received. Make a local copy to use it." = "Template received. Make a local copy to use it.";
+"Template updated. Existing local copies are unchanged." = "Template updated. Existing local copies are unchanged.";
+"The local share server returned an invalid response." = "The local share server returned an invalid response.";
+"The management password is incorrect." = "The management password is incorrect.";
+"The password is not saved. If it is lost, create a new distribution code." = "The password is not saved. If it is lost, create a new distribution code.";
+"The previous code is stopped. Create a new distribution to share this set again." = "The previous code is stopped. Create a new distribution to share this set again.";
+"The share package is invalid." = "The share package is invalid.";
+"The share package is too large." = "The share package is too large.";
+"This share changed. Check the latest version before publishing again." = "This share changed. Check the latest version before publishing again.";
+"This share code is unavailable or has been stopped." = "This share code is unavailable or has been stopped.";
+"This share package is invalid or incomplete." = "This share package is invalid or incomplete.";
+"Too many requests. Try again in a minute." = "Too many requests. Try again in a minute.";
+"Update available: v%1$@" = "Update available: v%1$@";
+"Update check failed" = "Update check failed";
+"Update checks completed." = "Update checks completed.";
+"Update template" = "Update template";
+"Updates refresh templates. Your edited local copies are always preserved." = "Updates refresh templates. Your edited local copies are always preserved.";
+"Version %1$@ · %2$@ images · includes key settings" = "Version %1$@ · %2$@ images · includes key settings";
+
+/* Pack exchange 0.20.0. Untranslated entries use English. */
+"Could not connect to the share service. Check your network and try again." = "Could not connect to the share service. Check your network and try again.";
+
+/* Template sidebar and management. */
+"Choose a local pack" = "選擇本機素材包";
+"Copy version %1$@" = "複製 v%1$@";
+"Enter the management password to manage and publish this template." = "輸入管理密碼後，即可管理此範本並發佈新版本。";
+"Image set preview" = "圖片集預覽";
+"Import template" = "匯入範本";
+"Local pack to publish" = "要發佈的本機素材包";
+"Manage" = "管理";
+"Manage template" = "管理範本";
+"Management password (at least 4 characters)" = "管理密碼（至少4個字元）";
+"Publishing creates a new version. Local copies are preserved." = "發佈後將建立新版本，並保留現有本機副本。";
+"Saved template" = "已儲存版本";
+"Share" = "分享";
+"Sharing succeeded. Import this code in Templates to add it to your library." = "分享已建立。在範本中匯入此代碼即可加入清單。";
+"Templates" = "範本";
+"The passwords do not match." = "兩次輸入的密碼不一致。";
+"Unlock management" = "驗證密碼";
+"Use at least four characters for the management password." = "管理密碼至少需要4個字元。";
+"Version history" = "版本歷程";
+"Your shared pack is available in Templates." = "可在左側範本清單中管理已分享的素材包。";
+
+/* Template sidebar and management. */
+"Enter a management password." = "請輸入管理密碼。";
+
+/* Template sidebar and management. */
+"Share code character %1$@" = "分享代碼第%1$@個字元";
+
+/* Community and version previews. */
+"Community public pack" = "在社群公開";
+"Community public packs" = "社群公開素材包";
+"Explore packs shared publicly by the community. Preview any version before importing." = "瀏覽社群公開素材包，預覽所需版本後匯入。";
+"Images: %1$@" = "圖片 %1$@ 張";
+"Import version %1$@" = "匯入 v%1$@";
+"Keyboard mappings are included with this pack." = "此素材包包含圖片和鍵盤對應。";
+"Load more" = "載入更多";
+"No community packs yet." = "尚無社群公開素材包。";
+"No individual key assignments. Uses the normal typing selection." = "沒有個別按鍵對應，使用一般打字設定。";
+"Public packs can be found and imported by anyone in the community gallery." = "任何人都可以在社群中尋找並匯入公開素材包。";
+"Refresh" = "重新整理";
+"Saved version: v%1$@" = "已儲存版本：v%1$@";
+"Template details" = "範本詳情";
+"Version" = "版本";

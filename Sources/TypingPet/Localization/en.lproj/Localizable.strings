@@ -483,9 +483,139 @@
 "Back" = "Back";
 "Forward" = "Forward";
 "Navigate Settings" = "Navigate Settings";
-
 /* System space & motion */
 "Dynamic combo bounce" = "Dynamic combo bounce";
 "Idle breathing animation" = "Idle breathing animation";
 "Show in full-screen spaces" = "Show in full-screen spaces";
 "Screen edge peeking" = "Screen edge peeking";
+
+"Share sets" = "Share sets";
+"Local development server · no data leaves this Mac" = "Local development server · no data leaves this Mac";
+"Development" = "Development";
+"Share actions" = "Share actions";
+"Manage this set" = "Manage this set";
+"Import by code" = "Import by code";
+"Current share code" = "Current share code";
+"Copy code" = "Copy code";
+"Published version %1$@" = "Published version %1$@";
+"Re-importing this code creates a separate copy of the latest version." = "Re-importing this code creates a separate copy of the latest version.";
+"Distribution stopped. Existing copies are unchanged." = "Distribution stopped. Existing copies are unchanged.";
+"Could not reach the local share server." = "Could not reach the local share server.";
+"Management password" = "Management password";
+"The password is not saved. If it is lost, create a new distribution code." = "The password is not saved. If it is lost, create a new distribution code.";
+"Create a distribution for “%1$@”" = "Create a distribution for “%1$@”";
+"Set a management password (8 or more characters)" = "Set a management password (8 or more characters)";
+"Confirm password" = "Confirm password";
+"Anyone with the code can import it. The password lets you publish updates and stop this distribution." = "Anyone with the code can import it. The password lets you publish updates and stop this distribution.";
+"Issue share code" = "Issue share code";
+"Enter a six-character share code. Importing always creates an independent copy." = "Enter a six-character share code. Importing always creates an independent copy.";
+"Preview share" = "Preview share";
+"Version %1$@ · %2$@ images · includes key settings" = "Version %1$@ · %2$@ images · includes key settings";
+"Import as a new copy" = "Import as a new copy";
+"Code copied." = "Code copied.";
+"Share code issued: %1$@" = "Share code issued: %1$@";
+"Imported “%1$@” as an independent copy." = "Imported “%1$@” as an independent copy.";
+"Local share server is unavailable. Start the development server first." = "Local share server is unavailable. Start the development server first.";
+"This share package is invalid or incomplete." = "This share package is invalid or incomplete.";
+"The local share server returned an invalid response." = "The local share server returned an invalid response.";
+"Share request failed: %1$@" = "Share request failed: %1$@";
+"Could not prepare the set package." = "Could not prepare the set package.";
+"Share & Import" = "Share & Import";
+"Export set file…" = "Export set file…";
+"Import set file…" = "Import set file…";
+"Exported set file." = "Exported set file.";
+"Publish new version" = "Publish new version";
+"Stop distribution" = "Stop distribution";
+"The previous code is stopped. Create a new distribution to share this set again." = "The previous code is stopped. Create a new distribution to share this set again.";
+"This share code is unavailable or has been stopped." = "This share code is unavailable or has been stopped.";
+"The management password is incorrect." = "The management password is incorrect.";
+"The share package is invalid." = "The share package is invalid.";
+"The share package is too large." = "The share package is too large.";
+
+/* Pack exchange 0.20.0. Untranslated entries use English. */
+"A share service address is required for online exchange." = "A share service address is required for online exchange.";
+"A word from the creator (optional)" = "A word from the creator (optional)";
+"Anyone with the code can receive this pack. The management password is separate." = "Anyone with the code can receive this pack. The management password is separate.";
+"Check all updates" = "Check all updates";
+"Check current version" = "Check current version";
+"Check updates" = "Check updates";
+"Copy management password" = "Copy management password";
+"Create share copy" = "Create share copy";
+"Delete share" = "Delete share";
+"Delete shared pack?" = "Delete shared pack?";
+"Enter a six-character code to receive a read-only template." = "Enter a six-character code to receive a read-only template.";
+"Keep the password separately. Anyone with it can edit or delete this share. Lost passwords cannot be recovered." = "Keep the password separately. Anyone with it can edit or delete this share. Lost passwords cannot be recovered.";
+"Latest version" = "Latest version";
+"Make local copy" = "Make local copy";
+"Manage share" = "Manage share";
+"New downloads and updates will stop. Existing local copies will remain available." = "New downloads and updates will stop. Existing local copies will remain available.";
+"No received templates yet." = "No received templates yet.";
+"Pack exchange" = "Pack exchange";
+"Publish from “%1$@”" = "Publish from “%1$@”";
+"Publish the selected local pack to an existing share." = "Publish the selected local pack to an existing share.";
+"Receive template" = "Receive template";
+"Received templates" = "Received templates";
+"Remove received template" = "Remove received template";
+"Retry share creation" = "Retry share creation";
+"Save your management password" = "Save your management password";
+"Share deleted" = "Share deleted";
+"Share deleted. Received templates and local copies are preserved." = "Share deleted. Received templates and local copies are preserved.";
+"Share pack" = "Share pack";
+"Shared snapshot published as version 1." = "Shared snapshot published as version 1.";
+"Sharing publishes a snapshot. Later local edits are published only when you choose to update." = "Sharing publishes a snapshot. Later local edits are published only when you choose to update.";
+"Some update checks failed. See each template for details." = "Some update checks failed. See each template for details.";
+"Template received. Make a local copy to use it." = "Template received. Make a local copy to use it.";
+"Template updated. Existing local copies are unchanged." = "Template updated. Existing local copies are unchanged.";
+"This share changed. Check the latest version before publishing again." = "This share changed. Check the latest version before publishing again.";
+"Too many requests. Try again in a minute." = "Too many requests. Try again in a minute.";
+"Update available: v%1$@" = "Update available: v%1$@";
+"Update check failed" = "Update check failed";
+"Update checks completed." = "Update checks completed.";
+"Update template" = "Update template";
+"Updates refresh templates. Your edited local copies are always preserved." = "Updates refresh templates. Your edited local copies are always preserved.";
+
+/* Pack exchange 0.20.0. Untranslated entries use English. */
+"Could not connect to the share service. Check your network and try again." = "Could not connect to the share service. Check your network and try again.";
+
+/* Template sidebar and management. */
+"Choose a local pack" = "Choose a local pack";
+"Copy version %1$@" = "Copy version %1$@";
+"Enter the management password to manage and publish this template." = "Enter the management password to manage and publish this template.";
+"Image set preview" = "Image set preview";
+"Import template" = "Import template";
+"Local pack to publish" = "Local pack to publish";
+"Manage" = "Manage";
+"Manage template" = "Manage template";
+"Management password (at least 4 characters)" = "Management password (at least 4 characters)";
+"Publishing creates a new version. Local copies are preserved." = "Publishing creates a new version. Local copies are preserved.";
+"Saved template" = "Saved template";
+"Share" = "Share";
+"Sharing succeeded. Import this code in Templates to add it to your library." = "Sharing succeeded. Import this code in Templates to add it to your library.";
+"Templates" = "Templates";
+"The passwords do not match." = "The passwords do not match.";
+"Unlock management" = "Unlock management";
+"Use at least four characters for the management password." = "Use at least four characters for the management password.";
+"Version history" = "Version history";
+"Your shared pack is available in Templates." = "Your shared pack is available in Templates.";
+
+/* Template sidebar and management. */
+"Enter a management password." = "Enter a management password.";
+
+/* Template sidebar and management. */
+"Share code character %1$@" = "Share code character %1$@";
+
+/* Community and version previews. */
+"Community public pack" = "Community public pack";
+"Community public packs" = "Community public packs";
+"Explore packs shared publicly by the community. Preview any version before importing." = "Explore packs shared publicly by the community. Preview any version before importing.";
+"Images: %1$@" = "Images: %1$@";
+"Import version %1$@" = "Import version %1$@";
+"Keyboard mappings are included with this pack." = "Keyboard mappings are included with this pack.";
+"Load more" = "Load more";
+"No community packs yet." = "No community packs yet.";
+"No individual key assignments. Uses the normal typing selection." = "No individual key assignments. Uses the normal typing selection.";
+"Public packs can be found and imported by anyone in the community gallery." = "Public packs can be found and imported by anyone in the community gallery.";
+"Refresh" = "Refresh";
+"Saved version: v%1$@" = "Saved version: v%1$@";
+"Template details" = "Template details";
+"Version" = "Version";

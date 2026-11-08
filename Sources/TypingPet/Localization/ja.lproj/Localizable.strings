@@ -489,3 +489,132 @@
 "Idle breathing animation" = "待機時の呼吸アニメーション";
 "Show in full-screen spaces" = "フルスクリーン空間でも表示";
 "Screen edge peeking" = "画面端のひょっこり待機";
+
+/* Pack exchange 0.20.0. Untranslated entries use English. */
+"A share service address is required for online exchange." = "A share service address is required for online exchange.";
+"A word from the creator (optional)" = "A word from the creator (optional)";
+"Anyone with the code can import it. The password lets you publish updates and stop this distribution." = "Anyone with the code can import it. The password lets you publish updates and stop this distribution.";
+"Anyone with the code can receive this pack. The management password is separate." = "Anyone with the code can receive this pack. The management password is separate.";
+"Check all updates" = "Check all updates";
+"Check current version" = "Check current version";
+"Check updates" = "Check updates";
+"Code copied." = "Code copied.";
+"Confirm password" = "Confirm password";
+"Copy code" = "Copy code";
+"Copy management password" = "Copy management password";
+"Could not prepare the set package." = "Could not prepare the set package.";
+"Could not reach the local share server." = "Could not reach the local share server.";
+"Create a distribution for “%1$@”" = "Create a distribution for “%1$@”";
+"Create share copy" = "Create share copy";
+"Current share code" = "Current share code";
+"Delete share" = "Delete share";
+"Delete shared pack?" = "Delete shared pack?";
+"Distribution stopped. Existing copies are unchanged." = "Distribution stopped. Existing copies are unchanged.";
+"Enter a six-character code to receive a read-only template." = "Enter a six-character code to receive a read-only template.";
+"Enter a six-character share code. Importing always creates an independent copy." = "Enter a six-character share code. Importing always creates an independent copy.";
+"Export set file…" = "Export set file…";
+"Exported set file." = "Exported set file.";
+"Import as a new copy" = "Import as a new copy";
+"Import by code" = "Import by code";
+"Import set file…" = "Import set file…";
+"Imported “%1$@” as an independent copy." = "Imported “%1$@” as an independent copy.";
+"Issue share code" = "Issue share code";
+"Keep the password separately. Anyone with it can edit or delete this share. Lost passwords cannot be recovered." = "Keep the password separately. Anyone with it can edit or delete this share. Lost passwords cannot be recovered.";
+"Latest version" = "最新バージョン";
+"Local development server · no data leaves this Mac" = "Local development server · no data leaves this Mac";
+"Local share server is unavailable. Start the development server first." = "Local share server is unavailable. Start the development server first.";
+"Make local copy" = "Make local copy";
+"Manage share" = "Manage share";
+"Manage this set" = "Manage this set";
+"Management password" = "Management password";
+"New downloads and updates will stop. Existing local copies will remain available." = "New downloads and updates will stop. Existing local copies will remain available.";
+"No received templates yet." = "No received templates yet.";
+"Pack exchange" = "Pack exchange";
+"Preview share" = "Preview share";
+"Publish from “%1$@”" = "Publish from “%1$@”";
+"Publish new version" = "Publish new version";
+"Publish the selected local pack to an existing share." = "Publish the selected local pack to an existing share.";
+"Published version %1$@" = "Published version %1$@";
+"Re-importing this code creates a separate copy of the latest version." = "Re-importing this code creates a separate copy of the latest version.";
+"Receive template" = "Receive template";
+"Received templates" = "Received templates";
+"Remove received template" = "Remove received template";
+"Retry share creation" = "Retry share creation";
+"Save your management password" = "Save your management password";
+"Set a management password (8 or more characters)" = "Set a management password (8 or more characters)";
+"Share & Import" = "Share & Import";
+"Share actions" = "Share actions";
+"Share code issued: %1$@" = "Share code issued: %1$@";
+"Share deleted" = "Share deleted";
+"Share deleted. Received templates and local copies are preserved." = "Share deleted. Received templates and local copies are preserved.";
+"Share pack" = "Share pack";
+"Share request failed: %1$@" = "Share request failed: %1$@";
+"Share sets" = "Share sets";
+"Shared snapshot published as version 1." = "Shared snapshot published as version 1.";
+"Sharing publishes a snapshot. Later local edits are published only when you choose to update." = "Sharing publishes a snapshot. Later local edits are published only when you choose to update.";
+"Some update checks failed. See each template for details." = "Some update checks failed. See each template for details.";
+"Stop distribution" = "Stop distribution";
+"Template received. Make a local copy to use it." = "Template received. Make a local copy to use it.";
+"Template updated. Existing local copies are unchanged." = "Template updated. Existing local copies are unchanged.";
+"The local share server returned an invalid response." = "The local share server returned an invalid response.";
+"The management password is incorrect." = "The management password is incorrect.";
+"The password is not saved. If it is lost, create a new distribution code." = "The password is not saved. If it is lost, create a new distribution code.";
+"The previous code is stopped. Create a new distribution to share this set again." = "The previous code is stopped. Create a new distribution to share this set again.";
+"The share package is invalid." = "The share package is invalid.";
+"The share package is too large." = "The share package is too large.";
+"This share changed. Check the latest version before publishing again." = "This share changed. Check the latest version before publishing again.";
+"This share code is unavailable or has been stopped." = "This share code is unavailable or has been stopped.";
+"This share package is invalid or incomplete." = "This share package is invalid or incomplete.";
+"Too many requests. Try again in a minute." = "Too many requests. Try again in a minute.";
+"Update available: v%1$@" = "Update available: v%1$@";
+"Update check failed" = "Update check failed";
+"Update checks completed." = "Update checks completed.";
+"Update template" = "Update template";
+"Updates refresh templates. Your edited local copies are always preserved." = "Updates refresh templates. Your edited local copies are always preserved.";
+"Version %1$@ · %2$@ images · includes key settings" = "Version %1$@ · %2$@ images · includes key settings";
+
+/* Pack exchange 0.20.0. Untranslated entries use English. */
+"Could not connect to the share service. Check your network and try again." = "Could not connect to the share service. Check your network and try again.";
+
+/* Template sidebar and management. */
+"Choose a local pack" = "ローカルパックを選択";
+"Copy version %1$@" = "v%1$@ をコピー";
+"Enter the management password to manage and publish this template." = "管理パスワードを入力すると、このテンプレートの管理や新しいバージョンの公開ができます。";
+"Image set preview" = "画像セットのプレビュー";
+"Import template" = "テンプレートを読み込む";
+"Local pack to publish" = "公開するローカルパック";
+"Manage" = "管理";
+"Manage template" = "テンプレートを管理";
+"Management password (at least 4 characters)" = "管理パスワード（4文字以上）";
+"Publishing creates a new version. Local copies are preserved." = "公開すると新しいバージョンが作成されます。既存のローカルコピーは保持されます。";
+"Saved template" = "保存済みバージョン";
+"Share" = "共有";
+"Sharing succeeded. Import this code in Templates to add it to your library." = "共有を作成しました。テンプレートでこのコードを読み込むと一覧に追加できます。";
+"Templates" = "テンプレート";
+"The passwords do not match." = "パスワードが一致しません。";
+"Unlock management" = "パスワードを確認";
+"Use at least four characters for the management password." = "管理パスワードは4文字以上にしてください。";
+"Version history" = "バージョン履歴";
+"Your shared pack is available in Templates." = "共有したパックはテンプレートから管理できます。";
+
+/* Template sidebar and management. */
+"Enter a management password." = "管理パスワードを入力してください。";
+
+/* Template sidebar and management. */
+"Share code character %1$@" = "共有コードの%1$@文字目";
+
+/* Community and version previews. */
+"Community public pack" = "コミュニティに公開";
+"Community public packs" = "コミュニティ公開パック";
+"Explore packs shared publicly by the community. Preview any version before importing." = "公開パックを探して、好きなバージョンを確認してから読み込めます。";
+"Images: %1$@" = "画像 %1$@枚";
+"Import version %1$@" = "v%1$@ を読み込む";
+"Keyboard mappings are included with this pack." = "画像と一緒にキーボード割り当ても含まれています。";
+"Load more" = "もっと見る";
+"No community packs yet." = "公開パックはまだありません。";
+"No individual key assignments. Uses the normal typing selection." = "個別キーの割り当てはありません。通常の入力設定を使用します。";
+"Public packs can be found and imported by anyone in the community gallery." = "公開したパックは誰でもコミュニティから読み込めます。";
+"Refresh" = "更新";
+"Saved version: v%1$@" = "保存済み: v%1$@";
+"Template details" = "Template details";
+"Version" = "バージョン";

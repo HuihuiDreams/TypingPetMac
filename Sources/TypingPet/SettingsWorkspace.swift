@@ -4,10 +4,12 @@ import Darwin
 import SwiftUI
 
 private enum WorkspacePage: String, CaseIterable {
-    case sets, appearance, todos, general
+    case sets, templates, community, appearance, todos, general
     var title: String {
         switch self {
         case .sets: L("Set Management")
+        case .templates: L("Templates")
+        case .community: L("Community public packs")
         case .appearance: L("Appearance and Behavior")
         case .todos: L("Todos and Focus")
         case .general: L("General")
@@ -16,6 +18,8 @@ private enum WorkspacePage: String, CaseIterable {
     var symbol: String {
         switch self {
         case .sets: "shippingbox"
+        case .templates: "square.stack"
+        case .community: "globe"
         case .appearance: "slider.horizontal.3"
         case .todos: "checklist"
         case .general: "gearshape"
@@ -24,6 +28,8 @@ private enum WorkspacePage: String, CaseIterable {
     var tint: NSColor {
         switch self {
         case .sets: .systemTeal
+        case .templates: .systemOrange
+        case .community: .systemGreen
         case .appearance: .systemBlue
         case .todos: .systemPurple
         case .general: .secondaryLabelColor
@@ -49,6 +55,8 @@ private final class WorkspaceNavigation: ObservableObject {
     var page: WorkspacePage {
         switch history.current {
         case .imageSet: .sets
+        case .templates, .template: .templates
+        case .community, .communityPack: .community
         case .appearance: .appearance
         case .todos: .todos
         case .general: .general
@@ -61,11 +69,14 @@ private final class WorkspaceNavigation: ObservableObject {
     func visit(_ page: WorkspacePage) {
         switch page {
         case .sets: break
+        case .templates: visit(SettingsDestination.templates)
+        case .community: visit(SettingsDestination.community)
         case .appearance: visit(SettingsDestination.appearance)
         case .todos: visit(SettingsDestination.todos)
         case .general: visit(SettingsDestination.general)
         }
     }
+    func removeDeletedTemplates(validCodes: Set<String>) { history.removeDeletedTemplates(validCodes: validCodes) }
     func goBack() { history.goBack() }
     func goForward() { history.goForward() }
     func removeDeletedSets(validIDs: Set<UUID>, fallbackID: UUID) {
@@ -82,6 +93,7 @@ private final class SettingsSplitView: NSSplitView {
 /// The integrated preset gallery and keyboard editor are native SwiftUI views.
 @MainActor
 final class SettingsWorkspaceController: NSSplitViewController, NSToolbarDelegate {
+    private let templates = ShareTemplateStore()
     private let editor: PackEditorModel
     private let navigation: WorkspaceNavigation
     private let historyID = NSToolbarItem.Identifier("TypingPetSettingsHistory")
@@ -96,7 +108,7 @@ final class SettingsWorkspaceController: NSSplitViewController, NSToolbarDelegat
         navigation = WorkspaceNavigation(initialSetID: editor.selectedSetID)
         super.init(nibName: nil, bundle: nil)
         splitView = SettingsSplitView()
-        let sidebar = NSSplitViewItem(sidebarWithViewController: WorkspaceSidebarController(editor: editor, navigation: navigation))
+        let sidebar = NSSplitViewItem(sidebarWithViewController: WorkspaceSidebarController(editor: editor, navigation: navigation, templates: templates))
         sidebar.minimumThickness = 240
         sidebar.maximumThickness = 320
         sidebar.canCollapse = false
@@ -104,7 +116,7 @@ final class SettingsWorkspaceController: NSSplitViewController, NSToolbarDelegat
         sidebar.allowsFullHeightLayout = true
         sidebar.preferredThicknessFraction = 0.23
         let content = NSSplitViewItem(viewController: WorkspaceContentController(
-            model: model, todoStore: todoStore, updater: updater, editor: editor, navigation: navigation))
+            model: model, todoStore: todoStore, updater: updater, editor: editor, navigation: navigation, templates: templates))
         content.minimumThickness = 530
         addSplitViewItem(sidebar)
         addSplitViewItem(content)
@@ -119,6 +131,11 @@ final class SettingsWorkspaceController: NSSplitViewController, NSToolbarDelegat
                 self.restoringHistory = false
             }
             self.updateToolbar(history: history)
+        }.store(in: &subscriptions)
+        templates.$templates.receive(on: DispatchQueue.main).sink { [weak self] values in
+            guard let self else { return }
+            self.navigation.removeDeletedTemplates(validCodes: Set(values.map(\.id)))
+            self.updateToolbar(history: self.navigation.history)
         }.store(in: &subscriptions)
         editor.onSelectionChanged = { [weak self] id in
             guard let self, !self.restoringHistory else { return }
@@ -204,12 +221,17 @@ final class SettingsWorkspaceController: NSSplitViewController, NSToolbarDelegat
         let page: WorkspacePage
         switch history.current {
         case .imageSet: page = .sets
+        case .templates, .template: page = .templates
+        case .community, .communityPack: page = .community
         case .appearance: page = .appearance
         case .todos: page = .todos
         case .general: page = .general
         }
         if case .imageSet(let id) = history.current, let set = editor.sets.first(where: { $0.id == id }) {
             pageTitle.stringValue = editor.configuration(for: set).name
+        } else if case .template(let code) = history.current,
+                  let template = templates.templates.first(where: { $0.id == code }) {
+            pageTitle.stringValue = template.preview.manifest.name
         } else {
             pageTitle.stringValue = page.title
         }
@@ -225,11 +247,11 @@ final class SettingsWorkspaceController: NSSplitViewController, NSToolbarDelegat
         view.window?.toolbar?.items.first(where: { $0.itemIdentifier == historyID })?.label = L("Navigate Settings")
         view.window?.toolbar?.items.first(where: { $0.itemIdentifier == pageTitleID })?.label = pageTitle.stringValue
     }
-
     @objc private func navigateHistory(_ sender: NSSegmentedControl) {
         if sender.selectedSegment == 0 { navigation.goBack() }
         else if sender.selectedSegment == 1 { navigation.goForward() }
     }
+
 }
 
 @MainActor
@@ -260,7 +282,8 @@ private final class SidebarSetCellView: NSTableCellView {
 
 @MainActor
 private final class WorkspaceSidebarController: NSViewController, NSTableViewDataSource, NSTableViewDelegate {
-    private enum Row: Equatable { case set(UUID), settings, page(WorkspacePage) }
+    private enum Row: Equatable { case set(UUID), templates, template(String), settings, page(WorkspacePage) }
+    private let templates: ShareTemplateStore
     private let editor: PackEditorModel
     private let navigation: WorkspaceNavigation
     private let table = NSTableView()
@@ -273,7 +296,8 @@ private final class WorkspaceSidebarController: NSViewController, NSTableViewDat
     private var createPopover: NSPopover?
     private var updating = false
 
-    init(editor: PackEditorModel, navigation: WorkspaceNavigation) {
+    init(editor: PackEditorModel, navigation: WorkspaceNavigation, templates: ShareTemplateStore) {
+        self.templates = templates
         self.editor = editor
         self.navigation = navigation
         super.init(nibName: nil, bundle: nil)
@@ -338,6 +362,7 @@ private final class WorkspaceSidebarController: NSViewController, NSTableViewDat
             scroll.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             scroll.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -12)
         ])
+        templates.$templates.receive(on: DispatchQueue.main).sink { [weak self] _ in self?.reload() }.store(in: &subscriptions)
         editor.objectWillChange.receive(on: DispatchQueue.main).sink { [weak self] in self?.reload() }.store(in: &subscriptions)
         navigation.$history.map(\.current).removeDuplicates().receive(on: DispatchQueue.main).sink { [weak self] _ in self?.reload() }.store(in: &subscriptions)
         AppLocalization.shared.$language.receive(on: DispatchQueue.main).sink { [weak self] _ in self?.reload() }.store(in: &subscriptions)
@@ -353,16 +378,54 @@ private final class WorkspaceSidebarController: NSViewController, NSTableViewDat
         addButton.setAccessibilityLabel(L("New Set"))
         addButton.toolTip = L("New Set")
         addButton.isEnabled = editor.canEdit
-        rows = editor.sets.map { .set($0.id) } + [.settings] + [WorkspacePage.appearance, .todos, .general].map(Row.page)
+        rows = editor.sets.map { .set($0.id) } + [.templates] + templates.templates.map { .template($0.id) } + [.page(.community), .settings] + [WorkspacePage.appearance, .todos, .general].map(Row.page)
         table.reloadData()
-        let desired: Row = navigation.page == .sets ? .set(editor.selectedSetID) : .page(navigation.page)
+        let desired: Row
+        switch navigation.history.current {
+        case .imageSet(let id): desired = .set(id)
+        case .template(let code): desired = .template(code)
+        case .templates: desired = .templates
+        case .community, .communityPack: desired = .page(.community)
+        default: desired = .page(navigation.page)
+        }
         if let row = rows.firstIndex(of: desired) { table.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false) }
     }
     func numberOfRows(in tableView: NSTableView) -> Int { rows.count }
-    func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat { rows[row] == .settings ? 36 : 38 }
-    func tableView(_ tableView: NSTableView, isGroupRow row: Int) -> Bool { rows[row] == .settings }
-    func tableView(_ tableView: NSTableView, shouldSelectRow row: Int) -> Bool { rows[row] != .settings }
+    func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat { (rows[row] == .settings || rows[row] == .templates) ? 36 : 38 }
+    func tableView(_ tableView: NSTableView, isGroupRow row: Int) -> Bool { rows[row] == .settings || rows[row] == .templates }
+    func tableView(_ tableView: NSTableView, shouldSelectRow row: Int) -> Bool { rows[row] != .settings && rows[row] != .templates }
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
+        if rows[row] == .templates {
+            let title = NSButton(title: L("Templates"), target: self, action: #selector(showTemplates))
+            title.isBordered = false; title.font = .systemFont(ofSize: 11, weight: .medium)
+            title.contentTintColor = .secondaryLabelColor
+            let button = NSButton(title: L("Import"), target: self, action: #selector(importTemplate))
+            button.bezelStyle = .inline; button.font = .systemFont(ofSize: 11)
+            let group = NSStackView(views: [title, NSView(), button])
+            group.alignment = .centerY
+            group.edgeInsets = NSEdgeInsets(top: 0, left: 10, bottom: 0, right: 16)
+            return group
+        }
+        if case .template(let code) = rows[row], let template = templates.templates.first(where: { $0.id == code }) {
+            let cell = NSTableCellView()
+            let label = NSTextField(labelWithString: template.preview.manifest.name)
+            label.lineBreakMode = .byTruncatingTail; label.font = .systemFont(ofSize: 13)
+            let icon = NSImageView(image: NSImage(systemSymbolName: "square.stack", accessibilityDescription: nil) ?? NSImage())
+            icon.contentTintColor = .systemOrange
+            let manage = NSButton(title: L("Manage"), target: self, action: #selector(manageTemplate(_:)))
+            manage.bezelStyle = .inline; manage.font = .systemFont(ofSize: 11)
+            manage.identifier = NSUserInterfaceItemIdentifier(code)
+            for child in [label, icon, manage] { child.translatesAutoresizingMaskIntoConstraints = false; cell.addSubview(child) }
+            NSLayoutConstraint.activate([
+                icon.leadingAnchor.constraint(equalTo: cell.leadingAnchor), icon.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
+                icon.widthAnchor.constraint(equalToConstant: 20), icon.heightAnchor.constraint(equalToConstant: 20),
+                label.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 8), label.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
+                label.trailingAnchor.constraint(lessThanOrEqualTo: manage.leadingAnchor, constant: -4),
+                manage.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -14), manage.centerYAnchor.constraint(equalTo: cell.centerYAnchor)
+            ])
+            cell.textField = label; cell.imageView = icon; cell.toolTip = template.preview.manifest.name + " · " + code
+            return cell
+        }
         if rows[row] == .settings {
             let group = NSView()
             let label = NSTextField(labelWithString: L("Settings"))
@@ -392,6 +455,7 @@ private final class WorkspaceSidebarController: NSViewController, NSTableViewDat
             symbol = "shippingbox"
             presetArtwork = editor.cover(for: set)
             active = id == editor.activeSetID
+        case .templates, .template: return cell
         case .settings: name = L("Settings"); symbol = ""; presetArtwork = nil
         case .page(let page): name = page.title; symbol = page.symbol; presetArtwork = nil; iconTint = page.tint
         }
@@ -475,8 +539,16 @@ private final class WorkspaceSidebarController: NSViewController, NSTableViewDat
             navigation.visit(.imageSet(id))
         case .page(let page):
             navigation.visit(page)
+        case .template(let code): navigation.visit(.template(code))
+        case .templates: navigation.visit(SettingsDestination.templates)
         case .settings: break
         }
+    }
+    @objc private func showTemplates() { navigation.visit(SettingsDestination.templates) }
+    @objc private func importTemplate() { templates.showsImport = true }
+    @objc private func manageTemplate(_ sender: NSButton) {
+        guard let code = sender.identifier?.rawValue else { return }
+        navigation.visit(.template(code)); templates.managementCode = code
     }
     @objc private func showSetMenu(_ sender: NSButton) {
         guard let rawID = sender.identifier?.rawValue, let id = UUID(uuidString: rawID),
@@ -567,8 +639,8 @@ private final class WorkspaceSidebarController: NSViewController, NSTableViewDat
 
 @MainActor
 private final class WorkspaceContentController: NSHostingController<WorkspaceContentView> {
-    init(model: TypingPetSettingsModel, todoStore: TodoStore, updater: UpdateController, editor: PackEditorModel, navigation: WorkspaceNavigation) {
-        super.init(rootView: WorkspaceContentView(model: model, todoStore: todoStore, updater: updater, editor: editor, navigation: navigation))
+    init(model: TypingPetSettingsModel, todoStore: TodoStore, updater: UpdateController, editor: PackEditorModel, navigation: WorkspaceNavigation, templates: ShareTemplateStore) {
+        super.init(rootView: WorkspaceContentView(model: model, todoStore: todoStore, updater: updater, editor: editor, navigation: navigation, templates: templates))
         sizingOptions = []
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -580,13 +652,28 @@ private struct WorkspaceContentView: View {
     let updater: UpdateController
     @ObservedObject var editor: PackEditorModel
     @ObservedObject var navigation: WorkspaceNavigation
+    @ObservedObject var templates: ShareTemplateStore
     var body: some View {
         Group {
-            if navigation.page == .sets { NativeSetWorkspace(editor: editor) }
-            else { NativeSettingsPages(model: model, todoStore: todoStore, updater: updater, navigation: navigation) }
+            if navigation.page == .sets { NativeSetWorkspace(editor: editor, templates: templates) }
+            else if case .template(let code) = navigation.history.current {
+                TemplateDetailView(code: code, editor: editor, templates: templates).id(code)
+            } else if case .communityPack(let code) = navigation.history.current {
+                TemplateDetailView(code: code, editor: editor, templates: templates, onReceived: { navigation.visit(.template($0)) }).id("community-" + code)
+            } else if navigation.page == .community {
+                CommunityGalleryView { navigation.visit(.communityPack($0)) }
+            } else if navigation.page == .templates {
+                TemplateLibraryView(templates: templates) { navigation.visit(.template($0)) }
+            } else { NativeSettingsPages(model: model, todoStore: todoStore, updater: updater, navigation: navigation) }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             SettingsLinksFooter()
+        }
+        .sheet(isPresented: $templates.showsImport) {
+            TemplateImportPanel(templates: templates) { code in navigation.visit(.template(code)) }
+        }
+        .sheet(isPresented: Binding(get: { templates.managementCode != nil }, set: { if !$0 { templates.managementCode = nil } })) {
+            if let code = templates.managementCode { TemplateManagementPanel(code: code, editor: editor, templates: templates).id(code) }
         }
         .onReceive(model.$imageSets) { _ in editor.refresh() }
     }
@@ -734,7 +821,7 @@ private struct NativeSettingsPages: View {
     var body: some View {
         Group {
                 switch navigation.page {
-                case .sets: EmptyView()
+                case .sets, .templates, .community: EmptyView()
                 case .appearance: GeneralSettingsView(model: model, updater: updater, scope: .pet)
                 case .todos: TodoSettingsView(store: todoStore)
                 case .general: GeneralSettingsView(model: model, updater: updater, scope: .system)

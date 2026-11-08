@@ -11,6 +11,7 @@ import urllib.request
 from urllib.parse import urlsplit
 from datetime import datetime, timezone
 from downloads import IMMUTABLE_CACHE, download_targets, latest_url
+from http_transport import urlopen
 
 BASE = 'https://typing-pet.miel.ing'
 
@@ -69,7 +70,7 @@ def main():
     for language, config in locales.items():
         for suffix in ('', 'changelog/'):
             path = f'/{language}/{suffix}'
-            with urllib.request.urlopen(BASE + path, timeout=20) as response:
+            with urlopen(BASE + path, timeout=20) as response:
                 html = response.read().decode()
                 status, cache = response.status, response.headers.get('Cache-Control')
             page = Page()
@@ -105,15 +106,15 @@ def main():
             for asset in page.assets:
                 if asset in result['assets']:
                     continue
-                with urllib.request.urlopen(urllib.request.Request(BASE + asset, method='HEAD'), timeout=20) as response:
+                with urlopen(urllib.request.Request(BASE + asset, method='HEAD'), timeout=20) as response:
                     require(response.status == 200 and 'immutable' in response.headers.get('Cache-Control', ''), f'Asset or cache failed: {asset}')
                     result['assets'][asset] = {'status': response.status, 'cache_control': response.headers['Cache-Control']}
                 if asset == theme_script[1]:
-                    with urllib.request.urlopen(BASE + asset, timeout=20) as response:
+                    with urlopen(BASE + asset, timeout=20) as response:
                         digest = hashlib.sha256(response.read()).hexdigest()
                     require(digest[:12] == theme_script[2], 'Theme bootstrap fingerprint mismatch')
                     result['assets'][asset]['sha256'] = digest
-    with urllib.request.urlopen(BASE + '/assets/social-preview.png', timeout=20) as response:
+    with urlopen(BASE + '/assets/social-preview.png', timeout=20) as response:
         image = response.read()
         require(image[:8] == b'\x89PNG\r\n\x1a\n', 'OG image is not a PNG')
         dimensions = struct.unpack('>II', image[16:24])
@@ -145,7 +146,7 @@ def main():
             target = targets[f'{source}:{kind}']
             check = redirect(url, target)
             redirect(url, target, 'HEAD')
-            with urllib.request.urlopen(url, timeout=60) as response:
+            with urlopen(url, timeout=60) as response:
                 data = response.read()
                 digest = hashlib.sha256(data).hexdigest()
                 require(response.status == 200 and len(data) == asset['size'] and digest == asset['sha256'],
@@ -165,19 +166,19 @@ def main():
                               'asset_cache_control': response.headers.get('Cache-Control')})
             result['downloads'][url] = check
         direct = targets[f'direct:{kind}']
-        with urllib.request.urlopen(urllib.request.Request(direct, headers={'Range': 'bytes=0-31'}), timeout=20) as response:
+        with urlopen(urllib.request.Request(direct, headers={'Range': 'bytes=0-31'}), timeout=20) as response:
             require(response.status == 206 and len(response.read()) == 32, f'{kind} Range download failed')
             require(response.headers.get('Cache-Control') == IMMUTABLE_CACHE, f'{kind} Range cache failed')
             result['downloads'][latest_url('direct', kind)]['range_status'] = response.status
         try:
-            urllib.request.urlopen(urllib.request.Request(direct, headers={'If-None-Match': etag}), timeout=20)
+            urlopen(urllib.request.Request(direct, headers={'If-None-Match': etag}), timeout=20)
             raise RuntimeError(f'Expected conditional response: {kind}')
         except urllib.error.HTTPError as response:
             with response:
                 require(response.code == 304 and response.headers.get('Cache-Control') == IMMUTABLE_CACHE,
                         f'{kind} conditional cache failed')
                 result['downloads'][latest_url('direct', kind)]['conditional_status'] = response.code
-        with urllib.request.urlopen(asset['checksumUrl'], timeout=20) as response:
+        with urlopen(asset['checksumUrl'], timeout=20) as response:
             checksum = response.read().decode().split()[0]
             require(checksum == asset['sha256'], f'{kind} checksum differs')
 
@@ -208,7 +209,7 @@ def main():
                 result['download_boundaries'][f'{method} {path}'] = response.code
     for path in ('/missing-page', '/.env', '/release.json', '/relay/admin', '/relay/flags'):
         try:
-            urllib.request.urlopen(BASE + path, timeout=20)
+            urlopen(BASE + path, timeout=20)
             raise RuntimeError(f'Unexpected public file: {path}')
         except urllib.error.HTTPError as response:
             require(response.code == 404 and response.headers.get('Cache-Control') == 'no-store', f'Unexpected missing-file response: {path}')
@@ -216,7 +217,7 @@ def main():
     for path, method in (('/relay/e/', 'GET'), ('/relay/i/v0/e/', 'GET'), ('/ko/', 'POST'), ('/relay/flags', 'POST')):
         request = urllib.request.Request(BASE + path, method=method, data=b'{}' if method == 'POST' else None)
         try:
-            urllib.request.urlopen(request, timeout=20)
+            urlopen(request, timeout=20)
             raise RuntimeError(f'Unexpected method accepted: {method} {path}')
         except urllib.error.HTTPError as response:
             require(response.code == 405 and response.headers.get('Cache-Control') == 'no-store', f'Unexpected method policy: {method} {path}')

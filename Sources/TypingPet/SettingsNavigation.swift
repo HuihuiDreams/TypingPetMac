@@ -1,7 +1,7 @@
 import Foundation
 
 enum SettingsDestination: Equatable {
-    case imageSet(UUID), appearance, todos, general
+    case imageSet(UUID), templates, template(String), community, communityPack(String), appearance, todos, general
 }
 
 struct SettingsNavigationHistory {
@@ -35,4 +35,17 @@ struct SettingsNavigationHistory {
         if entries.isEmpty { entries = [.imageSet(fallbackID)]; index = 0 }
         else if !currentSurvives { visit(.imageSet(fallbackID)) }
     }
+
+    mutating func removeDeletedTemplates(validCodes: Set<String>) {
+        let retained = entries.enumerated().filter { _, destination in
+            if case .template(let code) = destination { return validCodes.contains(code) }
+            return true
+        }
+        let currentSurvives = retained.contains { $0.offset == index }
+        index = retained.lastIndex { $0.offset <= index } ?? 0
+        entries = retained.map(\.element)
+        if entries.isEmpty { entries = [.templates]; index = 0 }
+        else if !currentSurvives { visit(.templates) }
+    }
+
 }

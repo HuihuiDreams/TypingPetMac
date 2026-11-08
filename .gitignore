@@ -25,3 +25,9 @@ __pycache__/
 !/docs/architecture.md
 !/docs/TypingPetMac-threat-model.md
 !/docs/archive/
+
+# Share service virtual environment.
+scripts/share-service/.venv/
+
+# Cloudflare local account discovery cache.
+.cloudflare/

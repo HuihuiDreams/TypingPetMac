@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+### Added
+
+- 同步上游原作者更新（v0.20.0、v0.20.1、v0.21.0）：
+  - **基于 6 位共享代码与管理密码的动作包在线交换 (`LocalShareAPI`, `ShareTemplateStore`)**：支持通过 6 位随机代码发布只读模板快照，支持密码保护的版本更新与停止分发；模板更新或删除不影响用户已复制的独立本地副本；内置严密的安全解包校验（防 Zip 炸弹、路径穿越、非法文件格式及哈希校验）。
+  - **设置面板模板管理工作区与社区公开素材画廊 (`TemplateWorkspace`, `CommunityGalleryView`)**：新增侧边栏“模板”分组，支持 6 位大输入框、粘贴回退与图片集预览；支持社区公开素材画廊浏览、版本下拉预览与导入；集成独立管理密码解锁。
+  - **键盘映射与版本历史回放预览 (`TemplateKeyboardPreview`, `TemplateVersionPreview`)**：支持在导入前预览任意发布版本的动作帧、打字回放与键盘映射配置。
+  - **服务端支撑脚本与管理台**：包含 `scripts/share_dev_server.py` 本地开发服务、`scripts/test_share_service.py` 自动化测试套件以及管理员审核控制台。
+
+### Changed
+
+- 同步版本号至 0.21.0（Build 38）。
+- 适配 Swift Testing 迁移，补齐 `SettingsNavigationTests` 中的模板历史导航断言并保证多测试框架兼容。
+- 完善 `Localizable.strings` 5 语种本地化文案，补充动作包在线交换、社区画廊与模板管理文案。
+
 ## [0.20.0] - 2026-11-04
 
 ### Added

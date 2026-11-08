@@ -50,4 +50,21 @@ import Testing
         #expect(empty.current == .imageSet(kept))
         #expect(!empty.canGoBack)
     }
+    @Test func templateHistoryKeepsLocalSetsAndPrunesDeletedTemplates() {
+        let local = UUID()
+        var history = SettingsNavigationHistory(initial: .imageSet(local))
+        history.visit(.templates)
+        history.visit(.template("AB12CD"))
+        history.visit(.general)
+        history.goBack()
+        #expect(history.current == .template("AB12CD"))
+        history.removeDeletedSets(validIDs: [local], fallbackID: local)
+        #expect(history.current == .template("AB12CD"))
+        history.removeDeletedTemplates(validCodes: [])
+        #expect(history.current == .templates)
+        #expect(!history.entries.contains(.template("AB12CD")))
+        history.goBack()
+        #expect(history.current == .imageSet(local))
+    }
+
 }
