@@ -106,6 +106,12 @@ final class ShareExchangeTests: XCTestCase {
         XCTAssertThrowsError(try LocalShareAPI.unpack(symlink, into: fixture.store))
     }
 
+    @MainActor func testArchiveValidatorRejectsShortAndMalformedData() {
+        XCTAssertThrowsError(try ShareArchiveValidator.validate(Data([0x01, 0x02, 0x03])))
+        XCTAssertThrowsError(try ShareArchiveValidator.validate(Data()))
+        XCTAssertThrowsError(try ShareArchiveValidator.validate(Data(repeating: 0xaa, count: 64)))
+    }
+
     @MainActor func testKeyboardMappingsAndPlaybackSurviveSharingAndSelectedVersionImport() throws {
         let fixture = try Fixture(); defer { fixture.clean() }
         let source = fixture.store.library.activeSet

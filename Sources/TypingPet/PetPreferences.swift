@@ -58,6 +58,10 @@ enum AppPreferencesKey {
     /// JSON encoded key reaction rules mapping key strokes to custom images (`Data`).
     static let keyReactionRules = "keyReactionRules-v1"
 
+    // MARK: - Template & Pack Share Exchange
+    /// Dictionary mapping image set UUIDs to their published 6-character share codes (`[String: String]`).
+    static let localShareCodes = "localShareCodes-v1"
+
     // MARK: - Todo Bubble & Focus Timer
     /// Todo bubble zoom scale factor (`Double`).
     static let todoBubbleZoom = "todoBubbleZoom"

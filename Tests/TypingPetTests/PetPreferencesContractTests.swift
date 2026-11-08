@@ -63,6 +63,39 @@ struct PetPreferencesContractTests {
         #expect(activeIDString == set.id.uuidString)
     }
 
+    @Test func shareCodesPersistUsingCentralizedPreferencesKey() {
+        let set = PetImageSet(
+            id: UUID(),
+            name: "Share Test Set",
+            storageFolder: "test",
+            idleFileName: "idle.png",
+            reactionFileNames: [],
+            isBuiltIn: false
+        )
+        let code = "XY99ZZ"
+        let original = AppEnvironment.defaults.dictionary(forKey: AppPreferencesKey.localShareCodes)
+        defer {
+            if let original {
+                AppEnvironment.defaults.set(original, forKey: AppPreferencesKey.localShareCodes)
+            } else {
+                AppEnvironment.defaults.removeObject(forKey: AppPreferencesKey.localShareCodes)
+            }
+        }
+
+        LocalShareAPI.remember(code, for: set)
+        let rawDict = AppEnvironment.defaults.dictionary(forKey: AppPreferencesKey.localShareCodes) as? [String: String]
+        #expect(rawDict?[set.id.uuidString] == code)
+        #expect(LocalShareAPI.code(for: set) == code)
+    }
+
+    @Test func normalizedCodeCleansAndTruncatesCorrectly() {
+        #expect(LocalShareAPI.normalizedCode("ab12cd") == "AB12CD")
+        #expect(LocalShareAPI.normalizedCode("  ab-12_cd! ") == "AB12CD")
+        #expect(LocalShareAPI.normalizedCode("🐾한글测试AB12CD") == "AB12CD")
+        #expect(LocalShareAPI.normalizedCode("ABCDEF123456") == "ABCDEF")
+        #expect(LocalShareAPI.normalizedCode("") == "")
+    }
+
     @Test func globalKeyMonitorLifecycleAndSafeTeardown() {
         var strokeReceived: KeyStroke?
         let monitor = GlobalKeyMonitor { stroke in
@@ -116,9 +149,10 @@ struct PetPreferencesContractTests {
             AppPreferencesKey.updateFeedURL,
             AppPreferencesKey.inputMonitoringWelcomeShown,
             AppPreferencesKey.inputMonitoringSetupPending,
+            AppPreferencesKey.localShareCodes,
         ]
 
-        #expect(allKeys.count == 37)
+        #expect(allKeys.count == 38)
         let uniqueKeys = Set(allKeys)
         #expect(uniqueKeys.count == allKeys.count)
         for key in allKeys {

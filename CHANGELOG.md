@@ -15,6 +15,8 @@
 - 同步版本号至 0.21.0（Build 38）。
 - 适配 Swift Testing 迁移，补齐 `SettingsNavigationTests` 中的模板历史导航断言并保证多测试框架兼容。
 - 完善 `Localizable.strings` 5 语种本地化文案，补充动作包在线交换、社区画廊与模板管理文案。
+- 收敛共享代码偏好设置键（`AppPreferencesKey.localShareCodes`）：消除 `LocalShareAPI` 中的硬编码 UserDefaults 键字面量，全量纳入 `PetPreferencesContractTests`（键数扩充至 38 项）并新增代码持久化与规范化清洗（`normalizedCode`）测试。
+- 补齐动作包模板磁盘物理清理与归档校验测试：在 `DiskCleanupTests` 中新增 `removeTemplateDeletesPhysicalDirectoryOnDisk` 断言模板删除时磁盘专属目录彻底移除；在 `ShareExchangeTests` 中补齐 `ShareArchiveValidator` 对空包及损坏包的快速失败断言。
 
 ## [0.20.0] - 2026-11-04
 

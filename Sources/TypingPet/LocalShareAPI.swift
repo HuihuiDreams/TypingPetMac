@@ -118,7 +118,7 @@ enum LocalShareAPI {
     static func normalizedCode(_ text: String) -> String {
         String(text.uppercased().filter { $0.isASCII && ($0.isLetter || $0.isNumber) }.prefix(6))
     }
-    private static let codesKey = "localShareCodes-v1"
+    private static let codesKey = AppPreferencesKey.localShareCodes
 
     static func code(for set: PetImageSet) -> String? {
         (AppEnvironment.defaults.dictionary(forKey: codesKey) as? [String: String])?[set.id.uuidString]

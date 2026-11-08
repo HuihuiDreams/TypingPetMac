@@ -83,4 +83,51 @@ struct DiskCleanupTests {
         #expect(!fileManager.fileExists(atPath: file1.path))
         #expect(fileManager.fileExists(atPath: file2.path))
     }
+
+    @Test func removeTemplateDeletesPhysicalDirectoryOnDisk() throws {
+        let fileManager = FileManager.default
+        let tempRoot = fileManager.temporaryDirectory.appendingPathComponent("TypingPetTemplateDiskTest-\(UUID().uuidString)", isDirectory: true)
+        let templatesDir = tempRoot.appendingPathComponent("Templates", isDirectory: true)
+        let imagesDir = tempRoot.appendingPathComponent("Images", isDirectory: true)
+        let keysDir = tempRoot.appendingPathComponent("Keys", isDirectory: true)
+        try fileManager.createDirectory(at: tempRoot, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: tempRoot) }
+
+        let suite = "TypingPetTemplateDiskTest.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let library = PetImageLibrary(fileManager: fileManager, defaults: defaults, imagesDirectory: imagesDir)
+        let keyStore = KeyReactionStore(fileManager: fileManager, defaults: defaults, directory: keysDir)
+        let store = PetPackStore(library: library, keyStore: keyStore)
+        let templates = ShareTemplateStore(directory: templatesDir)
+
+        let package = try LocalShareAPI.package(
+            configuration: store.activeConfiguration,
+            set: store.library.activeSet,
+            store: store,
+            message: "disk test"
+        )
+        let (root, manifest) = try LocalShareAPI.extract(package)
+        defer { try? fileManager.removeItem(at: root) }
+
+        let preview = LocalSharePreview(
+            code: "AB12CD",
+            status: "active",
+            latestVersion: 1,
+            manifest: manifest,
+            packageSize: package.count,
+            sha256: "test-hash",
+            publishedAt: 1
+        )
+
+        try templates.install(package, preview: preview)
+        let template = try #require(templates.templates.first)
+        let templateFolder = templatesDir.appendingPathComponent(template.folder)
+        #expect(fileManager.fileExists(atPath: templateFolder.path))
+
+        try templates.remove(template)
+        #expect(!fileManager.fileExists(atPath: templateFolder.path))
+        #expect(templates.templates.isEmpty)
+    }
 }
